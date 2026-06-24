@@ -22,6 +22,10 @@ Notes
 - Model definitions are global, edited from the "Models > Edit models..." menu.
 - Cards/nodes use typed ports and the editor validates connections.
 - Only clean JSON import/export is supported; NodeGraphQt session save/load was removed.
+- Import is ADDITIVE: importing a clean JSON adds it next to the current graph
+  (with fresh ids, shifted clear of existing content), so you can decompose a flow
+  into subflows, export each, and import them all into one file to wire together.
+  Use "File > New" to start from a blank canvas.
 - SoftBuffer probabilities are stored by connected output node id, not by order.
 - FirstTask model probabilities are edited with a model picker, not comma-separated text.
 - HardBuffer is the old "Buffer"; SoftBuffer is the old "Buffer Tree".
@@ -1390,7 +1394,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         file_menu = self.menuBar().addMenu("File")
 
         act_new = file_menu.addAction("New")
-        act_import = file_menu.addAction("Import clean JSON...")
+        act_import = file_menu.addAction("Import clean JSON (add)...")
         act_export = file_menu.addAction("Export clean JSON...")
 
         act_new.triggered.connect(self.new_graph)
@@ -2440,17 +2444,107 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.import_clean_json(data)
         self.statusBar().showMessage(f"Imported clean JSON: {path}")
 
+    def _remap_ids(self, data: dict) -> dict:
+        """Return a deep copy of *data* with every node id replaced by a fresh unique
+        id, and every reference to those ids (connections, backdrop membership,
+        SoftBuffer buffer_probs, resource/operator quantities, ...) rewritten to match.
+
+        This lets the same subflow be imported several times, and stops two
+        independently-authored subflows from clashing on a shared id.
+        """
+        data = json.loads(json.dumps(data))  # deep copy
+
+        mapping = {}
+        for node in data.get("nodes", []):
+            if isinstance(node, dict) and node.get("id"):
+                kind = str(node.get("kind", "node")).lower()
+                mapping[node["id"]] = new_uid(kind)
+
+        def walk(obj):
+            if isinstance(obj, dict):
+                return {k: walk(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [walk(v) for v in obj]
+            if isinstance(obj, str) and obj in mapping:
+                return mapping[obj]
+            return obj
+
+        return walk(data)
+
+    def _offset_imported_positions(self, data: dict, padding: float = 200.0) -> dict:
+        """Shift every imported card/backdrop so the new block sits to the right of
+        whatever is already on the canvas (no overlap). No-op on an empty canvas."""
+        existing = self.content_bounds()
+        if existing is None:
+            return data
+
+        ex_left, ex_top, ex_right, ex_bottom = existing
+
+        xs, ys = [], []
+        for group in (data.get("nodes", []), data.get("backdrops", [])):
+            for item in group:
+                pos = item.get("position") if isinstance(item, dict) else None
+                if isinstance(pos, list) and len(pos) >= 2:
+                    xs.append(pos[0])
+                    ys.append(pos[1])
+        if not xs:
+            return data
+
+        dx = (ex_right + padding) - min(xs)
+        dy = ex_top - min(ys)
+
+        for group in (data.get("nodes", []), data.get("backdrops", [])):
+            for item in group:
+                pos = item.get("position") if isinstance(item, dict) else None
+                if isinstance(pos, list) and len(pos) >= 2:
+                    item["position"] = [pos[0] + dx, pos[1] + dy]
+        return data
+
+    def _merge_models(self, imported_models: list) -> None:
+        """Union imported models into the global registry (by name). Existing models
+        win; a name imported with a different parent is reported, not overwritten."""
+        if not hasattr(self, "model_registry") or self.model_registry is None:
+            self.model_registry = []
+
+        existing = {m.get("name"): m for m in self.model_registry if m.get("name")}
+        conflicts = []
+        for model in imported_models or []:
+            name = model.get("name")
+            if not name:
+                continue
+            if name in existing:
+                if (existing[name].get("parent") or None) != (model.get("parent") or None):
+                    conflicts.append(name)
+                continue
+            entry = {"name": name, "parent": model.get("parent") or None}
+            self.model_registry.append(entry)
+            existing[name] = entry
+
+        if conflicts:
+            qmessage(
+                self,
+                "Model conflict",
+                "These imported models already exist with a different parent and were "
+                "kept as-is:\n- " + "\n- ".join(conflicts),
+                QtWidgets.QMessageBox.Warning,
+            )
+
     def import_clean_json(self, data: dict):
         """
-        Imports clean JSON only.
+        Imports clean JSON, ADDING it to the current graph (subflows compose).
+
+        The imported block is given fresh ids and shifted clear of existing content,
+        so you can import several subflows into one file and wire them together.
+        Use File > New to start from a blank canvas.
 
         It reconstructs:
         - cards
         - typed connections
         - persistent backdrop groups
         """
-        self.graph.clear_session()
-        self.model_registry = data.get("models", [])
+        data = self._remap_ids(data)
+        data = self._offset_imported_positions(data)
+        self._merge_models(data.get("models", []))
 
         id_to_node = {}
 
