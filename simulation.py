@@ -1,3 +1,27 @@
+"""
+Performance-optimized variant of simulation.py.
+
+Same modelling semantics as simulation.py, but the CPU-heavy ``standby()`` polling
+in the batch collectors has been replaced with event-driven waiting:
+
+* GreedyBatchCollector blocks on ``from_store(...)``, which salabim wakes natively
+  the instant a matching piece is added to an input buffer (no per-event polling).
+* AltruisticBatchCollector blocks on lightweight per-buffer "arrival" signal states
+  that are created lazily and only touched when an altruistic collector is present,
+  so a greedy-only model pays nothing for them.
+
+Other optimizations:
+* PickyPieceTaker.can_take is memoized per resolved model (the capability walk over
+  the model parent chain is computed once per distinct model).
+* Pieces carry a creation timestamp so monitors can measure lead time to a buffer.
+* HardBuffers expose hooks (arrival monitors) used by graph_parser_advanced.
+
+Because event ordering changes, a given random seed will NOT reproduce the exact
+same numbers as simulation.py, but the model behaves identically in distribution.
+The public surface (class names, ``env``, ``sim``) is unchanged so it is a drop-in
+replacement for ``from simulation import *``.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -64,13 +88,20 @@ class Piece(sim.Component):
 class PickyPieceTaker:
     def __init__(self, valid_models: list[Model]) -> None:
         self.valid_models = valid_models
+        # Memoize the capability walk: each distinct resolved model is classified once.
+        self._take_cache: dict[Model, bool] = {}
 
     def can_take(self, obj: Piece | Model) -> bool:
         model = obj.model if isinstance(obj, Piece) else obj
+        cached = self._take_cache.get(model)
+        if cached is not None:
+            return cached
         can_take_piece = False
-        while model is not None and not can_take_piece:
-            can_take_piece |= model in self.valid_models
-            model = model.parent
+        m = model
+        while m is not None and not can_take_piece:
+            can_take_piece |= m in self.valid_models
+            m = m.parent
+        self._take_cache[model] = can_take_piece
         return can_take_piece
 
     def can_flush_into(self, other: PickyPieceTaker):
@@ -96,8 +127,26 @@ class PickyPieceTaker:
         return ppt1.can_flush_into(ppt2) and ppt2.can_flush_into(ppt1)
 
 
+def _note_buffer_arrival(buffer, piece: Piece) -> None:
+    """Hook fired whenever a piece is stored into a buffer.`
+
+    Updates any attached arrival monitors (lead time since piece creation) and
+    wakes altruistic collectors waiting on this buffer. Both branches are skipped
+    for buffers without monitors / waiters, so greedy-only models pay nothing.
+    """
+    monitors = getattr(buffer, "arrival_monitors", None)
+    if monitors:
+        delay = env.now() - piece.creation_time()
+        for mon in monitors:
+            mon.tally(delay)
+
+    signal = getattr(buffer, "arrival_signal", None)
+    if signal is not None:
+        signal.set(signal.value() + 1)
+
+
 class PiecePlacer(sim.Component):
-    def setup(self, pieces: list[Piece], bufs_out: list[Buffer | BufferTree]):
+    def setup(self, pieces: list[Piece], bufs_out: list[Buffer]):
         self.pieces = pieces
         self.bufs_out = bufs_out
         self.done = sim.State(value=False)
@@ -106,10 +155,9 @@ class PiecePlacer(sim.Component):
         for piece in self.pieces:
             for buf_out in self.bufs_out:
                 if buf_out.can_take(piece):
-                    if isinstance(buf_out, SoftBuffer):
-                        self.to_store(buf_out.choose_buffer(), piece)
-                    else:
-                        self.to_store(buf_out, piece)
+                    target = buf_out.choose_buffer() if isinstance(buf_out, SoftBuffer) else buf_out
+                    self.to_store(target, piece)
+                    _note_buffer_arrival(target, piece)
                     break
 
         self.done.set(True)
@@ -127,6 +175,10 @@ class Buffer(PickyPieceTaker):
 class HardBuffer(sim.Store, Buffer):
     def setup(self, valid_models: list[Model]) -> None:
         PickyPieceTaker.__init__(self, valid_models)
+        # Monitor hooks (populated by graph_parser_advanced when a Monitor card is attached).
+        self.arrival_monitors: list[sim.Monitor] = []
+        # Lazily created arrival signal (only when an altruistic collector subscribes).
+        self.arrival_signal = None
 
 
 class SoftBuffer(Buffer):
@@ -144,7 +196,7 @@ class SoftBuffer(Buffer):
                 return self.bufs_out[i]
         return self.bufs_out[-1]
 
-    def init(self, bufs_out_probs: list[tuple[Buffer, float]]) -> bool:
+    def init(self, bufs_out_probs: list[tuple[Buffer, float]]) -> None:
         if not all(PickyPieceTaker.same_valid_models(bufs_out_probs[0][0], buf_out) for buf_out, _ in bufs_out_probs):
             raise ValueError("All buffers in soft buffer must accept the same models")
 
@@ -168,7 +220,19 @@ class BatchCollector(sim.Component):
     def setup(self, task: Task) -> None:
         self.task = task
         self.collected_pieces = []
+        self.reserved_slots = 0
         self.done = sim.State(value=False)
+
+    def reserve_slot(self):
+        self.request((self.task.vacant_slots, 1))
+        self.reserved_slots += 1
+
+    def release_reserved_slots(self):
+        if self.reserved_slots <= 0:
+            return
+        self.release()
+        self.reserved_slots = 0
+        self.task.notify_slot_freed()
 
     def update_done(self):
         self.done.set(len(self.collected_pieces) >= self.task.config.min_capacity)
@@ -176,35 +240,72 @@ class BatchCollector(sim.Component):
 
 class GreedyBatchCollector(BatchCollector):
     def process(self):
-        while not self.done.get():
-            for buf_in in self.task.bufs_in:
-                for piece in buf_in:
-                    if self.task.can_take(piece) and self.task.vacant_slots.available_quantity() > 0:
-                        self.from_store(buf_in, filter=lambda p: p is piece)
-                        self.collected_pieces.append(piece)
-                        self.request((self.task.vacant_slots, 1))
+        task = self.task
+        min_cap = task.config.min_capacity
 
-            self.update_done()
-            if not self.done.get():
-                self.standby()
+        # Phase 1 -- reach min_capacity, blocking efficiently for slots and pieces.
+        while len(self.collected_pieces) < min_cap:
+            self.reserve_slot()
+            piece = self.from_store(task.bufs_in, filter=task.can_take)  # blocks until matching piece
+            self.collected_pieces.append(piece)
+
+        # Phase 2 -- greedily absorb pieces already waiting, up to remaining WIP capacity.
+        while task.vacant_slots.available_quantity() > 0:
+            piece = self.from_store(task.bufs_in, filter=task.can_take, fail_delay=0)
+            if piece is None:                                          # nothing available right now
+                break
+            self.reserve_slot()
+            self.collected_pieces.append(piece)
+
+        self.update_done()
 
 
 class AltruisticBatchCollector(BatchCollector):
+    """Event-driven altruistic collector.
+
+    Semantics preserved: only ever grab pieces when a full batch of at least
+    ``min_capacity`` can be formed at once (so pieces are never held hostage while
+    waiting). Instead of polling via standby(), it blocks on lightweight per-buffer
+    arrival signals plus the task slot signal, which are bumped only when an
+    altruistic collector is actually waiting.
+    """
+
     def process(self):
-        while not self.done.get():
-            valid_pieces = [(piece, buf_in) for buf_in in self.task.bufs_in for piece in buf_in if
-                            self.task.can_take(piece)]
-            valid_pieces = valid_pieces[:self.task.vacant_slots.available_quantity()]
+        task = self.task
+        min_cap = task.config.min_capacity
 
-            if len(valid_pieces) >= self.task.config.min_capacity:
+        # Make sure the signals this collector waits on exist (lazy, greedy-only models skip this).
+        for buf_in in task.bufs_in:
+            if buf_in.arrival_signal is None:
+                buf_in.arrival_signal = sim.State("arrival." + buf_in.name(), value=0)
+        if task.slot_signal is None:
+            task.slot_signal = sim.State("slot." + task.name(), value=0)
+
+        while True:
+            capacity = int(task.vacant_slots.available_quantity())
+            valid_pieces = []
+            if capacity > 0:
+                for buf_in in task.bufs_in:
+                    for piece in buf_in:
+                        if task.can_take(piece):
+                            valid_pieces.append((piece, buf_in))
+                            if len(valid_pieces) >= capacity:
+                                break
+                    if len(valid_pieces) >= capacity:
+                        break
+
+            if len(valid_pieces) >= min_cap:
                 for piece, buf_in in valid_pieces:
-                    self.from_store(buf_in, filter=lambda p: p is piece)
+                    self.from_store(buf_in, filter=lambda p, q=piece: p is q)
                     self.collected_pieces.append(piece)
-                self.request((self.task.vacant_slots, len(valid_pieces)))
+                self.request((task.vacant_slots, len(valid_pieces)))
                 self.update_done()
+                return
 
-            if not self.done.get():
-                self.standby()
+            # Not enough to form a batch yet: block until inputs change (arrival or freed slot).
+            snapshot = [(buf_in.arrival_signal, buf_in.arrival_signal.value()) for buf_in in task.bufs_in]
+            snapshot.append((task.slot_signal, task.slot_signal.value()))
+            self.wait(*[(state, (lambda v, c, s, base=base: v != base)) for state, base in snapshot])
 
 
 ########
@@ -242,14 +343,18 @@ class Carrier(sim.Component):
 
         if self.batch_collector is not None:
             pieces = list(self.batch_collector.collected_pieces)
+            self.batch_collector.release_reserved_slots()
+            if not self.batch_collector.done.get():
+                self.batch_collector.cancel()
         else:
             pieces = list(self.loaded_pieces)
 
         if self.claimed_resources:
-            self.release(*self.claimed_resources)
+            self.release()
             self.claimed_resources = []
         if pieces:
-            self.request((self.task.vacant_slots, -len(pieces)))
+            if self.batch_collector is not None:
+                self.batch_collector.release_reserved_slots()
         if pieces and self.task.breakdown_bufs_out:
             placer = PiecePlacer(pieces=pieces, bufs_out=self.task.breakdown_bufs_out)
             self.wait((placer.done, True))
@@ -305,9 +410,9 @@ class Carrier(sim.Component):
         else:
             self.hold(self.task_duration)
 
-        self.release(*self.claimed_resources)
+        self.release()
         self.claimed_resources = []
-        self.request((self.task.vacant_slots, -len(self.loaded_pieces)))
+        self.task.notify_slot_freed()
         piece_placer = PiecePlacer(pieces=self.loaded_pieces, bufs_out=self.task.bufs_out)
         self.wait((piece_placer.done, True))
         self.done.set(True)
@@ -363,13 +468,19 @@ class Task(sim.Component, PickyPieceTaker):
         self.bufs_out = bufs_out
 
         self.active_carriers: list[Carrier] = []
-        self.vacant_slots = sim.Resource(capacity=config.max_capacity, anonymous=True)
+        self.vacant_slots = sim.Resource(capacity=config.max_capacity)
 
         self.started_up = sim.State(value=False)
         self.is_in_breakdown = sim.State(value=False)
         self.is_in_scheduled_shutdown = sim.State(value=False)
         self.has_breakdown = False
         self.breakdown_bufs_out = None
+        # Lazily created signal, bumped when a WIP slot frees (only altruistic collectors wait on it).
+        self.slot_signal = None
+
+    def notify_slot_freed(self) -> None:
+        if self.slot_signal is not None:
+            self.slot_signal.set(self.slot_signal.value() + 1)
 
     def process(self):
         while True:
@@ -471,6 +582,7 @@ class FirstTask(sim.Component, PickyPieceTaker):
             self.wait((piece_placer.done, True))
 
 
+
 ####################################
 # BREAKDOWNS & SCHEDULED SHUTDOWNS #
 ####################################
@@ -516,6 +628,7 @@ class ScheduledShutdowns:
         return None
 
 
+
 ########################
 # RESTOCKABLE RESOURCE #
 ########################
@@ -527,7 +640,7 @@ class Delivery(sim.Component):
 
     def process(self):
         self.hold(self.delivery_duration)
-        missing = self.stock.capacity - self.stock.available_quantity()
+        missing = self.stock.capacity.value - self.stock.available_quantity()
         if missing > 0:
             self.request((self.stock, -missing))
         self.stock.active_order = False
