@@ -247,14 +247,40 @@ elles ne sont pas respectées).
 
 ---
 
-## 9. Exporter, ré-importer
+## 9. Exporter, importer, et composer des sous-flux
 
 - **File → Export clean JSON…** écrit le flux (cartes, positions, connexions,
   modèles, *backdrops*) dans un fichier `.json`.
-- **File → Import clean JSON…** recharge un flux exporté, **aux mêmes positions** (et
-  les *backdrops* à leur taille d'origine).
+- **File → Import clean JSON (add)…** : l'import est **ADDITIF**. Le flux importé
+  **s'ajoute** à ce qui est déjà sur le canvas, **décalé sur la droite** pour ne
+  **jamais recouvrir** le contenu existant (ni un import précédent). Ses identifiants
+  sont **régénérés** à l'import, donc on peut importer **plusieurs fois le même
+  fichier** sans collision.
+- **File → New** : repartir d'un canvas vierge (c'est le seul moyen de « remplacer »
+  le contenu, puisque l'import n'efface plus rien).
 - La sauvegarde de session NodeGraphQt n'est **pas** utilisée : seul ce JSON propre
   fait foi.
+
+### Décomposer un grand flux en sous-flux
+
+Comme l'import est additif, vous pouvez **construire votre atelier par morceaux** :
+
+1. Concevez chaque **sous-flux** séparément (par ex. « injection cire », « finition »,
+   « contrôle qualité »), et **exportez** chacun dans son propre `.json`.
+2. Dans un fichier neuf (**File → New**), **importez-les les uns après les autres**
+   (**Import clean JSON (add)**). Chaque sous-flux arrive **côte à côte**, sans
+   chevauchement.
+3. **Reliez-les** dans l'éditeur : tirez les fils entre les ports des sous-flux (par
+   ex. le `bufs_out` d'une tâche du premier vers le `from_task` d'un stock du
+   second), en respectant les règles du §6.
+4. **Fusion des modèles** : les modèles des fichiers importés sont **unis** au registre
+   global (par nom). Si un nom existe déjà avec un **parent différent**, l'éditeur le
+   signale et **conserve** la définition en place — harmonisez vos modèles entre
+   sous-flux pour éviter les surprises.
+5. **Validez** (§8) puis **exportez** le grand flux complet.
+
+> 💡 Astuce : encadrez chaque sous-flux importé d'un *backdrop* titré (§10) pour
+> garder une vue claire de « qui est quoi » dans le grand assemblage.
 
 ---
 
