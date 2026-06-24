@@ -26,7 +26,16 @@ Notes
 - FirstTask model probabilities are edited with a model picker, not comma-separated text.
 - HardBuffer is the old "Buffer"; SoftBuffer is the old "Buffer Tree".
   A SoftBuffer may route to another SoftBuffer (nested probabilistic routing).
-- Backdrops are exported as clean JSON groups with their wrapped node ids.
+- Backdrops are exported as clean JSON groups with their wrapped node ids AND their
+  size, so importing restores them at the exact size they were saved at.
+
+Advanced additions (vs flow_designer.py)
+----------------------------------------
+- Monitor cards: drop a Monitor, name it, and connect a HardBuffer's "monitor" output
+  to it. Per-statistic checkboxes on the card pick which figures graph_parser_advanced
+  reports (average length, average stay time, average time before arrival, etc.).
+- Backdrop import/export now round-trips the backdrop size (width/height), fixing the
+  bug where re-imported backdrops came back at a different size.
 """
 
 from __future__ import annotations
@@ -79,9 +88,23 @@ PORT_COLORS = {
     "shutdown": (180, 100, 200),
     "interval": (160, 110, 220),
     "breakdown": (220, 90, 110),
+    "monitor": (110, 180, 200),
 }
 
 BUFFER_ROLES = ["Normal", "Exit", "Scrap"]
+
+# Statistics offered by a Monitor card: (property key, checkbox label, default enabled).
+# Keys must match MONITOR_STAT_DEFAULTS in graph_parser_advanced.py.
+MONITOR_STATS = [
+    ("avg_length", "avg length", True),
+    ("max_length", "max length", True),
+    ("length_std", "length std-dev", False),
+    ("current_length", "final length", False),
+    ("avg_stay", "avg stay time", True),
+    ("max_stay", "max stay time", False),
+    ("avg_time_before_arrival", "avg time before arrival", True),
+    ("throughput", "throughput", True),
+]
 
 # ============================================================
 # Helpers
@@ -458,6 +481,7 @@ class HardBufferNode(SimNode):
         super().__init__()
         self.add_input("from_task", multi_input=True, color=PORT_COLORS["task"])
         self.add_output("to_task", multi_output=True, color=PORT_COLORS["buffer"])
+        self.add_output("monitor", multi_output=True, color=PORT_COLORS["monitor"])
         self.create_property("valid_models", "[]")
         self.create_property("capacity", "inf")
         add_combo_input(self, "buffer_role", "role", BUFFER_ROLES, "Normal")
@@ -633,6 +657,32 @@ class BreakdownNode(SimNode):
             "mtbf": get_input_ref(self, "mtbf"),
             "mttr": get_input_ref(self, "mttr"),
             "bufs_out": get_output_refs(self, "bufs_out"),
+            "position": [self.x_pos(), self.y_pos()],
+        }
+
+
+class MonitorNode(SimNode):
+    NODE_NAME = "Monitor"
+    kind = "Monitor"
+    color = (55, 110, 125)
+
+    def __init__(self):
+        super().__init__()
+        self.add_input("buffer", color=PORT_COLORS["monitor"])
+        # One checkbox per statistic; toggled state is exported in "stats".
+        for key, label, default in MONITOR_STATS:
+            add_bool_input(self, key, label, default)
+
+    def to_clean_json(self) -> dict:
+        return {
+            "id": node_uid(self),
+            "kind": self.kind,
+            "name": self.name(),
+            "buffer": get_input_ref(self, "buffer"),
+            "stats": {
+                key: bool(self.get_property(key)) if self.has_property(key) else default
+                for key, _, default in MONITOR_STATS
+            },
             "position": [self.x_pos(), self.y_pos()],
         }
 
@@ -1263,6 +1313,10 @@ def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str
     if out_kind == "HardBuffer" and out_port == "to_task":
         return in_kind == "Task" and in_port == "bufs_in"
 
+    # HardBuffer taps a Monitor card (observation only, does not move pieces).
+    if out_kind == "HardBuffer" and out_port == "monitor":
+        return in_kind == "Monitor" and in_port == "buffer"
+
     # Tasks and FirstTasks feed buffers (hard or soft).
     if out_kind in {"Task", "FirstTask", "Breakdown"} and out_port == "bufs_out":
         return in_kind in {"HardBuffer", "SoftBuffer"} and in_port == "from_task"
@@ -1317,6 +1371,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             FirstTaskNode,
             TaskNode,
             BreakdownNode,
+            MonitorNode,
         ])
 
         self.setCentralWidget(self.graph.widget)
@@ -1383,6 +1438,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             ("First Task", "simulation.flow.FirstTaskNode"),
             ("Task", "simulation.flow.TaskNode"),
             ("Breakdown", "simulation.flow.BreakdownNode"),
+            ("Monitor", "simulation.flow.MonitorNode"),
         ]:
             action = create_menu.addAction(label)
             action.triggered.connect(lambda checked=False, t=cls_name: self.create_node(t))
@@ -1718,11 +1774,24 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
                 title = node.get_property("backdrop_title") if node.has_property("backdrop_title") else node.name()
 
+                # Persist the backdrop size so import restores it exactly instead of
+                # re-fitting to the wrapped nodes (which changed the size on reload).
+                width, height = None, None
+                try:
+                    width, height = node.size()
+                except Exception:
+                    if node.has_property("width"):
+                        width = node.get_property("width")
+                    if node.has_property("height"):
+                        height = node.get_property("height")
+
                 backdrops.append({
                     "id": node_uid(node),
                     "title": title,
                     "nodes": wrapped_node_ids,
                     "position": [node.x_pos(), node.y_pos()],
+                    "width": width,
+                    "height": height,
                 })
                 continue
 
@@ -1964,12 +2033,15 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
         return resource, order_duration, delivery_duration
 
-    def add_backdrop_for_nodes(self, nodes, title: str):
+    def add_backdrop_for_nodes(self, nodes, title: str, width=None, height=None):
         """
         Creates one persistent clean-JSON backdrop around exactly these nodes.
 
         The grouped node ids are stored in the backdrop itself, so export/import can
         reconstruct the same group instead of guessing from rectangle overlap.
+
+        If width/height are given (import of a saved backdrop), the backdrop is set to
+        that exact size. Otherwise it auto-fits the wrapped nodes (live creation).
         """
         if not nodes:
             return None
@@ -2026,10 +2098,21 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
-        try:
-            backdrop.wrap_nodes(clean_nodes)
-        except Exception:
-            pass
+        if width is not None and height is not None:
+            # Restore the saved size exactly (do not auto-fit, which changes the size).
+            try:
+                backdrop.set_size(float(width), float(height))
+            except Exception:
+                try:
+                    self.set_property_safe(backdrop, "width", float(width))
+                    self.set_property_safe(backdrop, "height", float(height))
+                except Exception:
+                    pass
+        else:
+            try:
+                backdrop.wrap_nodes(clean_nodes)
+            except Exception:
+                pass
 
         self.set_property_safe(backdrop, "backdrop_title", title)
         self.set_json_property_safe(backdrop, "wrapped_node_ids", [node_uid(n) for n in clean_nodes])
@@ -2225,6 +2308,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "FirstTask": "simulation.flow.FirstTaskNode",
             "Task": "simulation.flow.TaskNode",
             "Breakdown": "simulation.flow.BreakdownNode",
+            "Monitor": "simulation.flow.MonitorNode",
         }
 
         # Accept legacy nomenclature from older exports.
@@ -2296,6 +2380,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     resource_quantities[rid] = quantity
 
             self.set_json_property_safe(node, "resource_quantities", resource_quantities)
+
+        elif kind == "Monitor":
+            stats = node_data.get("stats", {}) or {}
+            for key, _label, default in MONITOR_STATS:
+                set_bool_prop(node, key, bool(stats.get(key, default)))
 
         elif kind == "Task":
             self.set_json_property_safe(node, "capability", node_data.get("capability", []))
@@ -2426,7 +2515,12 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     continue
 
                 title = group.get("title", "Imported group")
-                backdrop = self.add_backdrop_for_nodes(group_nodes, title)
+                backdrop = self.add_backdrop_for_nodes(
+                    group_nodes,
+                    title,
+                    width=group.get("width"),
+                    height=group.get("height"),
+                )
 
                 position = group.get("position")
                 if backdrop is not None and isinstance(position, list) and len(position) >= 2:
