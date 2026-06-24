@@ -1,25 +1,62 @@
 """
-Performance-optimized variant of simulation.py.
+Moteur de simulation d'atelier (simulation à événements discrets, via salabim).
 
-Same modelling semantics as simulation.py, but the CPU-heavy ``standby()`` polling
-in the batch collectors has been replaced with event-driven waiting:
+------------------------------------------------------------------------------
+1. L'IDÉE GÉNÉRALE
+------------------------------------------------------------------------------
+Ce fichier simule un atelier de production. Concrètement :
+  - des PIÈCES sont créées par une source,
+  - elles patientent dans des STOCKS (les buffers),
+  - des POSTES DE TRAVAIL (les tâches) les prennent, les transforment pendant une
+    certaine durée, puis les reposent dans d'autres stocks,
+  - et ainsi de suite jusqu'à la sortie.
 
-* GreedyBatchCollector blocks on ``from_store(...)``, which salabim wakes natively
-  the instant a matching piece is added to an input buffer (no per-event polling).
-* AltruisticBatchCollector blocks on lightweight per-buffer "arrival" signal states
-  that are created lazily and only touched when an altruistic collector is present,
-  so a greedy-only model pays nothing for them.
+Le temps n'avance pas en continu : il « saute » d'un événement au suivant (une
+pièce créée, une tâche terminée, une panne qui démarre...). C'est ce qui permet de
+simuler des heures ou des jours de production en quelques secondes.
 
-Other optimizations:
-* PickyPieceTaker.can_take is memoized per resolved model (the capability walk over
-  the model parent chain is computed once per distinct model).
-* Pieces carry a creation timestamp so monitors can measure lead time to a buffer.
-* HardBuffers expose hooks (arrival monitors) used by graph_parser_advanced.
+Le flux que vous dessinez est donc un réseau :
 
-Because event ordering changes, a given random seed will NOT reproduce the exact
-same numbers as simulation.py, but the model behaves identically in distribution.
-The public surface (class names, ``env``, ``sim``) is unchanged so it is a drop-in
-replacement for ``from simulation import *``.
+    Source ──► Stock ──► Poste ──► Stock ──► Poste ──► ... ──► Stock de sortie
+  (FirstTask)  (Buffer)  (Task)   (Buffer)  (Task)             (Buffer)
+
+Tout le reste (lois de durée, opérateurs, consommables, pannes, arrêts, mesures)
+vient SE BRANCHER sur ces éléments pour les paramétrer. Chaque concept est expliqué
+en commentaire juste au-dessus du code correspondant, plus bas dans ce fichier.
+
+------------------------------------------------------------------------------
+2. LE CYCLE DE VIE D'UNE PIÈCE
+------------------------------------------------------------------------------
+  1. Naissance      : la source (FirstTask) crée la pièce d'un certain modèle et la
+                      dépose dans un stock de sortie (directement ou via un SoftBuffer
+                      qui l'aiguille).
+  2. Attente        : la pièce patiente dans un HardBuffer parmi celles qu'il accepte.
+  3. Prise en charge: un poste (Task) dont la capability couvre le modèle la pioche
+                      — éventuellement avec d'autres pour former un LOT — dès qu'il a
+                      les opérateurs/consommables nécessaires et qu'il n'est ni en
+                      panne ni à l'arrêt.
+  4. Transformation : le poste traite le lot pendant sa durée de traitement.
+  5. Sortie         : les pièces finies vont dans le stock de sortie correspondant à
+                      leur modèle (voir la « règle de la partition » au-dessus de Task).
+  6. Répétition     : les étapes 2 à 5 se répètent de poste en poste.
+  7. Fin de parcours: la pièce finit dans un stock « Exit », ou au « Scrap » si elle a
+                      été évacuée lors d'une panne.
+
+------------------------------------------------------------------------------
+3. MÉMO DES RÈGLES À RESPECTER (vérifiées au démarrage, sinon le modèle refuse de
+   se construire)
+------------------------------------------------------------------------------
+  - SoftBuffer : toutes les destinations acceptent les mêmes modèles ; probabilités
+    dans [0, 1] et de somme 1.
+  - Sorties de Task / FirstTask : elles forment une PARTITION de la capability
+    (disjointes ET couvrant tous les modèles produits).
+  - FirstTask : probabilités des modèles dans [0, 1] et de somme 1.
+  - Opérateurs : portée PER_BATCH ou PER_TASK (jamais PER_PIECE).
+  - Consommables : portée PER_PIECE ou PER_BATCH (jamais PER_TASK).
+  - Interval : début <= fin ; ScheduledShutdowns : intervalles disjoints.
+
+Document complet (non technique) destiné aux concepteurs de flux :
+voir documentation_simulation_fr.md.
 """
 
 from __future__ import annotations
@@ -30,6 +67,11 @@ from enum import Enum, auto
 import numpy as np
 import salabim as sim
 
+# Les durées du modèle (création, traitement, démarrage, MTBF/MTTR, livraison...)
+# sont pilotées par des LOIS DE PROBABILITÉ salabim (sim.Constant, sim.Normal,
+# sim.Triangular, sim.Exponential) plutôt que par des valeurs fixes, afin de
+# refléter la variabilité réelle. C'est avec ces lois qu'on règle le rythme et
+# l'incertitude de l'atelier.
 sim.yieldless(True)
 env = sim.Environment(random_seed=42, trace=False)
 
@@ -60,6 +102,23 @@ class Interval:
 ##########
 # MODELS #
 ##########
+#
+# LES MODÈLES DE PIÈCES
+# ---------------------
+# Chaque pièce appartient à UN modèle. Les modèles forment une hiérarchie
+# parent / enfant, comme une famille de produits :
+#
+#         M1                 M2
+#        /  \                |
+#      C1    C2             C3
+#
+# RÈGLE CLÉ — l'héritage descendant : quand un stock ou une tâche « accepte » un
+# modèle, il accepte CE modèle ET TOUS SES DESCENDANTS. Un stock qui accepte M1
+# accepte donc aussi C1 et C2 ; un stock qui accepte seulement C1 n'accepte ni M1
+# ni C2. Voyez les modèles parents comme des CATÉGORIES : choisir une catégorie
+# large accepte toute sa descendance ; choisir une feuille précise ne prend que
+# celle-là. C'est ce mécanisme qui trie automatiquement les pièces dans le bon
+# stock et les fait prendre par le bon poste (voir PickyPieceTaker.can_take).
 
 class Model:
     def __init__(self, name: str, parent: Model | None = None) -> None:
@@ -75,6 +134,17 @@ class Model:
 #########
 # PIECE #
 #########
+#
+# LES PIÈCES
+# ----------
+# Une pièce, c'est simplement UN MODÈLE + un identifiant unique (et l'instant de sa
+# création, utilisé pour mesurer son temps de traversée). Les pièces ne « décident »
+# de rien : elles se laissent transporter par le flux. Ce sont les stocks et les
+# tâches qui décident qui prend quoi.
+#
+# PickyPieceTaker est la brique commune (stocks, tâches) qui sait, pour un modèle
+# donné, s'il est accepté : can_take remonte la chaîne des parents jusqu'à trouver
+# un modèle accepté (c'est l'héritage descendant décrit plus haut).
 
 class Piece(sim.Component):
     ID = 0
@@ -128,12 +198,9 @@ class PickyPieceTaker:
 
 
 def _note_buffer_arrival(buffer, piece: Piece) -> None:
-    """Hook fired whenever a piece is stored into a buffer.`
-
-    Updates any attached arrival monitors (lead time since piece creation) and
-    wakes altruistic collectors waiting on this buffer. Both branches are skipped
-    for buffers without monitors / waiters, so greedy-only models pay nothing.
-    """
+    """Appelé à chaque fois qu'une pièce entre dans un stock : met à jour les
+    mesures d'arrivée (temps de traversée) et réveille les collecteurs altruistes
+    en attente sur ce stock."""
     monitors = getattr(buffer, "arrival_monitors", None)
     if monitors:
         delay = env.now() - piece.creation_time()
@@ -166,21 +233,36 @@ class PiecePlacer(sim.Component):
 ###########
 # BUFFERS #
 ###########
+#
+# LES STOCKS (buffers)
+# --------------------
+# Il existe DEUX natures de stock très différentes. Bien les distinguer est
+# essentiel au moment de la conception.
 
 class Buffer(PickyPieceTaker):
     def __init__(self, valid_models: list[Model]) -> None:
         super().__init__(valid_models)
 
 
+# LE STOCK RÉEL — HardBuffer
+# Une file d'attente concrète : les pièces y patientent réellement. Il a une liste
+# de modèles acceptés (avec l'héritage du §MODELS). Une tâche vient y piocher les
+# pièces dont elle a besoin. C'est le seul endroit où les pièces « existent » entre
+# deux postes, et le seul type de stock que l'on peut observer avec un Monitor.
 class HardBuffer(sim.Store, Buffer):
     def setup(self, valid_models: list[Model]) -> None:
         PickyPieceTaker.__init__(self, valid_models)
-        # Monitor hooks (populated by graph_parser_advanced when a Monitor card is attached).
         self.arrival_monitors: list[sim.Monitor] = []
-        # Lazily created arrival signal (only when an altruistic collector subscribes).
         self.arrival_signal = None
 
 
+# L'AIGUILLAGE PROBABILISTE — SoftBuffer
+# N'est PAS un vrai stock : c'est un ROUTEUR. Il ne garde aucune pièce ; il décide
+# vers quel stock réel envoyer chaque pièce, selon des probabilités (ex. : 70 % vers
+# le stock A, 30 % vers le stock B). À utiliser pour un partage de flux aléatoire
+# (ex. un contrôle qualité qui envoie un pourcentage en retouche).
+# Règles : toutes les destinations doivent accepter EXACTEMENT les mêmes modèles ;
+# chaque probabilité dans [0, 1] ; la somme des probabilités vaut 1.
 class SoftBuffer(Buffer):
     def __init__(self) -> None:
         self.bufs_out = None
@@ -215,6 +297,25 @@ class SoftBuffer(Buffer):
 ###################
 # BATCH COLLECTOR #
 ###################
+#
+# LE TRAITEMENT PAR LOTS (batch)
+# ------------------------------
+# Une tâche ne traite pas forcément les pièces une par une : elle constitue un LOT.
+#   - min_capacity : il faut AU MOINS ce nombre de pièces pour démarrer.
+#   - max_capacity : le lot (et le nombre de pièces simultanément « en cours ») ne
+#     peut pas dépasser cette taille. Régler min = max = 1 => traitement pièce par
+#     pièce classique.
+#
+# Deux stratégies de constitution du lot (batch_collector) :
+#   - GreedyBatchCollector (gourmand) : dès que min_capacity pièces sont réunies, le
+#     lot démarre ; s'il reste des pièces disponibles tout de suite, il en prend
+#     autant que possible jusqu'à max_capacity. Réactif.
+#   - AltruisticBatchCollector (altruiste) : ne saisit des pièces QUE si un lot
+#     complet d'au moins min_capacity peut être formé d'un seul coup ; sinon il ne
+#     prend rien et laisse les pièces disponibles pour d'autres postes. Évite de
+#     garder des pièces « en otage ».
+# Choisir gourmand pour la vitesse ; altruiste quand plusieurs postes se partagent
+# les mêmes stocks et qu'on ne veut pas qu'un poste accapare des pièces.
 
 class BatchCollector(sim.Component):
     def setup(self, task: Task) -> None:
@@ -243,16 +344,17 @@ class GreedyBatchCollector(BatchCollector):
         task = self.task
         min_cap = task.config.min_capacity
 
-        # Phase 1 -- reach min_capacity, blocking efficiently for slots and pieces.
+        # Phase 1 : atteindre min_capacity (on attend les pièces et les places libres).
         while len(self.collected_pieces) < min_cap:
             self.reserve_slot()
-            piece = self.from_store(task.bufs_in, filter=task.can_take)  # blocks until matching piece
+            piece = self.from_store(task.bufs_in, filter=task.can_take)
             self.collected_pieces.append(piece)
 
-        # Phase 2 -- greedily absorb pieces already waiting, up to remaining WIP capacity.
+        # Phase 2 : absorber gloutonnement les pièces déjà disponibles, dans la limite
+        # de la capacité restante.
         while task.vacant_slots.available_quantity() > 0:
             piece = self.from_store(task.bufs_in, filter=task.can_take, fail_delay=0)
-            if piece is None:                                          # nothing available right now
+            if piece is None:
                 break
             self.reserve_slot()
             self.collected_pieces.append(piece)
@@ -261,20 +363,14 @@ class GreedyBatchCollector(BatchCollector):
 
 
 class AltruisticBatchCollector(BatchCollector):
-    """Event-driven altruistic collector.
-
-    Semantics preserved: only ever grab pieces when a full batch of at least
-    ``min_capacity`` can be formed at once (so pieces are never held hostage while
-    waiting). Instead of polling via standby(), it blocks on lightweight per-buffer
-    arrival signals plus the task slot signal, which are bumped only when an
-    altruistic collector is actually waiting.
-    """
+    """Collecteur altruiste : ne prend des pièces que lorsqu'un lot complet d'au
+    moins min_capacity peut être formé d'un seul coup (les pièces ne sont jamais
+    retenues en otage en attendant)."""
 
     def process(self):
         task = self.task
         min_cap = task.config.min_capacity
 
-        # Make sure the signals this collector waits on exist (lazy, greedy-only models skip this).
         for buf_in in task.bufs_in:
             if buf_in.arrival_signal is None:
                 buf_in.arrival_signal = sim.State("arrival." + buf_in.name(), value=0)
@@ -302,7 +398,8 @@ class AltruisticBatchCollector(BatchCollector):
                 self.update_done()
                 return
 
-            # Not enough to form a batch yet: block until inputs change (arrival or freed slot).
+            # Pas encore de quoi former un lot : on attend qu'une entrée change
+            # (arrivée d'une pièce ou libération d'une place).
             snapshot = [(buf_in.arrival_signal, buf_in.arrival_signal.value()) for buf_in in task.bufs_in]
             snapshot.append((task.slot_signal, task.slot_signal.value()))
             self.wait(*[(state, (lambda v, c, s, base=base: v != base)) for state, base in snapshot])
@@ -311,6 +408,40 @@ class AltruisticBatchCollector(BatchCollector):
 ########
 # TASK #
 ########
+#
+# LES POSTES DE TRAVAIL — Task
+# ----------------------------
+# C'est le cœur du modèle : un poste PREND des pièces dans ses stocks d'entrée
+# (bufs_in), les TRAITE pendant une durée, puis les DÉPOSE dans ses stocks de sortie
+# (bufs_out).
+#
+# CAPABILITY : la liste des modèles que la tâche sait traiter (héritage inclus). Elle
+#   ne piochera jamais une pièce qu'elle ne sait pas traiter, même disponible.
+#
+# RÈGLE DE LA PARTITION (sorties) : les stocks de sortie doivent former une PARTITION
+#   de la capability : les modèles couverts par les différentes sorties ne se
+#   chevauchent pas (disjoints) et, ensemble, couvrent TOUS les modèles produits.
+#   Autrement dit, pour chaque pièce qui sort il existe EXACTEMENT un stock de sortie
+#   capable de la recevoir — ni zéro (pièce bloquée), ni deux (ambiguïté).
+#
+# OPÉRATEURS & CONSOMMABLES : une tâche peut exiger des ressources (voir plus bas).
+#   Chaque catégorie a une PORTÉE (scope) :
+#     - PER_PIECE : par pièce du lot (la quantité est multipliée par la taille du lot).
+#     - PER_BATCH : une fois par lot, quelle que soit sa taille.
+#     - PER_TASK  : une fois pour toute la durée de vie du poste (ressource mobilisée).
+#   Contraintes : les opérateurs ne peuvent PAS être PER_PIECE ; les consommables ne
+#   peuvent PAS être PER_TASK.
+#
+# DÉMARRAGE (startup) : avant de traiter, un poste peut devoir se préparer — une
+#   startup_duration et d'éventuels startup_operators. Après une panne ou un arrêt
+#   programmé, le poste est « éteint » et devra redémarrer (re-payer ce temps).
+#
+# independent_carriers : False (défaut) => le poste attend qu'un lot soit terminé
+#   avant d'en commencer un autre (séquentiel). True => il peut enchaîner / faire
+#   avancer plusieurs lots en parallèle (dans la limite de max_capacity).
+#
+# (Operation et Carrier ci-dessous sont la mécanique interne qui porte un lot à
+#  travers ces étapes ; le concepteur n'a pas à les manipuler directement.)
 
 class Operation(sim.Component):
     def setup(self, duration: float) -> None:
@@ -475,7 +606,8 @@ class Task(sim.Component, PickyPieceTaker):
         self.is_in_scheduled_shutdown = sim.State(value=False)
         self.has_breakdown = False
         self.breakdown_bufs_out = None
-        # Lazily created signal, bumped when a WIP slot frees (only altruistic collectors wait on it).
+        # Signal incrémenté quand une place de traitement se libère (seuls les
+        # collecteurs altruistes l'écoutent).
         self.slot_signal = None
 
     def notify_slot_freed(self) -> None:
@@ -526,6 +658,15 @@ class Task(sim.Component, PickyPieceTaker):
                     continue
 
 
+# LA SOURCE — FirstTask
+# ----------------------
+# Le point d'entrée des pièces dans l'atelier. En boucle, elle : tire une durée
+# (intervalle entre deux créations), choisit un MODÈLE selon des probabilités que
+# vous fixez, attend la durée, puis dépose la nouvelle pièce dans ses stocks de
+# sortie. Elle peut aussi consommer des ressources à chaque création (matière
+# première, par exemple).
+# Règles : probabilités des modèles dans [0, 1] et de somme 1 ; les stocks de sortie
+# doivent former une PARTITION des modèles générés (cf. règle de partition de Task).
 @dataclass
 class FirstTaskConfig:
     models_probs: list[tuple[Model, float]]
@@ -586,6 +727,22 @@ class FirstTask(sim.Component, PickyPieceTaker):
 ####################################
 # BREAKDOWNS & SCHEDULED SHUTDOWNS #
 ####################################
+#
+# LES ALÉAS : PANNES ET ARRÊTS PROGRAMMÉS
+# ---------------------------------------
+# PANNES (Breakdown) — se rattache à UNE tâche, avec deux lois :
+#   - MTBF (Mean Time Between Failures) : temps de bon fonctionnement avant la panne.
+#   - MTTR (Mean Time To Repair)        : durée de réparation.
+#   Pendant la panne, le lot en cours est INTERROMPU et les pièces sont évacuées vers
+#   les stocks de sortie de la panne (bufs_out) : c'est là qu'on modélise les REBUTS
+#   ou un réacheminement vers une zone de reprise. Après réparation, le poste doit
+#   redémarrer.
+#
+# ARRÊTS PROGRAMMÉS (ScheduledShutdowns + Interval) — arrêts PLANIFIÉS (pauses, nuits,
+#   maintenance...), par opposition aux pannes aléatoires. Un Interval est une fenêtre
+#   [début, fin] (début <= fin) ; un ScheduledShutdowns regroupe plusieurs intervalles
+#   qui doivent être DISJOINTS. À l'approche d'un arrêt, la tâche finit proprement ce
+#   qu'elle peut, se met en pause (en libérant ses opérateurs PER_TASK), puis redémarre.
 
 class Breakdown(sim.Component):
     def setup(self, task: Task, mtbf: sim.Distribution, mttr: sim.Distribution, bufs_out: list[Buffer]) -> None:
@@ -632,6 +789,20 @@ class ScheduledShutdowns:
 ########################
 # RESTOCKABLE RESOURCE #
 ########################
+#
+# LES RESSOURCES
+# --------------
+# RESSOURCE RÉUTILISABLE (sim.Resource, paramétrée côté flux) — un pool de capacité
+#   (ex. « 3 opérateurs »). Les tâches en empruntent une partie le temps de
+#   travailler, puis la rendent ; si elle n'est pas disponible, la tâche attend son
+#   tour. C'est l'outil pour modéliser une contention (plusieurs postes se disputant
+#   un nombre limité de personnes ou de machines).
+#
+# CONSOMMABLE RÉAPPROVISIONNABLE (RestockableResource) — une ressource qui se VIDE
+#   (matière première, composants...) et se réapprovisionne automatiquement : elle a
+#   une capacité (stock plein) et un seuil (threshold) ; dès que le niveau passe sous
+#   le seuil, une commande part et, après delivery_duration, le stock revient à sa
+#   capacité. Seuil bas => ruptures possibles ; seuil haut => on commande tôt et souvent.
 
 class Delivery(sim.Component):
     def setup(self, stock: RestockableResource, delivery_duration):
