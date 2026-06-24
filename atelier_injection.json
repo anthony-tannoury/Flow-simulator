@@ -19,7 +19,7 @@
       "id": "resource_6bb409ad",
       "kind": "Resource",
       "name": "Groupe opérateurs injection",
-      "capacity": 50.0,
+      "capacity": 100.0,
       "anonymous": false,
       "position": [
         3365.647203685623,
@@ -30,7 +30,7 @@
       "id": "resource_a96558f9",
       "kind": "Resource",
       "name": "Startup Operator",
-      "capacity": 20.0,
+      "capacity": 50.0,
       "anonymous": false,
       "position": [
         3402.6103908675896,
@@ -60,22 +60,22 @@
     {
       "id": "distribution_886be4a8",
       "kind": "Distribution",
-      "name": "Task Duration 1",
+      "name": "Constant distribution 8",
       "distribution": {
         "type": "Constant",
         "params": {
-          "value": 1.0
+          "value": 10.0
         }
       },
       "position": [
-        2293.1639999455283,
-        2339.6271039564713
+        2252.648265400224,
+        2502.14648947085
       ]
     },
     {
       "id": "distribution_884d2320",
       "kind": "Distribution",
-      "name": "Startup Duration 1",
+      "name": "Constant distribution 3",
       "distribution": {
         "type": "Constant",
         "params": {
@@ -83,20 +83,18 @@
         }
       },
       "position": [
-        2294.1297076445508,
-        2479.627103956471
+        2253.6139730992463,
+        2642.14648947085
       ]
     },
     {
       "id": "scheduledshutdowns_c1b8919d",
       "kind": "ScheduledShutdowns",
       "name": "No Scheduled Shutdowns 1",
-      "intervals": [
-        "interval_739efdf4"
-      ],
+      "intervals": [],
       "position": [
-        2293.1639999455283,
-        3018.4552556003277
+        2252.648265400224,
+        3180.9746411147066
       ]
     },
     {
@@ -140,14 +138,14 @@
       "independent_carriers": false,
       "scheduled_shutdowns": "scheduledshutdowns_c1b8919d",
       "position": [
-        2753.1639999455283,
-        2679.6271039564713
+        2712.648265400224,
+        2842.14648947085
       ]
     },
     {
       "id": "distribution_f1a35a96",
       "kind": "Distribution",
-      "name": "MTBF 1",
+      "name": "Constant distribution 1",
       "distribution": {
         "type": "Constant",
         "params": {
@@ -155,14 +153,14 @@
         }
       },
       "position": [
-        3135.3415341569857,
-        2589.6271039564713
+        3093.6961135954625,
+        2752.14648947085
       ]
     },
     {
       "id": "distribution_b9dd4f73",
       "kind": "Distribution",
-      "name": "MTTR 1",
+      "name": "Constant distribution 2",
       "distribution": {
         "type": "Constant",
         "params": {
@@ -170,8 +168,8 @@
         }
       },
       "position": [
-        3133.1639999455283,
-        2779.6271039564713
+        3092.648265400224,
+        2942.14648947085
       ]
     },
     {
@@ -185,19 +183,8 @@
         "hardbuffer_14863206"
       ],
       "position": [
-        3493.1639999455283,
+        3494.782920903952,
         2679.6271039564713
-      ]
-    },
-    {
-      "id": "interval_739efdf4",
-      "kind": "Interval",
-      "name": "Interval 1",
-      "start": 0.0,
-      "end": 1.0,
-      "position": [
-        1966.678573040509,
-        2992.1024876903925
       ]
     },
     {
@@ -226,15 +213,15 @@
         }
       },
       "position": [
-        654.8590652118114,
-        533.3308616184886
+        498.35891619796485,
+        473.1384966131627
       ]
     },
     {
       "id": "restockableresource_731bc110",
       "kind": "RestockableResource",
       "name": "Noyaux",
-      "capacity": 100.0,
+      "capacity": 1000.0,
       "threshold": 20.0,
       "order_duration": "distribution_6ff3c47c",
       "delivery_duration": "distribution_fb8ea0bd",
@@ -279,8 +266,8 @@
       "independent_carriers": false,
       "scheduled_shutdowns": null,
       "position": [
-        1114.8590652118112,
-        733.3308616184886
+        958.3589161979648,
+        673.1384966131627
       ]
     },
     {
@@ -452,7 +439,7 @@
       "id": "restockableresource_39ed021e",
       "kind": "RestockableResource",
       "name": "Cire",
-      "capacity": 100.0,
+      "capacity": 1000.0,
       "threshold": 20.0,
       "order_duration": "distribution_50c23da1",
       "delivery_duration": "distribution_83202136",
@@ -622,8 +609,8 @@
       ],
       "outputs_to": [],
       "position": [
-        3408.2493182605403,
-        2885.5099465880617
+        3433.5960841405367,
+        3029.7022349576205
       ]
     },
     {
@@ -1188,7 +1175,7 @@
     {
       "id": "distribution_40a1242f",
       "kind": "Distribution",
-      "name": "Constant distribution 2",
+      "name": "Constant distribution 4",
       "distribution": {
         "type": "Constant",
         "params": {
@@ -1196,8 +1183,8 @@
         }
       },
       "position": [
-        -426.1794257611617,
-        520.3970481597543
+        -533.9831929378028,
+        489.8258306021994
       ]
     },
     {
@@ -1237,11 +1224,11 @@
       "models_probs": [
         {
           "model": "M88",
-          "probability": 0.5
+          "probability": 0.0
         },
         {
           "model": "LEAP",
-          "probability": 0.5
+          "probability": 1.0
         }
       ],
       "resources": [],
@@ -1251,8 +1238,8 @@
         "hardbuffer_acd43613"
       ],
       "position": [
-        -151.71054411082332,
-        639.9717375070712
+        -259.5143112874643,
+        609.4005199495164
       ]
     },
     {
@@ -1272,8 +1259,8 @@
         "task_feebb7bf"
       ],
       "position": [
-        152.61593000376354,
-        602.1800446571538
+        68.94733458308696,
+        492.76726603011525
       ]
     },
     {
@@ -1589,11 +1576,11 @@
     {
       "id": "distribution_4135cf9e",
       "kind": "Distribution",
-      "name": "Distribution",
+      "name": "Constant distribution 6",
       "distribution": {
         "type": "Constant",
         "params": {
-          "value": 1.0
+          "value": 100.0
         }
       },
       "position": [
@@ -1604,7 +1591,7 @@
     {
       "id": "distribution_98def818",
       "kind": "Distribution",
-      "name": "Distribution 1",
+      "name": "Constant distribution 5",
       "distribution": {
         "type": "Constant",
         "params": {
@@ -1637,6 +1624,66 @@
       "position": [
         3256.1713170540925,
         844.8275987761217
+      ]
+    },
+    {
+      "id": "monitor_ce1b9c6d",
+      "kind": "Monitor",
+      "name": "Monitor",
+      "buffer": "hardbuffer_14863206",
+      "stats": {
+        "avg_length": true,
+        "max_length": true,
+        "length_std": true,
+        "current_length": true,
+        "avg_stay": true,
+        "max_stay": true,
+        "avg_time_before_arrival": true,
+        "throughput": true
+      },
+      "position": [
+        3801.1797598433477,
+        2907.9869474415314
+      ]
+    },
+    {
+      "id": "monitor_84159472",
+      "kind": "Monitor",
+      "name": "Monitor 1",
+      "buffer": "hardbuffer_acd43613",
+      "stats": {
+        "avg_length": true,
+        "max_length": true,
+        "length_std": true,
+        "current_length": true,
+        "avg_stay": true,
+        "max_stay": true,
+        "avg_time_before_arrival": true,
+        "throughput": true
+      },
+      "position": [
+        1238.4809482972055,
+        2754.7983837437096
+      ]
+    },
+    {
+      "id": "monitor_3ca4fff1",
+      "kind": "Monitor",
+      "name": "Monitor 2",
+      "buffer": "hardbuffer_8e582a56",
+      "stats": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": true,
+        "throughput": true
+      },
+      "position": [
+        16001.160431620658,
+        600.6116150649834
       ]
     }
   ],
@@ -1762,6 +1809,14 @@
       "to_port": "bufs_in"
     },
     {
+      "from_node": "hardbuffer_acd43613",
+      "from_kind": "HardBuffer",
+      "from_port": "monitor",
+      "to_node": "monitor_84159472",
+      "to_kind": "Monitor",
+      "to_port": "buffer"
+    },
+    {
       "from_node": "distribution_886be4a8",
       "from_kind": "Distribution",
       "from_port": "distribution",
@@ -1824,14 +1879,6 @@
       "to_node": "hardbuffer_14863206",
       "to_kind": "HardBuffer",
       "to_port": "from_task"
-    },
-    {
-      "from_node": "interval_739efdf4",
-      "from_kind": "Interval",
-      "from_port": "interval",
-      "to_node": "scheduledshutdowns_c1b8919d",
-      "to_kind": "ScheduledShutdowns",
-      "to_port": "intervals"
     },
     {
       "from_node": "distribution_64680818",
@@ -2008,6 +2055,14 @@
       "to_node": "task_8499fec5",
       "to_kind": "Task",
       "to_port": "bufs_in"
+    },
+    {
+      "from_node": "hardbuffer_14863206",
+      "from_kind": "HardBuffer",
+      "from_port": "monitor",
+      "to_node": "monitor_ce1b9c6d",
+      "to_kind": "Monitor",
+      "to_port": "buffer"
     },
     {
       "from_node": "distribution_17e0b23d",
@@ -2402,6 +2457,14 @@
       "to_port": "from_task"
     },
     {
+      "from_node": "hardbuffer_8e582a56",
+      "from_kind": "HardBuffer",
+      "from_port": "monitor",
+      "to_node": "monitor_3ca4fff1",
+      "to_kind": "Monitor",
+      "to_port": "buffer"
+    },
+    {
       "from_node": "breakdown_cdd4d8bf",
       "from_kind": "Breakdown",
       "from_port": "bufs_out",
@@ -2444,7 +2507,7 @@
   ],
   "backdrops": [
     {
-      "id": "node_72517ae3",
+      "id": "node_50edf409",
       "title": "Task Template",
       "nodes": [
         "distribution_886be4a8",
@@ -2456,12 +2519,14 @@
         "breakdown_8c585352"
       ],
       "position": [
-        1912.678573040509,
-        2285.6271039564713
-      ]
+        1872.1628384952046,
+        2448.14648947085
+      ],
+      "width": 1843.2054007237598,
+      "height": 880.8753837339214
     },
     {
-      "id": "node_3ac72996",
+      "id": "node_aa00763d",
       "title": "Task Template",
       "nodes": [
         "distribution_64680818",
@@ -2470,12 +2535,14 @@
         "task_feebb7bf"
       ],
       "position": [
-        600.8590652118114,
-        339.3308616184886
-      ]
+        444.35891619796485,
+        279.1384966131627
+      ],
+      "width": 801.21875,
+      "height": 637.7
     },
     {
-      "id": "node_c57c2de7",
+      "id": "node_763e63ff",
       "title": "Task Template",
       "nodes": [
         "distribution_9b0ce350",
@@ -2485,10 +2552,12 @@
       "position": [
         2088.01079461235,
         295.94203064220517
-      ]
+      ],
+      "width": 652.27571968229,
+      "height": 559.5298560760092
     },
     {
-      "id": "node_f9825b61",
+      "id": "node_4ba56a7c",
       "title": "Task Template",
       "nodes": [
         "distribution_50c23da1",
@@ -2499,12 +2568,14 @@
         "task_ef30323c"
       ],
       "position": [
-        3195.1419196732422,
-        326.77638506298626
-      ]
+        3202.1713170540925,
+        321.50433702734836
+      ],
+      "width": 1033.4991669379924,
+      "height": 697.7232617487733
     },
     {
-      "id": "node_8a47ce37",
+      "id": "node_790ea890",
       "title": "Task Template",
       "nodes": [
         "distribution_3982d9ae",
@@ -2514,10 +2585,12 @@
       "position": [
         4825.697384438984,
         293.53831401859026
-      ]
+      ],
+      "width": 787.03125,
+      "height": 637.7000000000003
     },
     {
-      "id": "node_983e4866",
+      "id": "node_2b463be0",
       "title": "Task Template",
       "nodes": [
         "distribution_17e0b23d",
@@ -2527,10 +2600,12 @@
       "position": [
         6344.998658334948,
         324.7845311566394
-      ]
+      ],
+      "width": 787.0312500000009,
+      "height": 636.1397187705256
     },
     {
-      "id": "node_46c1d231",
+      "id": "node_b5ab822e",
       "title": "Task Template",
       "nodes": [
         "distribution_6244f2a9",
@@ -2544,10 +2619,12 @@
       "position": [
         7715.381061024995,
         133.10358660011568
-      ]
+      ],
+      "width": 1477.0,
+      "height": 988.0
     },
     {
-      "id": "node_9c298102",
+      "id": "node_212f6dc0",
       "title": "Task Template",
       "nodes": [
         "distribution_2bed992c",
@@ -2561,10 +2638,12 @@
       "position": [
         10049.77273693856,
         -583.406092357622
-      ]
+      ],
+      "width": 1477.0,
+      "height": 987.9999999999999
     },
     {
-      "id": "node_423bd422",
+      "id": "node_58eefee3",
       "title": "Task Template",
       "nodes": [
         "distribution_a8991aa5",
@@ -2574,10 +2653,12 @@
       "position": [
         12212.342594808913,
         -465.19647035233595
-      ]
+      ],
+      "width": 787.03125,
+      "height": 637.7
     },
     {
-      "id": "node_9ead4826",
+      "id": "node_d9939c01",
       "title": "FirstTask Template",
       "nodes": [
         "distribution_40a1242f",
@@ -2586,12 +2667,14 @@
         "firsttask_ab237df2"
       ],
       "position": [
-        -480.1794257611617,
-        466.39704815975426
-      ]
+        -587.9831929378028,
+        435.8258306021994
+      ],
+      "width": 556.5157566503385,
+      "height": 301.774689347317
     },
     {
-      "id": "node_98600de6",
+      "id": "node_b1e15cce",
       "title": "Task Template",
       "nodes": [
         "distribution_82b6340f",
@@ -2601,10 +2684,12 @@
       "position": [
         14208.35894897746,
         -815.6870720223685
-      ]
+      ],
+      "width": 787.03125,
+      "height": 637.7
     },
     {
-      "id": "node_82cc2765",
+      "id": "node_c06973dd",
       "title": "Task Template",
       "nodes": [
         "distribution_8c50e03f",
@@ -2614,10 +2699,12 @@
       "position": [
         14556.562662725539,
         176.50761729545533
-      ]
+      ],
+      "width": 787.03125,
+      "height": 637.7000000000002
     },
     {
-      "id": "node_c598048c",
+      "id": "node_61fdadaa",
       "title": "Task Template",
       "nodes": [
         "distribution_a376ee6d",
@@ -2627,7 +2714,9 @@
       "position": [
         16236.437393809796,
         -1074.2848152156873
-      ]
+      ],
+      "width": 787.03125,
+      "height": 637.7
     }
   ]
 }
