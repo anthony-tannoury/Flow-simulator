@@ -5,106 +5,98 @@ This module takes a flow exported by ``flow_designer.py`` (the same JSON that
 ``graph_parser.py`` consumes), builds the live simulation through ``GraphParser``
 and then draws it with salabim's built-in 2D animation engine.
 
-Goals
------
-* **Look like the designer.** Every card from the flow is rendered as a coloured
-  box at (roughly) the same place it occupies in ``flow_designer.py``, using the
-  same per-kind colours, and the wiring between cards is redrawn as edges.
-* **Show the material flow live.** Hard buffers display the pieces they currently
-  hold (one little coloured square per piece, coloured by its root model), tasks
-  light up while they are working / break down in red / go grey while idle, and a
-  header keeps a running count of the work-in-progress.
-* **Be explorable, not cramped.** Instead of squeezing a large graph into one
-  window, the whole scene is laid out at a readable scale and you *pan and zoom*
-  to move around it (salabim binds this out of the box):
+What is drawn
+-------------
+Only the **essential material flow** is shown — first tasks, tasks and the buffers
+they are wired to — plus the edges between them. Distributions, resources,
+breakdowns, scheduled shutdowns, monitors and the like are *not* drawn (they still
+drive the simulation, they just aren't part of the picture).
 
-      - drag with the left mouse button .... pan
-      - mouse wheel ........................ zoom in / out
-      - ``u`` .............................. reset the zoom
-      - ``space`` .......................... pause / resume
-      - ``s`` .............................. single step
-      - ``-`` / ``+`` ...................... slow down / speed up
+Buffers
+~~~~~~~
+Every hard buffer shows a per-model count and a total. In addition:
+
+* **Normal** buffers also show the pieces themselves as **colour-coded squares**
+  (one square per piece, colour = the piece's model).
+* **Exit** and **Scrap** buffers show **counts only** (no squares).
+
+Models / colours are handled automatically: add or rename models in the flow and
+the legend, the per-model counts and the square colours follow. Children are
+prioritised over their parents — a model that has children is represented by those
+children; a model with no children represents itself.
+
+Tasks light up while working, turn red on breakdown and purple on a scheduled stop.
+
+Controls
+--------
+The whole scene is laid out at a readable scale and you *pan and zoom* around it
+(salabim binds this out of the box):
+
+    drag (left button) ... pan          u ......... reset the zoom
+    mouse wheel .......... zoom          space ..... pause / resume
+    s .... single step                  -/+ ....... slower / faster
 
 Usage
 -----
-    python visual_simulation.py                       # animates atelier_injection.json
+    python visual_simulation.py                       # atelier_injection.json
     python visual_simulation.py clean_export.json
     python visual_simulation.py atelier_injection.json --till 5000 --speed 8
 
     # build the model + layout without opening a window (CI / headless check):
     python visual_simulation.py --no-animate --till 2000
-
-The optimized_version/ folder is intentionally ignored; this builds straight on
-top of simulation.py / graph_parser.py.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 
 from simulation import env, sim, Model, Piece, HardBuffer, SoftBuffer, Task, FirstTask
 from graph_parser import GraphParser
 
 
 # ============================================================
-# Appearance — mirrors flow_designer.py
+# Appearance
 # ============================================================
 
 # Per-kind card colours, copied from flow_designer.py so the animation reads like
-# the editor the flow was designed in.
+# the editor the flow was designed in. Only flow kinds are kept.
 KIND_COLORS = {
-    "Distribution": (80, 100, 160),
-    "Interval": (110, 90, 160),
-    "ScheduledShutdowns": (125, 80, 130),
-    "Resource": (120, 100, 60),
-    "RestockableResource": (140, 105, 55),
     "HardBuffer": (60, 125, 90),
     "SoftBuffer": (60, 115, 125),
     "FirstTask": (145, 80, 80),
     "Task": (150, 90, 60),
-    "Breakdown": (150, 65, 85),
-    "Monitor": (55, 110, 125),
 }
 DEFAULT_KIND_COLOR = (70, 70, 70)
 
-# Colours used to tint an edge by the port it leaves from (flow_designer PORT_COLORS).
+# Edge tint by the port the wire leaves from.
 PORT_COLORS = {
     "buffer": (80, 180, 120),
     "task": (230, 140, 70),
-    "duration": (90, 130, 230),
-    "resource": (230, 190, 80),
-    "shutdown": (180, 100, 200),
-    "interval": (160, 110, 220),
-    "breakdown": (220, 90, 110),
-    "monitor": (110, 180, 200),
 }
 
-# Box footprint (in flow-designer scene units) used per kind. Positions in the JSON
-# are top-left corners, so width/height only need to be "close enough" to read well.
+# Box footprint (in flow-designer scene units) per kind. Positions in the JSON are
+# top-left corners, so width/height only need to be "close enough" to read well.
 KIND_SIZES = {
     "FirstTask": (260, 150),
     "Task": (260, 150),
-    "HardBuffer": (250, 130),
+    "HardBuffer": (290, 190),
     "SoftBuffer": (230, 95),
-    "RestockableResource": (230, 120),
-    "Breakdown": (230, 110),
-    "Monitor": (230, 110),
-    "Distribution": (220, 90),
-    "Resource": (220, 85),
-    "ScheduledShutdowns": (230, 95),
-    "Interval": (210, 85),
 }
-DEFAULT_SIZE = (220, 95)
+DEFAULT_SIZE = (240, 120)
 
-# Palette for piece colours (by root model).
+# Deterministic, colour-blind-friendly-ish palette assigned to models in name order.
 MODEL_PALETTE = [
     "#e6584d", "#4da3e6", "#54c27a", "#e6b34d", "#a06fe0",
     "#4dd0d6", "#e07fb0", "#9fd14d", "#e6864d", "#6d7fe0",
+    "#d65db1", "#00b8a9", "#f6c85f", "#9b8df0", "#5fb0f6",
 ]
 
 BACKGROUND = "#1e1e28"
-EDGE_FLOW_KINDS = {"HardBuffer", "SoftBuffer", "Task", "FirstTask"}
+
+# Only these kinds are drawn; everything else is simulated but not shown.
+FLOW_KINDS = {"Task", "FirstTask", "HardBuffer", "SoftBuffer"}
 
 
 def _hex(rgb, factor: float = 1.0) -> str:
@@ -113,32 +105,11 @@ def _hex(rgb, factor: float = 1.0) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-def _port_color(from_port: str, from_kind: str):
-    """Pick an edge colour from the originating port name (falls back to the kind)."""
+def _port_color(from_port: str):
     p = (from_port or "").lower()
-    if "duration" in p or p == "distribution":
-        return PORT_COLORS["duration"]
-    if "interval" in p:
-        return PORT_COLORS["interval"]
-    if "shutdown" in p:
-        return PORT_COLORS["shutdown"]
-    if "operator" in p or "resource" in p:
-        return PORT_COLORS["resource"]
-    if "monitor" in p:
-        return PORT_COLORS["monitor"]
-    if "breakdown" in p or "task_ref" in p:
-        return PORT_COLORS["breakdown"]
     if "buf" in p or "buffer" in p:
         return PORT_COLORS["buffer"]
-    if "task" in p:
-        return PORT_COLORS["task"]
-    return KIND_COLORS.get(from_kind, DEFAULT_KIND_COLOR)
-
-
-def _root_model(model: Model) -> Model:
-    while model.parent is not None:
-        model = model.parent
-    return model
+    return PORT_COLORS["task"]
 
 
 # ============================================================
@@ -147,6 +118,10 @@ def _root_model(model: Model) -> Model:
 
 class VisualSimulation:
     """Lays out and animates the model built by a :class:`GraphParser`."""
+
+    # World-width (designer units) shown across the window on start-up. Chosen so
+    # individual cards stay readable; the rest of the graph is reached by panning.
+    INITIAL_SPAN = 3000
 
     def __init__(self, filename: str) -> None:
         self.filename = filename
@@ -158,41 +133,48 @@ class VisualSimulation:
         self.nodes = {n["id"]: n for n in self.data["nodes"]}
         self.connections = self.data.get("connections", [])
 
-        self._assign_model_colors()
+        self._resolve_models()
         self._compute_layout()
 
-    # ---- model colours -------------------------------------------------
+    # ---- models & colours ---------------------------------------------
 
-    def _assign_model_colors(self) -> None:
-        """Map every root model to a colour and teach Piece how to draw itself."""
-        roots = []
-        for model in self.parser.models.values():
-            root = _root_model(model)
-            if root.name not in [r.name for r in roots]:
-                roots.append(root)
+    def _resolve_models(self) -> None:
+        """Decide which models are *represented* and give each one a stable colour.
 
+        Rule: prioritise children. A model that has children is represented by those
+        children, not itself; a model with no children represents itself. We also
+        always include any model a FirstTask actually creates, so no piece is left
+        without a colour even in unusual flows.
+        """
+        models = self.parser.models  # name -> Model
+        has_child = {m.parent.name for m in models.values() if m.parent is not None}
+        leaves = {name for name in models if name not in has_child}
+
+        created = set()
+        for node in self.nodes.values():
+            if node["kind"] == "FirstTask":
+                created.update(mp["model"] for mp in node.get("models_probs", []))
+
+        # Represented vocabulary, in a deterministic order so colours are stable as
+        # the flow grows.
+        self.represented_models = sorted(leaves | created)
         self.model_colors = {
-            root.name: MODEL_PALETTE[i % len(MODEL_PALETTE)]
-            for i, root in enumerate(roots)
+            name: MODEL_PALETTE[i % len(MODEL_PALETTE)]
+            for i, name in enumerate(self.represented_models)
         }
+
+        # Teach pieces to draw themselves in their model colour (used nowhere now that
+        # squares are drawn manually, but kept harmless/consistent).
         color_of = self.model_colors
 
         def piece_animation_objects(piece, id, screen_coordinates=True):
-            color = color_of.get(_root_model(piece.model).name, "#cccccc")
-            size = 22
+            color = color_of.get(piece.model.name, "#cccccc")
             ao = sim.AnimateRectangle(
-                spec=(-size / 2, -size / 2, size / 2, size / 2),
-                fillcolor=color,
-                linecolor="white",
-                linewidth=0.5,
-                text=piece.model.name,
-                textcolor="white",
-                fontsize=9,
-                screen_coordinates=screen_coordinates,
+                spec=(-10, -10, 10, 10), fillcolor=color, linecolor="white",
+                linewidth=0.5, screen_coordinates=screen_coordinates,
             )
-            return (26, 26, ao)
+            return (24, 24, ao)
 
-        # Monkeypatch the Piece class so AnimateQueue renders pieces in model colour.
         Piece.animation_objects = piece_animation_objects
 
     # ---- geometry ------------------------------------------------------
@@ -201,62 +183,55 @@ class VisualSimulation:
         return KIND_SIZES.get(kind, DEFAULT_SIZE)
 
     def _rect(self, node):
-        """Return (left, bottom, right, top) of a node in salabim world coords.
+        """(left, bottom, right, top) of a node in salabim world coords.
 
-        Designer scene-y grows downward; salabim world-y grows upward, so we flip y.
+        Designer scene-y grows downward; salabim world-y grows upward -> flip y.
         """
         x, y = node["position"]
         w, h = self._size(node["kind"])
-        left, right = x, x + w
-        top, bottom = -y, -(y + h)
-        return left, bottom, right, top
+        return x, -(y + h), x + w, -y
 
     def _center(self, node):
         left, bottom, right, top = self._rect(node)
         return (left + right) / 2, (bottom + top) / 2
 
+    def _flow_nodes(self):
+        return [n for n in self.nodes.values() if n["kind"] in FLOW_KINDS]
+
     def _compute_layout(self) -> None:
         xs, ys = [], []
-        for node in self.nodes.values():
+        for node in self._flow_nodes():
             left, bottom, right, top = self._rect(node)
             xs += [left, right]
             ys += [bottom, top]
         self.bbox = (min(xs), min(ys), max(xs), max(ys))
 
-    # World-width (in designer units) shown across the window on start-up. Chosen so
-    # individual cards stay readable; the rest of the graph is reached by panning.
-    INITIAL_SPAN = 3000
+    def _anchor_point(self):
+        flow = self._flow_nodes()
+        first = next((n for n in flow if n["kind"] == "FirstTask"), None)
+        if first is None:
+            first = min(flow, key=lambda n: n["position"][0])
+        return self._center(first)
 
     def _initial_view(self, width: int, height: int):
         """World window (x0, y0, x1) to open on.
 
-        Big graphs are *not* squeezed into the window — we open zoomed in to a
-        readable scale, anchored on the flow's source (the first task), and you pan
-        from there. Graphs smaller than ``INITIAL_SPAN`` are simply fitted.
+        Big graphs are not squeezed into the window — we open zoomed in to a readable
+        scale, anchored on the source, and pan from there. Small graphs are fitted.
         """
         minx, miny, maxx, maxy = self.bbox
         bw, bh = (maxx - minx), (maxy - miny)
         win_aspect = height / width
 
-        # Small enough to show at once -> fit it with a margin.
         if bw <= self.INITIAL_SPAN and bh <= self.INITIAL_SPAN * win_aspect:
             cx, cy = (minx + maxx) / 2, (miny + maxy) / 2
             span = max(bw, bh / win_aspect) * 1.12
             return cx - span / 2, cy - (span * win_aspect) / 2, cx + span / 2
 
-        # Large graph -> open on the source, source sitting in the left third.
         ax, ay = self._anchor_point()
         span = self.INITIAL_SPAN
         x0 = ax - 0.20 * span
-        y0 = ay - (span * win_aspect) / 2
-        return x0, y0, x0 + span
-
-    def _anchor_point(self):
-        """Centre of the node to open the view on: the first task, else left-most node."""
-        first = next((n for n in self.nodes.values() if n["kind"] == "FirstTask"), None)
-        if first is None:
-            first = min(self.nodes.values(), key=lambda n: n["position"][0])
-        return self._center(first)
+        return x0, ay - (span * win_aspect) / 2, x0 + span
 
     # ---- registry: node id -> live engine object ----------------------
 
@@ -267,13 +242,31 @@ class VisualSimulation:
                 return table[node_id]
         return None
 
+    # ---- buffer content helpers (evaluated each frame) ----------------
+
+    @staticmethod
+    def _contents(buf) -> list:
+        return list(buf)
+
+    def _count(self, buf, model_name: str) -> int:
+        return sum(1 for p in buf if p.model.name == model_name)
+
+    def _models_in(self, buf) -> list[str]:
+        """Represented models this buffer is allowed to hold (stable per buffer)."""
+        out = []
+        for name in self.represented_models:
+            model = self.parser.models.get(name)
+            if model is not None and buf.can_take(model):
+                out.append(name)
+        return out
+
     # ============================================================
     # Drawing
     # ============================================================
 
     def build_animation(self) -> None:
         self._draw_edges()
-        for node in self.nodes.values():
+        for node in self._flow_nodes():
             self._draw_node(node)
         self._draw_overlay()
 
@@ -283,111 +276,130 @@ class VisualSimulation:
             dst = self.nodes.get(conn["to_node"])
             if src is None or dst is None:
                 continue
+            if src["kind"] not in FLOW_KINDS or dst["kind"] not in FLOW_KINDS:
+                continue
 
-            sl, sb, sr, st = self._rect(src)
-            dl, db, dr, dt = self._rect(dst)
-            # leave the right edge of the source, enter the left edge of the target
-            x1, y1 = sr, (sb + st) / 2
-            x2, y2 = dl, (db + dt) / 2
+            _, sb, sr, st = self._rect(src)
+            dl, db, _, dt = self._rect(dst)
+            x1, y1 = sr, (sb + st) / 2          # leave the source's right edge
+            x2, y2 = dl, (db + dt) / 2          # enter the target's left edge
+            midx = (x1 + x2) / 2                 # squared-off elbow
 
-            is_flow = src["kind"] in EDGE_FLOW_KINDS and dst["kind"] in EDGE_FLOW_KINDS
-            color = _port_color(conn.get("from_port", ""), conn.get("from_kind", ""))
-
-            # gentle S-shaped elbow so parallel wires don't overlap into one line
-            midx = (x1 + x2) / 2
             sim.AnimateLine(
                 spec=(x1, y1, midx, y1, midx, y2, x2, y2),
-                linecolor=_hex(color, 1.0 if is_flow else 0.7),
-                linewidth=3.0 if is_flow else 1.2,
+                linecolor=_hex(_port_color(conn.get("from_port", ""))),
+                linewidth=3.0,
                 layer=50,
             )
 
     def _draw_node(self, node) -> None:
         kind = node["kind"]
         left, bottom, right, top = self._rect(node)
-        cx, cy = (left + right) / 2, (bottom + top) / 2
+        cx = (left + right) / 2
         base = KIND_COLORS.get(kind, DEFAULT_KIND_COLOR)
         live = self._live_object(node["id"])
 
-        # --- box fill (dynamic for tasks & buffers) ---
+        # box fill (dynamic for tasks & hard buffers)
         if isinstance(live, Task):
             fill = (lambda t=live, b=base: self._task_fill(t, b))
             line = (lambda t=live: self._task_line(t))
         elif isinstance(live, HardBuffer):
-            fill = (lambda buf=live, b=base: _hex(b, 1.25 if len(buf) else 0.85))
+            fill = (lambda buf=live, b=base: _hex(b, 1.2 if len(buf) else 0.8))
             line = _hex(base, 1.6)
         else:
             fill = _hex(base)
             line = _hex(base, 1.6)
 
-        sim.AnimateRectangle(
-            spec=(left, bottom, right, top),
-            fillcolor=fill,
-            linecolor=line,
-            linewidth=2,
-            layer=30,
-        )
+        sim.AnimateRectangle(spec=(left, bottom, right, top), fillcolor=fill,
+                             linecolor=line, linewidth=2, layer=30)
 
-        # --- kind tag (small, top-left) ---
-        sim.AnimateText(
-            text=kind,
-            x=left + 10,
-            y=top - 12,
-            text_anchor="nw",
-            textcolor=_hex(base, 1.9),
-            fontsize=11,
-            layer=20,
-        )
+        # role / kind tag (top-left)
+        role = node.get("buffer_role")
+        tag = f"{kind} · {role}" if (isinstance(live, HardBuffer) and role) else kind
+        sim.AnimateText(text=tag, x=left + 12, y=top - 13, text_anchor="nw",
+                        textcolor=_hex(base, 1.9), fontsize=11, layer=20)
 
-        # --- name (centered) ---
-        sim.AnimateText(
-            text=node.get("name", node["id"]),
-            x=cx,
-            y=top - 34,
-            text_anchor="n",
-            textcolor="white",
-            fontsize=15,
-            layer=20,
-        )
+        # name (top, centred)
+        sim.AnimateText(text=node.get("name", node["id"]), x=cx, y=top - 31,
+                        text_anchor="n", textcolor="white", fontsize=15,
+                        max_lines=2, layer=20)
 
         if isinstance(live, HardBuffer):
-            self._draw_buffer_contents(node, live, left, bottom, right, top)
+            self._draw_buffer(node, live, left, bottom, right, top)
         elif isinstance(live, Task):
             self._draw_task_status(live, cx, bottom)
+        elif isinstance(live, FirstTask):
+            sim.AnimateText(text="▶ source", x=cx, y=bottom + 16, text_anchor="s",
+                            textcolor="#e0a0a0", fontsize=13, layer=20)
 
-    # ---- per-kind live decorations ------------------------------------
+    # ---- buffers -------------------------------------------------------
 
-    def _draw_buffer_contents(self, node, buf: HardBuffer, left, bottom, right, top) -> None:
-        # live count, top-right
-        sim.AnimateText(
-            text=lambda b=buf: f"{len(b)}",
-            x=right - 12,
-            y=top - 12,
-            text_anchor="ne",
-            textcolor="white",
-            fontsize=18,
-            layer=20,
-        )
-        # the pieces themselves, marching right along the bottom of the box
-        sim.AnimateQueue(
-            queue=buf,
-            x=left + 22,
-            y=bottom + 22,
-            direction="e",
-            max_length=max(1, int((right - left - 30) // 26)),
-            title="",                    # buffer name is already drawn above
-            screen_coordinates=False,    # anchor is in world coords, not pixels
-            layer=10,
-        )
+    def _draw_buffer(self, node, buf, left, bottom, right, top) -> None:
+        role = node.get("buffer_role", "Normal")
+        is_normal = role == "Normal"
+        models_here = self._models_in(buf)
+
+        # total (top-right, big)
+        sim.AnimateText(text=lambda b=buf: f"Σ {len(b)}", x=right - 12, y=top - 13,
+                        text_anchor="ne", textcolor="white", fontsize=18, layer=20)
+
+        if is_normal:
+            # compact per-model counts stacked under the name (small, colour-coded)
+            y = top - 52
+            for name in models_here:
+                sim.AnimateText(
+                    text=lambda b=buf, m=name: f"{m}: {self._count(b, m)}",
+                    x=left + 12, y=y, text_anchor="nw",
+                    textcolor=self.model_colors.get(name, "#cccccc"),
+                    fontsize=11, layer=20,
+                )
+                y -= 16
+            header = (top - y) + 6
+            self._draw_squares(buf, left, bottom, right, top - header)
+        else:
+            # exit / scrap: counts only, larger and centred (no squares)
+            y = top - 60
+            for name in models_here:
+                sim.AnimateText(
+                    text=lambda b=buf, m=name: f"{m}:  {self._count(b, m)}",
+                    x=(left + right) / 2, y=y, text_anchor="n",
+                    textcolor=self.model_colors.get(name, "#cccccc"),
+                    fontsize=15, layer=20,
+                )
+                y -= 24
+
+    def _draw_squares(self, buf, left, bottom, right, top_area) -> None:
+        pad, sq, pitch = 12, 20, 24
+        cols = max(1, int((right - left - 2 * pad) // pitch))
+        rows = max(1, int((top_area - bottom - pad) // pitch))
+        for i in range(cols * rows):
+            col, row = i % cols, i // cols
+            x = left + pad + col * pitch + sq / 2
+            y = top_area - pad - row * pitch - sq / 2
+            sim.AnimateRectangle(
+                spec=(-sq / 2, -sq / 2, sq / 2, sq / 2), x=x, y=y,
+                fillcolor=lambda b=buf, i=i: self._square_color(b, i),
+                linecolor="white", linewidth=0.4,
+                visible=lambda b=buf, i=i: i < len(b),
+                layer=10,
+            )
+
+    def _square_color(self, buf, i: int) -> str:
+        lst = self._contents(buf)
+        if i < len(lst):
+            return self.model_colors.get(lst[i].model.name, "#cccccc")
+        return BACKGROUND  # hidden anyway
+
+    # ---- tasks ---------------------------------------------------------
 
     def _task_fill(self, task: Task, base) -> str:
         if task.is_in_breakdown.get():
-            return "#c0392b"           # broken -> red
+            return "#c0392b"
         if task.is_in_scheduled_shutdown.get():
-            return "#8e44ad"           # scheduled stop -> purple
+            return "#8e44ad"
         if task.active_carriers:
-            return _hex(base, 1.45)    # working -> bright
-        return _hex(base, 0.75)        # idle -> dim
+            return _hex(base, 1.45)
+        return _hex(base, 0.75)
 
     def _task_line(self, task: Task) -> str:
         if task.is_in_breakdown.get():
@@ -402,67 +414,41 @@ class VisualSimulation:
         if task.is_in_scheduled_shutdown.get():
             return "● SHUTDOWN"
         n = len(task.active_carriers)
-        if n:
-            return f"● WORKING ({n})"
-        return "○ idle"
+        return f"● WORKING ({n})" if n else "○ idle"
 
     def _draw_task_status(self, task: Task, cx, bottom) -> None:
-        sim.AnimateText(
-            text=lambda t=task: self._task_status_text(t),
-            x=cx,
-            y=bottom + 16,
-            text_anchor="s",
-            textcolor=lambda t=task: self._task_line(t),
-            fontsize=13,
-            layer=20,
-        )
+        sim.AnimateText(text=lambda t=task: self._task_status_text(t), x=cx,
+                        y=bottom + 16, text_anchor="s",
+                        textcolor=lambda t=task: self._task_line(t),
+                        fontsize=13, layer=20)
 
     # ---- fixed overlay (screen coordinates) ---------------------------
 
     def _draw_overlay(self) -> None:
+        sim.AnimateText(text=f"Flow Simulator — {self.filename}", x=18, y=-18,
+                        xy_anchor="nw", text_anchor="nw", textcolor="white",
+                        fontsize=20, screen_coordinates=True, layer=0)
+        sim.AnimateText(text=lambda: f"t = {env.now():,.1f}", x=18, y=-46,
+                        xy_anchor="nw", text_anchor="nw", textcolor="#9fd14d",
+                        fontsize=16, screen_coordinates=True, layer=0)
         sim.AnimateText(
-            text=f"Flow Simulator — {self.filename}",
-            x=18, y=-18, xy_anchor="nw",
-            text_anchor="nw", textcolor="white", fontsize=20,
-            screen_coordinates=True, layer=0,
-        )
-        sim.AnimateText(
-            text=lambda: f"t = {env.now():,.1f}",
-            x=18, y=-46, xy_anchor="nw",
-            text_anchor="nw", textcolor="#9fd14d", fontsize=16,
-            screen_coordinates=True, layer=0,
-        )
-        sim.AnimateText(
-            text=lambda: (
-                f"pieces created: {Piece.ID}    "
-                f"WIP (in buffers): {self._wip()}"
-            ),
-            x=18, y=-70, xy_anchor="nw",
-            text_anchor="nw", textcolor="#cccccc", fontsize=13,
-            screen_coordinates=True, layer=0,
-        )
+            text=lambda: f"pieces created: {Piece.ID}    WIP (in buffers): {self._wip()}",
+            x=18, y=-70, xy_anchor="nw", text_anchor="nw", textcolor="#cccccc",
+            fontsize=13, screen_coordinates=True, layer=0)
         sim.AnimateText(
             text="drag = pan   ·   wheel = zoom   ·   u = reset   ·   space = pause   ·   -/+ = speed",
-            x=18, y=18, xy_anchor="sw",
-            text_anchor="sw", textcolor="#777788", fontsize=12,
-            screen_coordinates=True, layer=0,
-        )
+            x=18, y=18, xy_anchor="sw", text_anchor="sw", textcolor="#777788",
+            fontsize=12, screen_coordinates=True, layer=0)
 
         # model legend (top-right)
         y = -18
-        for name, color in self.model_colors.items():
-            sim.AnimateRectangle(
-                spec=(-10, -8, 10, 8),
-                x=-150, y=y, xy_anchor="ne",
-                fillcolor=color, linecolor="white", linewidth=0.5,
-                screen_coordinates=True, layer=0,
-            )
-            sim.AnimateText(
-                text=f"model {name}",
-                x=-132, y=y, xy_anchor="ne",
-                text_anchor="w", textcolor="white", fontsize=12,
-                screen_coordinates=True, layer=0,
-            )
+        for name in self.represented_models:
+            sim.AnimateRectangle(spec=(-10, -8, 10, 8), x=-150, y=y, xy_anchor="ne",
+                                 fillcolor=self.model_colors[name], linecolor="white",
+                                 linewidth=0.5, screen_coordinates=True, layer=0)
+            sim.AnimateText(text=f"model {name}", x=-132, y=y, xy_anchor="ne",
+                            text_anchor="w", textcolor="white", fontsize=12,
+                            screen_coordinates=True, layer=0)
             y -= 22
 
     def _wip(self) -> int:
@@ -477,19 +463,11 @@ class VisualSimulation:
         if animate:
             x0, y0, x1 = self._initial_view(width, height)
             env.animation_parameters(
-                animate=True,
-                synced=True,
-                speed=speed,
-                width=width,
-                height=height,
+                animate=True, synced=True, speed=speed, width=width, height=height,
                 title=f"Flow Simulator — {self.filename}",
-                background_color=BACKGROUND,
-                foreground_color="white",
-                # Our own header draws the time/WIP, and the controls live in the hint
-                # bar, so the built-in widgets are turned off to avoid overlap.
-                show_menu_buttons=False,
-                show_fps=False,
-                show_time=False,
+                background_color=BACKGROUND, foreground_color="white",
+                # our own header draws the time/WIP, controls live in the hint bar
+                show_menu_buttons=False, show_fps=False, show_time=False,
                 x0=x0, y0=y0, x1=x1,
             )
             self.build_animation()
@@ -512,17 +490,14 @@ def main() -> None:
     args = ap.parse_args()
 
     vis = VisualSimulation(args.file)
-    vis.run(
-        till=args.till,
-        animate=not args.no_animate,
-        speed=args.speed,
-        width=args.width,
-        height=args.height,
-    )
+    vis.run(till=args.till, animate=not args.no_animate, speed=args.speed,
+            width=args.width, height=args.height)
 
     if args.no_animate:
-        print(f"Built {len(vis.nodes)} nodes, {len(vis.connections)} connections.")
-        print(f"Model colors: {vis.model_colors}")
+        flow = vis._flow_nodes()
+        print(f"Drawn nodes: {len(flow)} (flow kinds only), "
+              f"connections: {sum(1 for c in vis.connections if vis.nodes.get(c['from_node'],{}).get('kind') in FLOW_KINDS and vis.nodes.get(c['to_node'],{}).get('kind') in FLOW_KINDS)}")
+        print(f"Represented models -> colors: {vis.model_colors}")
         vis.parser.print_statistics()
 
 

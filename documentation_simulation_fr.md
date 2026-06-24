@@ -377,12 +377,22 @@ Une fois le flux exporté en JSON depuis l'éditeur, deux outils l'exploitent :
 
 - **`graph_parser.py`** — reconstruit le modèle et, à la fin, **imprime les
   statistiques** des *Monitors*.
-- **`visual_simulation.py`** — **anime** le flux : il dessine chaque carte à sa
-  place (mêmes couleurs que l'éditeur), trace les liaisons, et montre **en direct**
-  les pièces s'accumuler dans les stocks et les postes changer d'état (gris =
-  inactif, clair = en cours, rouge = panne, violet = arrêt). On s'y **déplace à la
-  souris** (glisser pour naviguer, molette pour zoomer) plutôt que de tout
-  comprimer dans une seule fenêtre.
+- **`visual_simulation.py`** — **anime** le flux. Pour rester lisible, il ne dessine
+  que l'**essentiel** : la source, les postes et les stocks qui les relient (les
+  distributions, ressources, pannes, arrêts… pilotent toujours la simulation mais
+  ne sont pas dessinés). Chaque carte garde les **couleurs de l'éditeur** et les
+  liaisons sont retracées. En direct :
+    - les stocks **Normaux** affichent les pièces sous forme de **carrés
+      colorés** (une couleur par modèle) **plus** le compte par modèle et le total ;
+    - les stocks **Exit** et **Scrap** affichent **uniquement** le compte par modèle
+      et le total (pas de carrés) ;
+    - les postes changent d'état : gris = inactif, clair = en cours, rouge = panne,
+      violet = arrêt programmé.
+  Les **couleurs des modèles sont attribuées automatiquement** (et restent stables
+  quand on ajoute des modèles) ; conformément à la hiérarchie, on **représente les
+  enfants** plutôt que leur parent. On se **déplace à la souris** (glisser pour
+  naviguer, molette pour zoomer) plutôt que de tout comprimer dans une seule
+  fenêtre.
 
 C'est le meilleur moyen de **vérifier visuellement** que les pièces circulent comme
 prévu et de repérer d'un coup d'œil les stocks qui gonflent.
