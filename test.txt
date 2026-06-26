@@ -1,0 +1,524 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from enum import Enum, auto
+
+import numpy as np
+import salabim as sim
+
+SEED = 0
+sim.yieldless(True)
+env = sim.Environment(random_seed=SEED)
+np.random.seed(SEED)
+
+
+
+#########
+# MODEL #
+#########
+
+class Model:
+    def __init__(self, name: str, parent: Model | None = None) -> None:
+        self.name = name
+        self.parent = parent
+
+
+
+#########
+# PIECE #
+#########
+
+class Piece(sim.Component):
+    ID = 0
+
+    def setup(self, model: Model) -> None:
+        self.model = model
+        self.id = str(Piece.ID).zfill(6)
+        Piece.ID += 1
+
+
+class PickyPieceTaker:
+    def __init__(self, valid_models: list[Model]) -> None:
+        self.valid_models = valid_models
+
+    def can_take(self, obj: Piece | Model) -> bool:
+        model = obj.model if isinstance(obj, Piece) else obj
+        can_take_model = False
+        while model is not None and not can_take_model:
+            can_take_model |= model in self.valid_models
+            model = model.parent
+        return can_take_model
+
+    def can_flush_into(self, other: PickyPieceTaker) -> bool:
+        for model in self.valid_models:
+            if not other.can_take(model):
+                return False
+        return True
+
+    def check_inlet_validity(self, inlets: list[Buffer]) -> None:
+        for inlet in inlets:
+            if not inlet.can_flush_into(self):
+                raise ValueError("Inlets must be able to flush into task capability")
+
+    def check_outlet_validity(self, outlets: list[Outlet]) -> None:
+        flushable_models_sets = [set(outlet.valid_models) for outlet in outlets]
+        union = set.union(*flushable_models_sets)
+
+        if not self.can_flush_into(PickyPieceTaker(list(union))):
+            raise ValueError("Task capability must be able to flush into outlets")
+
+        for i in range(len(outlets)):
+            for j in range(i + 1, len(outlets)):
+                if not PickyPieceTaker.disjoint(outlets[i], outlets[j]):
+                    raise ValueError("Outlets valid models must be pairwise disjoint")
+
+    @staticmethod
+    def disjoint(ppt1: PickyPieceTaker, ppt2: PickyPieceTaker) -> bool:
+        for model in ppt1.valid_models:
+            if ppt2.can_take(model):
+                return False
+
+        for model in ppt2.valid_models:
+            if ppt1.can_take(model):
+                return False
+
+        return True
+
+
+class PiecePlacer(sim.Component):
+    def setup(self, pieces: list[Piece], outlets: list[Outlet]) -> None:
+        self.pieces = pieces
+        self.outlets = outlets
+
+    def process(self):
+        for piece in self.pieces:
+            for outlet in self.outlets:
+                if outlet.can_take(piece):
+                    chosen_buffer = outlet.get()
+                    piece.enter(chosen_buffer)
+                    chosen_buffer.update_arrival_signal()
+                    break
+
+
+
+#############################
+# OUTLETS, ROUTERS, BUFFERS #
+#############################
+
+class Outlet(PickyPieceTaker, ABC):
+    def __init__(self, valid_models: list[Model]) -> None:
+        PickyPieceTaker.__init__(self, valid_models)
+
+    @abstractmethod
+    def get(self) -> Buffer:
+        pass
+
+
+class Buffer(sim.Store, Outlet):
+    def setup(self, valid_models: list[Model]) -> None:
+        Outlet.__init__(self, valid_models)
+        self.arrival_signal = sim.State(value=0)
+
+    def update_arrival_signal(self) -> None:
+        self.arrival_signal.set(self.arrival_signal.get() + 1)
+
+    def get(self) -> Buffer:
+        return self
+
+
+class Router(Outlet):
+    def __init__(self, buffers_probs: list[tuple[Buffer, float]]) -> None:
+        self.buffers = [b for b, _ in buffers_probs]
+        self.probs = [p for _, p in buffers_probs]
+
+        if not all(0 <= p <= 1 for p in self.probs):
+            raise ValueError("Probabilities must be in [0,1]")
+        if abs(sum(self.probs) - 1) > 1e-9:
+            raise ValueError("Probabilities must sum to 1")
+
+        valid_models_sets = [set(buffer.valid_models) for buffer in self.buffers]
+        intersection = set.intersection(*valid_models_sets)
+
+        if not intersection:
+            raise ValueError("Router buffers must have at least one valid model in common")
+
+        super().__init__(list(intersection))
+
+    def get(self) -> Buffer:
+        return self.buffers[np.random.choice(len(self.buffers), p=self.probs)].get()
+
+
+
+#######################
+# SCHEDULED SHUTDOWNS #
+#######################
+
+class Interval:
+    def __init__(self, start: float, end: float) -> None:
+        if start >= end:
+            raise ValueError("Interval start must be before interval end")
+
+        self.start = start
+        self.end = end
+
+    @property
+    def length(self) -> float:
+        return self.end - self.start
+
+
+class ScheduledShutdown(sim.Component):
+    def setup(self, task: Task, intervals: list[Interval]) -> None:
+        self.task = task
+        self.intervals = sorted(intervals, key=lambda i: i.end)
+
+    def next_shutdown(self) -> Interval | None:
+        for interval in self.intervals:
+            if interval.end > env.now():
+                return interval
+        return None
+
+    def process(self):
+        while (next_shutdown := self.next_shutdown()) is not None:
+            if env.now() + self.task.next_operation_duration > next_shutdown.start:
+                self.task.allow_operation.set(False)
+
+            self.hold(till=next_shutdown.start, cap_now=True)
+            self.task.abort()
+            self.task.is_in_shutdown.set(True)
+            self.hold(till=next_shutdown.end)
+            self.task.is_in_shutdown.set(False)
+
+
+
+##############
+# BREAKDOWNS #
+##############
+
+class BathtubCurveGenerator:
+    @staticmethod
+    def generate(A: float, tau: float, c: float, beta: float, eta: float) -> function:
+        def bathtub_curve(t: float) -> float:
+            return A * np.exp(-t / tau) + c + beta / eta * np.pow(t / eta, beta - 1)
+
+        return bathtub_curve
+
+
+class Breakdown(sim.Component):
+    def setup(self, task: Task, failure_rate: function, mttr: sim.Distribution) -> None:
+        self.task = task
+        self.failure_rate = failure_rate
+        self.mttr = mttr
+
+    def get_next_breakdown_time(self) -> float:
+        threshold = -np.log(env.random.random())
+        integral = 0
+        t = env.now()
+        dt = 1
+        while integral < threshold:
+            integral += self.failure_rate(t) * dt
+            t += dt
+        return t
+
+    def process(self):
+        while True:
+            self.wait((self.task.is_in_shutdown, False))
+
+            next_breakdown_time = self.get_next_breakdown_time()
+            self.hold(till=next_breakdown_time)
+
+            if self.task.is_in_shutdown.get():
+                continue
+
+            self.task.abort()
+            self.task.is_in_breakdown.set(True)
+            self.hold(self.mttr.sample())
+            self.task.is_in_breakdown.set(False)
+
+
+
+####################
+# BATCH COLLECTORS #
+####################
+
+class BatchCollectorType(Enum):
+    GREEDY = auto()
+    ALTRUISTIC = auto()
+
+
+class BatchCollector(sim.Component):
+    def setup(self, task: Task) -> None:
+        self.task = task
+        self.collected_pieces: list[Piece] = []
+        self.allow_dispatch = sim.State(value=False)
+        self.done = sim.State(value=False)
+
+
+class GreedyBatchCollector(BatchCollector):
+    def process(self):
+        self.wait((self.allow_dispatch, True))
+
+        if self.task.config.greedy_carriers:
+            self.request((self.task.vacant_slots, self.task.config.max_carrier_capacity))
+        else:
+            self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity))
+
+        while len(self.collected_pieces) < self.task.config.min_carrier_capacity:
+            piece = self.from_store(self.task.inlets, filter=self.task.can_take)
+            self.collected_pieces.append(piece)
+
+        valid_pieces = [piece for inlet in self.task.inlets for piece in inlet if self.task.can_take(piece)]
+        remainder = min(self.task.vacant_slots.available_quantity(), len(valid_pieces), self.task.config.max_carrier_capacity - self.task.config.min_carrier_capacity)
+
+        if not self.task.config.greedy_carriers:
+            # This request must be instant and should not hold the collector (remainder <= available vacant slots)
+            self.request((self.task.vacant_slots, remainder))
+
+        for _ in range(remainder):
+            piece = self.from_store(self.task.inlets, filter=self.task.can_take)
+            self.collected_pieces.append(piece)
+
+        self.done.set(True)
+
+
+class AltruisticBatchCollector(BatchCollector):
+    def setup(self, task: Task) -> None:
+        super().setup(task)
+        self.snapshot = []
+
+    def process(self):
+        self.wait((self.allow_dispatch, True))
+
+        if self.task.config.greedy_carriers:
+            self.request((self.task.vacant_slots, self.task.config.max_carrier_capacity))
+        else:
+            self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity))
+
+        while not self.collected_pieces:
+            valid_pieces = [(piece, buffer) for buffer in self.task.inlets for piece in buffer if
+                            self.task.can_take(piece)]
+            truncate = min(self.task.config.max_carrier_capacity, self.task.vacant_slots.available_quantity() + self.task.config.min_carrier_capacity)
+            valid_pieces = valid_pieces[:truncate]
+
+            if len(valid_pieces) >= self.task.config.min_capacity:
+                if not self.task.config.greedy_carriers:
+                    additional_slots_to_request = len(valid_pieces) - self.task.config.min_capacity
+                    self.request((self.task.vacant_slots, additional_slots_to_request))
+                for piece, buffer in valid_pieces:
+                    piece.leave(buffer)
+                    self.collected_pieces.append(piece)
+                self.done.set(True)
+            else:
+                snapshot = [(buffer.arrival_signal, buffer.arrival_signal.get()) for buffer in self.task.inlets]
+                self.wait(*[(state, lambda value, comp, state, old=old: value != old) for state, old in snapshot])
+
+
+
+#########
+# TASKS #
+#########
+
+class Scope(Enum):
+    PER_PIECE = auto()
+    PER_BATCH = auto()
+    PER_TASK = auto()
+
+
+class Carrier(sim.Component):
+    def setup(self, task: Task) -> None:
+        self.task = task
+        self.allow_dispatch = sim.State(value=False)
+        self.loaded = sim.State(value=False)
+        self.done = sim.State(value=False)
+        if self.task.config.batch_collector_type is BatchCollectorType.GREEDY:
+            self.batch_collector = GreedyBatchCollector(task=self.task)
+        else:
+            self.batch_collector = AltruisticBatchCollector(task=self.task)
+
+    def process(self):
+        self.batch_collector.allow_dispatch.set(True)
+        self.wait((self.batch_collector.done, True))
+        self.loaded.set(True)
+        self.wait((self.allow_dispatch, True))
+
+        self.task.next_operation_duration = self.task.config.task_duration.sample()
+        task_duration = self.task.next_operation_duration
+        self.wait(self.task.allow_operation)
+        self.task.allow_operation.set(True)
+
+        resources_to_request = []
+
+        if self.task.config.operators_scope is Scope.PER_BATCH:
+            resources_to_request.extend(self.task.config.operators)
+            for resource, _ in self.task.config.resources:
+                if isinstance(resource, RestockableResource):
+                    resource.restock(demander=self)
+
+        if self.task.config.resources_scope is Scope.PER_BATCH:
+            resources_to_request.extend(self.task.config.resources)
+        elif self.task.config.resources_scope is Scope.PER_PIECE:
+            resources_to_request.extend(
+                [(resource, quantity * len(self.batch_collector.collected_pieces)) for resource, quantity in
+                 self.task.config.resources])
+
+        self.request(*resources_to_request)
+        self.hold(task_duration)
+        self.release()
+
+        PiecePlacer(pieces=self.batch_collector.collected_pieces, outlets=self.task.outlets)
+
+        self.done.set(True)
+        if self in self.task.active_carriers:
+            self.task.active_carriers.remove(self)
+
+
+class PieceGenerator(sim.Component, PickyPieceTaker):
+    def setup(self, models_probs_batch_sizes: list[tuple[Model, float, int]], duration: sim.Distribution,
+              outlets: list[Outlet]) -> None:
+        self.models = [m for m, _, _ in models_probs_batch_sizes]
+        self.probs = [p for _, p, _ in models_probs_batch_sizes]
+        self.batch_sizes = [b for _, _, b in models_probs_batch_sizes]
+
+        if not all(0 <= p <= 1 for p in self.probs):
+            raise ValueError("Probabilities must be in [0,1]")
+        if abs(sum(self.probs) - 1) > 1e-9:
+            raise ValueError("Probabilities must sum to 1")
+
+        PickyPieceTaker.__init__(self, self.models)
+        self.check_outlet_validity(outlets)
+
+        self.duration = duration
+        self.outlets = outlets
+
+    def process(self):
+        while True:
+            self.hold(self.duration.sample())
+            idx = np.random.choice(range(len(self.models)), p=self.probs)
+            pieces = [Piece(model=self.models[idx]) for _ in range(self.batch_sizes[idx])]
+            PiecePlacer(pieces=pieces, outlets=self.outlets)
+
+
+@dataclass
+class TaskConfig:
+    capability: list[Model]
+    operators: list[tuple[sim.Resource, int]]
+    startup_operators: list[tuple[sim.Resource, int]]
+    resources: list[tuple[sim.Resource, float]]
+    operators_scope: Scope
+    resources_scope: Scope
+    min_carriers: int
+    max_capacity: int
+    min_carrier_capacity: int
+    max_carrier_capacity: int
+    greedy_carriers: bool
+    task_duration: sim.Distribution
+    startup_duration: sim.Distribution
+    independent_carriers: bool
+    batch_collector_type: BatchCollectorType
+
+
+class Task(sim.Component, PickyPieceTaker):
+    def setup(self, config: TaskConfig, inlets: list[Buffer], outlets: list[Outlet]) -> None:
+        PickyPieceTaker.__init__(self, config.capability)
+
+        self.check_inlet_validity(inlets)
+        self.check_outlet_validity(outlets)
+
+        self.config = config
+        self.inlets = inlets
+        self.outlets = outlets
+
+        self.vacant_slots = sim.Resource(capacity=config.max_capacity)
+        self.is_in_breakdown = sim.State(value=False)
+        self.is_in_shutdown = sim.State(value=False)
+        self.allow_operation = sim.State(value=True)
+        self.next_operation_duration = -1
+        self.started_up = sim.State(value=False)
+
+        self.active_carriers: list[Carrier] = []
+
+    def handle_startup(self) -> None:
+        self.request(*self.config.startup_operators)
+        self.next_operation_duration = self.config.startup_duration.sample()
+        self.wait((self.allow_operation, True))
+        self.hold(self.next_operation_duration)
+        self.release()
+        self.allow_operation.set(True)
+        self.started_up.set(True)
+
+        if self.config.operators_scope is Scope.PER_TASK:
+            self.request(*self.config.operators)
+
+    def abort(self) -> None:
+        self.started_up.set(False)
+        self.release()
+
+        for carrier in self.active_carriers:
+            carrier.batch_collector.release()
+            carrier.batch_collector.cancel()
+
+            carrier.release()
+            carrier.cancel()
+            carrier.loaded.set(True)
+            carrier.done.set(True)
+
+        self.active_carriers.clear()
+
+    def process(self):
+        while True:
+            self.wait((self.is_in_breakdown, False), (self.is_in_shutdown, False), all=True)
+
+            if not self.started_up.get():
+                self.handle_startup()
+
+            if self.config.operators_scope is Scope.PER_TASK:
+                for resource, _ in self.config.resources:
+                    if isinstance(resource, RestockableResource):
+                        resource.restock(demander=self)
+
+            carrier = Carrier(task=self)
+            self.active_carriers.append(carrier)
+            self.wait((carrier.loaded, True))
+
+            non_dispatched_carriers = list(filter(lambda c: not c.allow_dispatch.get(), self.active_carriers))
+            if len(non_dispatched_carriers) >= self.config.min_carriers:
+                for carrier in non_dispatched_carriers:
+                    carrier.allow_dispatch.set(True)
+
+            if not self.config.independent_carriers:
+                self.wait(*[(c.done, True) for c in non_dispatched_carriers], all=True)
+
+
+
+#########################
+# RESTOCKABLE RESOURCES #
+#########################
+
+class Delivery(sim.Component):
+    def setup(self, stock: RestockableResource, delivery_duration: sim.Distribution) -> None:
+        self.stock = stock
+        self.delivery_duration = delivery_duration
+
+    def process(self):
+        self.hold(self.delivery_duration.sample())
+        missing = self.stock.capacity.value - self.stock.available_quantity()
+        self.request((self.stock, -missing))
+        self.stock.active_order = False
+
+
+class RestockableResource(sim.Resource):
+    def __init__(self, *args, **kwargs) -> None:
+        kwargs["anonymous"] = True
+        super().__init__(*args, **kwargs)
+
+    def setup(self, order_duration: sim.Distribution, delivery_duration: sim.Distribution, threshold: float) -> None:
+        self.order_duration = order_duration
+        self.delivery_duration = delivery_duration
+        self.threshold = threshold
+        self.active_order = False
+
+    def restock(self, demander: sim.Component) -> None:
+        if not self.active_order and self.available_quantity() < self.threshold:
+            self.active_order = True
+            demander.hold(self.order_duration.sample())
+            Delivery(stock=self, delivery_duration=self.delivery_duration)
