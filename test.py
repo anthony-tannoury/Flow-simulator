@@ -184,6 +184,10 @@ class ScheduledShutdown(sim.Component):
                 self.task.allow_operation.set(False)
 
             self.hold(till=next_shutdown.start, cap_now=True)
+
+            for carrier in self.task.active_carriers:
+                PiecePlacer(pieces=carrier.batch_collector.collected_pieces, outlet=self.task.inlets)
+
             self.task.abort()
             self.task.is_in_shutdown.set(True)
             self.hold(till=next_shutdown.end)
@@ -205,10 +209,12 @@ class BathtubCurveGenerator:
 
 
 class Breakdown(sim.Component):
-    def setup(self, task: Task, failure_rate: function, mttr: sim.Distribution) -> None:
+    def setup(self, task: Task, failure_rate: function, mttr: sim.Distribution, outlets: list[Outlet]) -> None:
+        task.check_outlet_validity(outlets)
         self.task = task
         self.failure_rate = failure_rate
         self.mttr = mttr
+        self.outlets = outlets
 
     def get_next_breakdown_time(self) -> float:
         threshold = -np.log(env.random.random())
@@ -230,6 +236,11 @@ class Breakdown(sim.Component):
             if self.task.is_in_shutdown.get():
                 continue
 
+            saved_pieces: list[Piece] = []
+            for carrier in self.task.active_carriers:
+                saved_pieces.extend(carrier.batch_collector.collected_pieces)
+            PiecePlacer(pieces=saved_pieces, outlets=self.outlets)
+
             self.task.abort()
             self.task.is_in_breakdown.set(True)
             self.hold(self.mttr.sample())
@@ -247,8 +258,9 @@ class BatchCollectorType(Enum):
 
 
 class BatchCollector(sim.Component):
-    def setup(self, task: Task) -> None:
-        self.task = task
+    def setup(self, carrier: Carrier) -> None:
+        self.carrier = carrier
+        self.task = carrier.task
         self.collected_pieces: list[Piece] = []
         self.allow_dispatch = sim.State(value=False)
         self.done = sim.State(value=False)
@@ -259,9 +271,9 @@ class GreedyBatchCollector(BatchCollector):
         self.wait((self.allow_dispatch, True))
 
         if self.task.config.greedy_carriers:
-            self.request((self.task.vacant_slots, self.task.config.max_carrier_capacity))
+            self.carrier.request((self.task.vacant_slots, self.task.config.max_carrier_capacity))
         else:
-            self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity))
+            self.carrier.request((self.task.vacant_slots, self.task.config.min_carrier_capacity))
 
         while len(self.collected_pieces) < self.task.config.min_carrier_capacity:
             piece = self.from_store(self.task.inlets, filter=self.task.can_take)
@@ -272,7 +284,7 @@ class GreedyBatchCollector(BatchCollector):
 
         if not self.task.config.greedy_carriers:
             # This request must be instant and should not hold the collector (remainder <= available vacant slots)
-            self.request((self.task.vacant_slots, remainder))
+            self.carrier.request((self.task.vacant_slots, remainder))
 
         for _ in range(remainder):
             piece = self.from_store(self.task.inlets, filter=self.task.can_take)
@@ -282,17 +294,17 @@ class GreedyBatchCollector(BatchCollector):
 
 
 class AltruisticBatchCollector(BatchCollector):
-    def setup(self, task: Task) -> None:
-        super().setup(task)
+    def setup(self, carrier: Carrier) -> None:
+        super().setup(carrier=carrier)
         self.snapshot = []
 
     def process(self):
         self.wait((self.allow_dispatch, True))
 
         if self.task.config.greedy_carriers:
-            self.request((self.task.vacant_slots, self.task.config.max_carrier_capacity))
+            self.carrier.request((self.task.vacant_slots, self.task.config.max_carrier_capacity))
         else:
-            self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity))
+            self.carrier.request((self.task.vacant_slots, self.task.config.min_carrier_capacity))
 
         while not self.collected_pieces:
             valid_pieces = [(piece, buffer) for buffer in self.task.inlets for piece in buffer if
@@ -300,10 +312,10 @@ class AltruisticBatchCollector(BatchCollector):
             truncate = min(self.task.config.max_carrier_capacity, self.task.vacant_slots.available_quantity() + self.task.config.min_carrier_capacity)
             valid_pieces = valid_pieces[:truncate]
 
-            if len(valid_pieces) >= self.task.config.min_capacity:
+            if len(valid_pieces) >= self.task.config.min_carrier_capacity:
                 if not self.task.config.greedy_carriers:
-                    additional_slots_to_request = len(valid_pieces) - self.task.config.min_capacity
-                    self.request((self.task.vacant_slots, additional_slots_to_request))
+                    additional_slots_to_request = len(valid_pieces) - self.task.config.min_carrier_capacity
+                    self.carrier.request((self.task.vacant_slots, additional_slots_to_request))
                 for piece, buffer in valid_pieces:
                     piece.leave(buffer)
                     self.collected_pieces.append(piece)
@@ -485,8 +497,8 @@ class Task(sim.Component, PickyPieceTaker):
                 for carrier in non_dispatched_carriers:
                     carrier.allow_dispatch.set(True)
 
-            if not self.config.independent_carriers:
-                self.wait(*[(c.done, True) for c in non_dispatched_carriers], all=True)
+                if not self.config.independent_carriers:
+                    self.wait(*[(c.done, True) for c in non_dispatched_carriers], all=True)
 
 
 
