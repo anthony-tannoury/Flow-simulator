@@ -1,4 +1,3 @@
-- Piece collector timeout implementation
-- Relay policy
-- Resource task
-- Piece generator
+- Shift generator
+- Function generator
+

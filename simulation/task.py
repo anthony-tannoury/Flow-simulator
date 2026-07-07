@@ -9,6 +9,7 @@ from .helpers import sample_distr_or_func
 from .operator import Alternative
 from .distribution import Distribution
 from .protocols import *
+from .resource import
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -26,6 +27,86 @@ class Carrier(Component, ABC):
     @abstractmethod
     def abort(self, *args) -> None:
         pass
+
+    def freeze_abort_if(self, condition: bool) -> None:
+        if condition:
+            self.task.is_frozen.set(True)
+            self.abort(self.task.inlets)
+
+    def handle_operators(self, operators: Alternative, earliest_deadline: float, ideal_duration: float, fail_before: float, handle_restock: bool) -> None:
+        recuperated = operators.request(demander=self, fail_at=earliest_deadline - fail_before)
+        self.freeze_abort_if(self.failed())
+        assert recuperated is not None
+        productivity = recuperated[0][0].productivity
+
+        if self.task.config.operator_scope is Scope.PER_BATCH and handle_restock:
+            self.task.handle_restock(demander=self)
+
+        match self.task.config.protocols.operators_self_conscious.decide():
+            case ConsciousnessState.CONSCIOUS:
+                duration = ideal_duration / productivity.sample_now()
+            case ConsciousnessState.UNCONSCIOUS:
+                duration = ideal_duration
+
+        current_shift = recuperated[0][0].current_shift()
+        operator_shift_constraint_decision = self.task.config.protocols.operator_shift_constraint.decide(current_shift, duration)
+        task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(current_shift, duration)
+
+        self.freeze_abort_if(operator_shift_constraint_decision is Action.ABORT or task_shift_constraint_decision is Action.ABORT)
+        self.hold(duration)
+        self.release(*recuperated)
+
+    @abstractmethod
+    def get_ideal_loading_duration(self) -> float:
+        pass
+
+    @abstractmethod
+    def get_ideal_duration(self) -> float:
+        pass
+
+    @abstractmethod
+    def request_resources(self, fail_at: float) -> None:
+        pass
+
+    @abstractmethod
+    def successfully_end_process(self) -> None:
+        pass
+
+    def process(self):
+        start_time = env.now()
+        non_flexible_shutdown_deadline = self.task.non_flexible_shutdowns.get_deadline()
+        task_shift_deadline = self.task.current_shift().end
+        earliest_deadline = min(non_flexible_shutdown_deadline, task_shift_deadline)
+
+        self.collector.allow_dispatch.set(True)
+        self.wait(self.collector.done, fail_at=earliest_deadline)
+        self.freeze_abort_if(self.failed())
+        self.loaded.set(True)
+
+        ideal_loading_duration = self.get_ideal_loading_duration()
+        ideal_duration = self.get_duration()
+
+        self.request_resources(fail_at=earliest_deadline - (ideal_duration + ideal_loading_duration))
+
+        match self.task.config.protocols.pending_carrier_pre_task_shift_end.decide(self.task.config.min_carriers, len(self.task.pending_carriers)):
+            case Action.LAUNCH:
+                self.task.skip_downtime_check = True
+            case Action.ABORT:
+                self.task.skip_downtime_check = False
+
+        self.wait(self.allow_dispatch, fail_at=earliest_deadline - (ideal_duration + ideal_loading_duration))
+        self.freeze_abort_if(self.failed())
+
+        if self.task.config.loading_operators:
+            self.handle_operators(self.task.config.loading_operators, earliest_deadline, ideal_loading_duration, ideal_duration + ideal_loading_duration, False)
+
+        if self.task.config.operators:
+            self.handle_operators(self.task.config.operators, earliest_deadline, ideal_duration, ideal_duration, True)
+
+        if self.task.flexible_shutdowns.adapt(Interval(start_time, env.now())):
+            self.task.is_frozen.set(True)
+
+        self.successfully_end_process()
 
 
 class CarrierTracker:
@@ -86,11 +167,11 @@ class TaskStarter(Component):
 
 @dataclass
 class Protocols:
-    pending_carriers_pre_flexible_shutdowns: PendingCarriersPreFlexibleShutdownProtocol
+    pending_carriers_pre_flexible_shutdowns: PendingCarriers
+    pending_carrier_pre_task_shift_end: PendingCarriers
     operator_shift_constraint: ShiftConstraint
     task_shift_constraint: ShiftConstraint
     operators_self_conscious: SelfConsciouness
-    operation_relay: OperationRelay
 
 
 @dataclass
@@ -110,6 +191,8 @@ class TaskConfig:
     max_capacity: float
     contiguous_carriers: bool
     independent_carriers: bool
+    timeout: float
+    priority: int
 
     protocols: Protocols
 
@@ -122,11 +205,16 @@ class Task(Component, Interruptible, HasShifts, ABC):
         if config.resource_scope is Scope.PER_TASK:
             raise ValueError("Resource scope cannot be PER_TASK")
 
+        if not 0 <= config.priority <= 10:
+            raise ValueError("Task prioriy must be in [0,10]")
+        
+
         Interruptible.__init__(self)
         HasShifts.__init__(self, config.task_shifts)
 
         self.shift_manager = ShiftManager(entity=self)
 
+        config.priority = 10 - config.priority
         self.config = config
         self.carrier_type = carrier_type
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
@@ -137,12 +225,8 @@ class Task(Component, Interruptible, HasShifts, ABC):
         self.skip_frozen_check = False
         self.skip_downtime_check = False
 
-    @override
-    def abort(self) -> None:
-        pass
-
     @abstractmethod
-    def handle_restock(self) -> None:
+    def handle_restock(self, demander: Component) -> None:
         pass
 
     def handle_startup(self) -> None:
@@ -175,7 +259,7 @@ class Task(Component, Interruptible, HasShifts, ABC):
                 continue
 
             if self.config.operators_scope is Scope.PER_TASK:
-                self.handle_restock()
+                self.handle_restock(demander=self)
 
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
@@ -187,6 +271,7 @@ class Task(Component, Interruptible, HasShifts, ABC):
                     self.active_carriers.add(carrier)
 
                 self.skip_frozen_check = False
+                self.skip_downtime_check = False
 
                 if not self.config.independent_carriers:
                     self.wait(*[carrier.done for carrier in self.pending_carriers], all=True)
@@ -199,22 +284,3 @@ class Task(Component, Interruptible, HasShifts, ABC):
                             carrier.abort(self.inlets)
                     case Action.WAIT:
                         self.skip_frozen_check = True
-
-
-                
-
-
-                
-
-
-
-        
-
-'''
-Paramètres de rampup :
-- tps de cycle (manuel)
-- taux de rebuts
-- mtbf
-- mttr
-- Nouvelles machines qui deviennent dispo au cours de la simulation
-'''

@@ -43,6 +43,11 @@ class OperatorGroup(sim.Resource, HasShifts, Triggerable):
 
 class Alternative:
     def __init__(self, *alternatives: list[tuple[OperatorGroup, int]]):
+        for alt in alternatives:
+            productivity = alt[0][0].productivity
+            if not all(o.productivity is productivity for o, _ in alt):
+                raise ValueError("Operators do not have productivity")
+            
         self.alternatives = alternatives
         self.triggers = [r.trigger for alt in alternatives for r, _ in alt]
 

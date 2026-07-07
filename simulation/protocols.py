@@ -16,21 +16,21 @@ class ConsciousnessState(Enum):
     UNCONSCIOUS = auto()
 
 
-class PendingCarriersPreFlexibleShutdownProtocol(Protocol):
+class PendingCarriers(Protocol):
     def decide(self, min_carriers: int, pending_carriers: int) -> Action: ...
 
 
-class AbortPendingCarriersPreFlexibleShutdown:
+class AbortPendingCarriers:
     def decide(self, min_carriers: int, pending_carriers: int) -> Action:
         return Action.ABORT
     
 
-class WaitForCarriersPreFlexibleShutdown:
+class WaitForCarriers:
     def decide(self, min_carriers: int, pending_carriers: int) -> Action:
         return Action.WAIT
     
 
-class AbortOrWaitCarriersPreFlexibleShutdown:
+class AbortOrWaitForCarriers:
     def __init__(self, tolerance_fraction: float):
         self.tolerance_fraction = tolerance_fraction
     
@@ -66,12 +66,3 @@ class Conscious:
 class Unconscious:
     def decide(self) -> ConsciousnessState:
         return ConsciousnessState.UNCONSCIOUS
-    
-
-class OperationRelay(Protocol):
-    def decide(self, current_operator_shift: Interval, current_task_shift: Interval, duration: float) -> Action: ...
-
-
-class CanRelay:
-    def decide(self, current_operator_shift: Interval, current_task_shift: Interval, duration: float) -> Action:
-        return Action.LAUNCH

@@ -4,6 +4,7 @@ import numpy as np
 from .piece import Model, PickyPieceTaker
 from .triggerable import Triggerable
 from .helpers import check_probabilities
+from .distribution import Distribution
 
 from abc import ABC, abstractmethod
 from typing import override
@@ -29,8 +30,10 @@ class Buffer(sim.Store, Outlet, Triggerable):
 
 
 class Router(Outlet):
-    def __init__(self, outlets_probs: dict[Outlet, float]) -> None:
-        check_probabilities(outlets_probs.values())
+    def __init__(self, outlets_probs: dict[Outlet, Distribution]) -> None:
+        for distr in outlets_probs.values():
+            if distr.distr_type is not sim.Constant:
+                raise ValueError("Randomness is not allowed in outlet probability variations with time")
 
         valid_models_sets = [set(outlet.valid_models) for outlet in outlets_probs.keys()]
         intersection = set.intersection(*valid_models_sets)
@@ -44,4 +47,6 @@ class Router(Outlet):
 
     @override
     def get(self) -> Buffer:
-        return self.outlets[np.random.choice(len(self.outlets), p=self.probs)].get()
+        probs = [distr.sample_now() for distr in self.probs]
+        check_probabilities(probs=probs)
+        return self.outlets[np.random.choice(len(self.outlets), p=probs)].get()

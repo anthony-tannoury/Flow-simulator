@@ -27,6 +27,9 @@ class Interval:
     def disjoint(self, other: Interval) -> bool:
         return min(self.end, other.end) < max(self.start, other.start)
     
+    def copy(self) -> Interval:
+        return Interval(self.start, self.end)
+    
 
 class IntervalWaiter(Component, ABC):
     def setup(self, intervals: list[Interval]) -> None:

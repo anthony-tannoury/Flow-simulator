@@ -1,2 +1,6 @@
-l = [1]
-print(bool(l))
+x = {
+    1: 2,
+    2: 3
+}
+
+print(x.get(0))
