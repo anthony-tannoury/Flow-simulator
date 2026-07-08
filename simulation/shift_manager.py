@@ -13,10 +13,10 @@ class HasShifts:
         check_disjoint_sorted_intervals(self.shifts)
         self.is_in_downtime = sim.State(value=True)
 
-    def current_shift(self) -> Interval | None:
-        for shift in self.shifts:
+    def current_or_last_shift(self) -> Interval | None:
+        for i, shift in enumerate(self.shifts):
             if shift.start > env.now():
-                break
+                return self.shifts[i - 1] if i > 0 else None
             if shift.end >= env.now():
                 return shift
         return None

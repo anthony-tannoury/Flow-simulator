@@ -8,16 +8,16 @@ from .distribution import Distribution
 class Resource(sim.Resource, Triggerable):
     def __init__(self, *args, **kwargs) -> None:
         kwargs['anonymous'] = True
+        kwargs['initial_claimed_quantity'] = kwargs['capacity']
         super().__init__(*args, **kwargs)
 
     def setup(self, initial_capacity: float | None = None, lifespan: float = float('inf')) -> None:
         if initial_capacity is None:
             initial_capacity = self.capacity()
-        self.expiry_managers = [ExpiryManager(resource=self, quantity=self.capacity() - initial_capacity)]
+        self.expiry_managers = [ExpiryManager(resource=self, quantity=initial_capacity)]
         self.lifespan = lifespan
 
     def shave(self, quantity: float) -> None:
-        assert self.available_quantity() >= quantity
         shaved_quantity = 0.0
         while shaved_quantity < quantity:
             assert self.expiry_managers
@@ -56,14 +56,14 @@ class Delivery(Component):
 
     def process(self):
         missing = self.stock.capacity.value - self.stock.available_quantity()
-        self.hold(self.delivery_duration.sample())
+        self.hold(self.delivery_duration.sample_now())
         self.stock.replenish(demander=self, quantity=missing)
         self.stock.active_order = False
 
 
 class RestockableResource(Resource):
-    def setup(self, order_duration: Distribution, delivery_duration: Distribution, threshold: float, initial_capcity: float | None = None, lifespan: float = float('inf')) -> None:
-        super().setup(initial_capacity=initial_capcity, lifespan=lifespan)
+    def setup(self, order_duration: Distribution, delivery_duration: Distribution, threshold: float, initial_capacity: float | None = None, lifespan: float = float('inf')) -> None:
+        super().setup(initial_capacity=initial_capacity, lifespan=lifespan)
         self.order_duration = order_duration
         self.delivery_duration = delivery_duration
         self.threshold = threshold
@@ -71,6 +71,6 @@ class RestockableResource(Resource):
 
     def restock(self, demander: Component):
         if not self.active_order and self.available_quantity() < self.threshold:
-            demander.hold(self.order_duration.sample_now())
             self.active_order = True
+            demander.hold(self.order_duration.sample_now())
             Delivery(stock=self, delivery_duration=self.delivery_duration)

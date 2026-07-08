@@ -20,6 +20,10 @@ class Interval:
         self.start = start
         self.end = end
 
+    @property
+    def length(self) -> float:
+        return self.end - self.start
+
     def translate(self, t: float) -> None:
         self.start += t
         self.end += t

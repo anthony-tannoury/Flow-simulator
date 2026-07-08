@@ -45,6 +45,11 @@ def check_outlet_validity(giver: PickyPieceTaker, outlets: list[Outlet]) -> None
 
 def place(pieces: list[Piece], outlets: list[Outlet]):
     for piece in pieces:
+        placed = False
         for outlet in outlets:
             if outlet.can_take(piece):
                 piece.enter(outlet.get())
+                placed = True
+                break
+        
+        assert placed

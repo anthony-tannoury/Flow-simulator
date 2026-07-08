@@ -43,15 +43,21 @@ class OperatorGroup(sim.Resource, HasShifts, Triggerable):
 
 class Alternative:
     def __init__(self, *alternatives: list[tuple[OperatorGroup, int]]):
+        self.alternatives = alternatives
+        if not alternatives:
+            return
+        
         for alt in alternatives:
             productivity = alt[0][0].productivity
             if not all(o.productivity is productivity for o, _ in alt):
-                raise ValueError("Operators do not have productivity")
+                raise ValueError("Operators do not have the same productivity")
             
-        self.alternatives = alternatives
         self.triggers = [r.trigger for alt in alternatives for r, _ in alt]
 
     def request(self, demander: sim.Component, **kwargs) -> list[tuple[OperatorGroup, int]] | None:
+        if not self.alternatives:
+            return []
+        
         if 'fail_at' in kwargs:
             fail_at = kwargs['fail_at']
         elif 'fail_delay' in kwargs:
@@ -60,7 +66,7 @@ class Alternative:
             fail_at = float('inf')
 
         if len(self.alternatives) == 1:
-            demander.request(*self.alternatives[0], fail_at=0)
+            demander.request(*self.alternatives[0], fail_at=fail_at)
             if not demander.failed():
                 return self.alternatives[0]
             return None

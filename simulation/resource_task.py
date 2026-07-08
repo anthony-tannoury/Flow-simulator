@@ -4,13 +4,11 @@ from enum import Enum, auto
 from typing import override
 from dataclasses import dataclass
 
-from simulation import env
 from .component import Component
 from .task import TaskConfig, Task, Carrier, Scope
 from .resource import Resource, RestockableResource
 from .distribution import Distribution
-from .interval import Interval
-from .protocols import Action
+from .helpers import check_probabilities
 
 
 class ResourceCollectorType(Enum):
@@ -37,7 +35,7 @@ class ResourceTimeoutManager(Component):
     
     def process(self):
         self.wait(self.allow_dispatch)
-        self.wait(self.resource_collector.done, fail_delay=self.resource_collector.task.timeout)
+        self.wait(self.resource_collector.done, fail_delay=self.resource_collector.task.config.timeout)
         if not self.failed():
             return
         self.resource_collector.interrupt()
@@ -62,8 +60,8 @@ class GreedyResourceCollector(ResourceCollector):
         while sum(self.requested_quantities) < self.task.config.min_carrier_capacity:
             for i, (r, p, _) in enumerate(self.task.config.transformed_resources_salvageable):
                 requested_quantity_per_resource = min(p*self.task.config.min_carrier_capacity - self.requested_quantities[i], r.available_quantity())
-                self.request((self.task.vacant_slots, requested_quantity_per_resource), request_priority=self.task.config.priority)
-                self.request((r, requested_quantity_per_resource), request_priority=self.task.config.priority)
+                self.request((self.task.vacant_slots, requested_quantity_per_resource), request_priority=self.task.request_priority)
+                self.request((r, requested_quantity_per_resource), request_priority=self.task.request_priority)
                 self.requested_quantities[i] += requested_quantity_per_resource
             self.wait(*self.triggers)
 
@@ -77,7 +75,7 @@ class GreedyResourceCollector(ResourceCollector):
             additional_request = min(self.task.vacant_slots.available_quantity(),
                                      self.task.config.max_carrier_capacity - self.task.config.min_carrier_capacity,
                                      available)
-            self.request(*[(r, p * additional_request) for r, p, _ in self.task.config.transformed_resources_salvageable], fail_delay=0, request_priority=self.task.config.priority)
+            self.request(*[(r, p * additional_request) for r, p, _ in self.task.config.transformed_resources_salvageable], fail_delay=0, request_priority=self.task.request_priority)
             assert not self.failed()
             self.requested_quantity += additional_request
 
@@ -85,7 +83,7 @@ class GreedyResourceCollector(ResourceCollector):
             additional_slots_to_request = additional_request
         else:
             additional_slots_to_request = self.task.config.max_carrier_capacity - self.task.config.min_carrier_capacity
-        self.request((self.task.vacant_slots, additional_slots_to_request), request_priority=self.task.config.priority)
+        self.request((self.task.vacant_slots, additional_slots_to_request), request_priority=self.task.request_priority)
 
         self.done.set(True)
         self.passivate()
@@ -95,9 +93,9 @@ class AltruisticResourceCollector(ResourceCollector):
     def process(self):
         self.wait(self.allow_dispatch)
         self.timeout_manager.allow_dispatch.set(True)
-        self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity), request_priority=self.task.config.priority)
+        self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity), request_priority=self.task.request_priority)
 
-        self.request(*[(r,p*self.task.config.min_carrier_capacity) for r, p, _ in self.task.config.transformed_resources_salvageable], fail_delay=0, request_priority=self.task.config.priority)
+        self.request(*[(r,p*self.task.config.min_carrier_capacity) for r, p, _ in self.task.config.transformed_resources_salvageable], fail_delay=0, request_priority=self.task.request_priority)
         assert not self.failed()
         self.requested_quantity = self.task.config.min_carrier_capacity
 
@@ -106,7 +104,7 @@ class AltruisticResourceCollector(ResourceCollector):
         additional_request = 0
         if (self.task.vacant_slots.available_quantity() > 0) and (available > 0):
             additional_request = min(self.task.vacant_slots.available_quantity(), self.task.config.max_carrier_capacity - self.task.config.min_carrier_capacity, available)
-            self.request(*[(r,p*additional_request) for r, p, _ in self.task.config.transformed_resources_salvageable], fail_delay=0, request_priority=self.task.config.priority)
+            self.request(*[(r, p*additional_request) for r, p, _ in self.task.config.transformed_resources_salvageable], fail_delay=0, request_priority=self.task.request_priority)
             assert not self.failed()
             self.requested_quantity += additional_request
 
@@ -114,7 +112,7 @@ class AltruisticResourceCollector(ResourceCollector):
             additional_slots_to_request = additional_request
         else:
             additional_slots_to_request = self.task.config.max_carrier_capacity - self.task.config.min_carrier_capacity
-        self.request((self.task.vacant_slots, additional_slots_to_request), request_priority=self.task.config.priority)
+        self.request((self.task.vacant_slots, additional_slots_to_request), request_priority=self.task.request_priority)
 
         self.done.set(True)
         self.passivate()
@@ -140,7 +138,19 @@ class ResourceCarrier(Carrier):
                 self.resource_collector = AltruisticResourceCollector(task=task)
 
     @override
+    def handle_restock(self) -> None:
+        assert isinstance(self.config, ResourceTaskConfig)
+        for resource, _ in self.config.non_transformed_resources:
+            if isinstance(resource, RestockableResource):
+                resource.restock(demander=self)
+        
+        for resource, _, _ in self.config.transformed_resources_salvageable:
+            if isinstance(resource, RestockableResource):
+                resource.restock(demander=self)
+
+    @override
     def abort(self, *args) -> None:
+        assert isinstance(self.task.config, ResourceTaskConfig)
         for i, (r, p, s) in enumerate(self.task.config.transformed_resources_salvageable):
             if s:
                 r.replenish(demander=self, quantity=p*self.resource_collector.requested_quantities[i])
@@ -157,16 +167,27 @@ class ResourceCarrier(Carrier):
         self.cancel()
 
     @override
+    def freeze_abort_if(self, condition: bool) -> None:
+        if condition:
+            self.task.is_frozen.set(True)
+            self.abort()
+
+    @override
+    def wait_for_collector(self, fail_at: float) -> None:
+        self.resource_collector.allow_dispatch.set(True)
+        self.wait(self.resource_collector.done, fail_at=fail_at)
+
+    @override
     def get_ideal_loading_duration(self) -> float:
         return self.task.config.loading_duration.sample_now()
     
     @override
     def get_ideal_duration(self) -> float:
-        return self.task.config.duration.sample()
+        return self.task.config.duration.sample_now()
     
     @override
     def request_resources(self, fail_at: float) -> None:
-        mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else len(self.piece_collector.collected_pieces)
+        mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else len(self.resource_collector.requested_quantity)
         resources = [(r, q*mult) for r, q in self.task.config.non_transformed_resources]
         self.request(*resources, fail_at=fail_at)
         self.freeze_abort_if(self.failed())
@@ -182,20 +203,17 @@ class ResourceCarrier(Carrier):
 
 
 class ResourceTask(Task):
-    @override
     def setup(self, config: ResourceTaskConfig):
+        check_probabilities([p for _, p, _ in config.transformed_resources_salvageable])
+
         if any(distr.lowerbound < 0 or distr.upperbound == float('inf') for _, distr in config.resources_out_distr):
             raise ValueError("Output resource distribution must be bounded in [0, +inf[")
 
         super().setup(config=config, carrier_type=ResourceCarrier)
 
     @override
-    def handle_restock(self, demander: Component) -> None:
-        assert isinstance(self.config, ResourceTaskConfig)
-        for resource, _ in self.config.non_transformed_resources:
-            if isinstance(resource, RestockableResource):
-                resource.restock(demander=demander)
-        
-        for resource, _, _ in self.config.transformed_resources_salvageable:
-            if isinstance(resource, RestockableResource):
-                resource.restock(demander=demander)
+    def abort(self, *args):
+        for carrier in list(self.pending_carriers) + list(self.active_carriers):
+            carrier.abort()
+        self.release()
+        self.started_up = False

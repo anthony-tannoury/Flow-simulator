@@ -20,11 +20,11 @@ class PieceGenerator(Component, PickyPieceTaker, Interruptible, HasShifts):
 
         self.outlets = outlets
         self.goals = list(models_goals.values())
-        self.probs = [0 for _ in range(len(self.models))]
+        self.probs = [0.0 for _ in range(len(self.models))]
         self.generated = [0 for _ in range(len(self.models))]
 
         self.total_goal = sum(self.goals)
-        self.gap = self.total_goal / sum(shift.length for shift in shifts)
+        self.gap = sum(shift.length for shift in shifts) / self.total_goal
 
     def update_probs(self) -> None:
         total_generated = sum(self.generated)
@@ -33,7 +33,7 @@ class PieceGenerator(Component, PickyPieceTaker, Interruptible, HasShifts):
 
     def process(self):
         while sum(self.generated) < self.total_goal:
-            self.wait((self.is_in_downtime, False), (self.is_in_shutdown, False), (self.is_in_breakdown, False))
+            self.wait((self.is_in_downtime, False), (self.is_in_shutdown, False), (self.is_in_breakdown, False), all=True)
             self.update_probs()
             self.hold(self.gap)
             idx = np.random.choice(len(self.models), p=self.probs)

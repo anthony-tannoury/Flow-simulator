@@ -5,62 +5,45 @@ from .component import Component
 from .interval import Interval, IntervalWaiter
 from .distribution import Distribution
 from .task import Task
-from abc import ABC, abstractmethod
-from typing import Callable, override
-
-
-class Interruptible(ABC):
-    def __init__(self) -> None:
-        self.non_flexible_shutdowns = NonFlexibleShutdowns()
-        self.flexible_shutdowns = FlexibleShutdowns()
-        self.is_in_breakdown = sim.State(value=False)
-        self.is_in_shutdown = sim.State(value=False)
-        self.is_frozen = sim.State(value=False)
-
-    def get_earliest_shutdown(self) -> Interval | None:
-        fs = self.flexible_shutdowns.get_next_shutdown()
-        nfs = self.non_flexible_shutdowns.get_next_shutdown()
-
-        if fs is not None and nfs is not None:
-            return min(fs, nfs, key=lambda s: s.start)
-        elif nfs is None:
-            return fs
-        return nfs
-    
-    def get_earliest_deadline(self) -> float:
-        earliest_shutdown = self.get_earliest_shutdown()
-        return earliest_shutdown.start if earliest_shutdown is not None else float('inf')
-
-    @abstractmethod
-    def abort(self) -> None:
-        pass
+from .piece_task import PieceTask
+from .resource_task import ResourceTask
+from .outlet import Outlet
+from .helpers import check_outlet_validity
+from abc import ABC
+from typing import override
 
 
 class Breakdown(Component, ABC):
-    def setup(self, entity: Interruptible, mtbf: Distribution, mttr: Distribution) -> None:
-        self.entity = entity
+    def setup(self, task: Task, mtbf: Distribution, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
+        if outlets is None:
+            outlets = []
+
+        if outlets and isinstance(task, ResourceTask):
+            raise ValueError("Breakdown on resource task cannot have outlets")
+    
+        self.task = task
         self.mtbf = mtbf
         self.mttr = mttr
+        self.outlets = outlets
 
     def process(self):
         while True:
-            self.wait((self.entity.is_in_shutdown, False))
-            self.hold(till=self.mtbf.sample_now())
+            self.wait((self.task.is_in_shutdown, False))
+            self.hold(self.mtbf.sample_now())
 
-            if self.entity.is_in_shutdown.get():
+            if self.task.is_in_shutdown.get():
                 continue
 
-            self.entity.abort()
-
-            self.entity.is_in_breakdown.set(True)
+            self.task.abort(self.outlets)
+            self.task.is_in_breakdown.set(True)
             self.hold(self.mttr.sample_now())
-            self.entity.is_in_breakdown.set(False)
+            self.task.is_in_breakdown.set(False)
 
 
 class Shutdowns(IntervalWaiter):
-    def setup(self, entity: Interruptible, intervals: list[Interval]):
+    def setup(self, task: Task, intervals: list[Interval]):
         super().setup(intervals=intervals)
-        self.entity = entity
+        self.task = task
 
     def get_next_shutdown(self) -> Interval | None:
         for interval in self.intervals:
@@ -74,18 +57,19 @@ class Shutdowns(IntervalWaiter):
     
     @override
     def on_enter(self, *args):
-        self.entity.is_in_shutdown.set(True)
+        self.task.abort(self.task.inlets)
+        self.task.is_in_shutdown.set(True)
 
     @override
     def on_leave(self, *args):
-        self.entity.is_in_shutdown.set(False)
-        self.entity.is_frozen.set(False)
+        self.task.is_in_shutdown.set(False)
+        self.task.is_frozen.set(False)
 
 
 class FlexibleShutdowns(Shutdowns):
     def setup(self, task: Task, intervals: list[Interval]):
-        super().setup(entity=task, intervals=intervals)
-        self.entity.flexible_shutdowns = self
+        super().setup(task=task, intervals=intervals)
+        self.task.flexible_shutdowns = self
 
     def rearrange(self, idx: int) -> None:
         while idx + 1 < len(self.intervals) and self.intervals[idx + 1].end < self.intervals[idx].start:
@@ -102,25 +86,22 @@ class FlexibleShutdowns(Shutdowns):
     
     @override
     def process(self):
-        assert isinstance(self.entity, Task)
         while True:
-            self.wait((self.entity.active_carriers.num_carriers, 0))
+            self.wait((self.task.active_carriers.num_carriers, 0))
 
             next_shutdown = self.get_next_shutdown()
             if next_shutdown is None:
                 break
 
             self.hold(till=next_shutdown.start, cap_now=True)
-            self.task.started_up = False
+            self.task.abort(self.task.inlets)
             self.task.is_in_shutdown.set(True)
             self.hold(till=next_shutdown.end, cap_now=True)
             self.task.is_in_shutdown.set(False)
             self.task.is_frozen.set(False)
-        
 
 
 class NonFlexibleShutdowns(Shutdowns):
-    def setup(self, entity: Interruptible, intervals:list[Interval]):
-        super().setup(entity=entity, intervals=intervals)
-        self.entity.non_flexible_shutdowns = self
-
+    def setup(self, task: Task, intervals:list[Interval]):
+        super().setup(task=task, intervals=intervals)
+        self.task.non_flexible_shutdowns = self

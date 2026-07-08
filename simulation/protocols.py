@@ -54,7 +54,7 @@ class NotConstrainedByShift:
         return Action.LAUNCH
 
 
-class SelfConsciouness(Protocol):
+class SelfConsciousness(Protocol):
     def decide(self) -> ConsciousnessState: ...
 
 
