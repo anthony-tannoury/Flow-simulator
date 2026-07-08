@@ -42,13 +42,13 @@ class PieceTimeoutManager(Component):
 
     def process(self):
         self.wait(self.allow_dispatch)
-        self.wait(self.piece_collector.done, fail_delay=self.piece_collector.task.config.timeout)
+        self.wait(self.piece_collector.done, fail_delay=self.piece_collector.task.request_priority)
         if not self.failed():
             return
         self.piece_collector.interrupt()
         if not self.piece_collector.collected_pieces:
-            piece = self.from_store(self.piece_collector.task.inlets, filter=self.piece_collector.task.can_take, request_priority=self.piece_collector.task.config.priority)
-            self.request((self.piece_collector.task.vacant_slots, 1), request_priority=self.piece_collector.task.config.priority)
+            piece = self.from_store(self.piece_collector.task.inlets, filter=self.piece_collector.task.can_take, request_priority=self.piece_collector.task.request_priority)
+            self.request((self.piece_collector.task.vacant_slots, 1), request_priority=self.piece_collector.task.request_priority)
             self.piece_collector.collected_pieces.append(piece)
         self.piece_collector.done.set(True)
         self.passivate()
@@ -235,18 +235,19 @@ class PieceCarrier(Carrier):
 
     @override
     def handle_restock(self) -> None:
-        assert isinstance(self.config, PieceTaskConfig)
-        for config in self.config.models_configs.values():
+        assert isinstance(self.task.config, PieceTaskConfig)
+        for config in self.task.config.models_configs.values():
             for resource, _ in config.resources:
                 if isinstance(resource, RestockableResource):
                     resource.restock(demander=self)
 
     @override
-    def abort(self, lifeboats: list[Outlet]):
+    def abort(self, *args):
+        outlets = args[0] if args else self.task.inlets
         self.piece_collector.done.set(True)
         self.piece_collector.timeout_manager.cancel()
         self.piece_collector.cancel()
-        place(self.piece_collector.collected_pieces, lifeboats)
+        place(self.piece_collector.collected_pieces, outlets)
 
         self.loaded.set(True)
         self.done.set(True)
@@ -298,9 +299,15 @@ class PieceCarrier(Carrier):
 class PieceTask(Task, PickyPieceTaker):
     def setup(self, config: PieceTaskConfig, inlets: list[Buffer], outlets: list[Outlet]) -> None:
         if not PieceCollectorType.is_discriminating(config.piece_collector_type):
-            first = next(iter(config.models_configs.values())).duration
-            if not all(distr is first for distr in config.models_configs.values()):
+            first_config = next(iter(config.models_configs.values()))
+            if not all(cfg.duration is first_config.duration for cfg in config.models_configs.values()):
                 raise ValueError("Piece task cannot have different durations for models and not discriminate")
+            
+            if not all(cfg.min_carrier_capacity != first_config.min_carrier_capacity for cfg in config.models_configs.values()):
+                raise Value("Piece task cannot have different min_carrrier_capacity for models and not discriminate")
+            
+            if not all(cfg.max_carrier_capacity != first_config.max_carrier_capacity for cfg in config.models_configs.values()):
+                raise Value("Piece task cannot have different max_carrrier_capacity for models and not discriminate")
 
         PickyPieceTaker.__init__(self, list(config.models_configs.keys()))
         check_outlet_validity(self, outlets)
@@ -311,8 +318,7 @@ class PieceTask(Task, PickyPieceTaker):
 
     @override
     def abort(self, *args):
-        outlets = args[0]
         for carrier in list(self.pending_carriers) + list(self.active_carriers):
-            carrier.abort(outlets)
+            carrier.abort(*args)
         self.release()
         self.started_up = False
