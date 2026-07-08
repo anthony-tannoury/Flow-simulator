@@ -5,18 +5,18 @@ from .component import Component
 from .piece import PickyPieceTaker, Model, Piece
 from .outlet import Outlet
 from .helpers import check_outlet_validity, place
-from .interrupters import Interruptible
-from .shift_manager import HasShifts
+from .shift_manager import ShiftManager, HasShifts
 from .interval import Interval
 
 
-class PieceGenerator(Component, PickyPieceTaker, Interruptible, HasShifts):
+class PieceGenerator(Component, PickyPieceTaker, HasShifts):
     def setup(self, models_goals: dict[Model, int], shifts: list[Interval], outlets: list[Outlet]) -> None:
         self.models = list(models_goals.keys())
         PickyPieceTaker.__init__(self, self.models)
-        Interruptible.__init__(self)
         HasShifts.__init__(self, shifts)
         check_outlet_validity(self, outlets)
+
+        self.shift_manager = ShiftManager(entity=self)
 
         self.outlets = outlets
         self.goals = list(models_goals.values())
@@ -35,7 +35,10 @@ class PieceGenerator(Component, PickyPieceTaker, Interruptible, HasShifts):
         while sum(self.generated) < self.total_goal:
             self.wait((self.is_in_downtime, False), (self.is_in_shutdown, False), (self.is_in_breakdown, False), all=True)
             self.update_probs()
-            self.hold(self.gap)
+            inter_arrival_time = self.gap
+            if self.current_or_last_shift() is not None:
+                inter_arrival_time = min(inter_arrival_time, self.current_or_last_shift.end)
+            self.hold(inter_arrival_time)
             idx = np.random.choice(len(self.models), p=self.probs)
             piece = Piece(model=self.models[idx])
             place([piece], self.outlets)
