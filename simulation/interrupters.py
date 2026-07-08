@@ -84,7 +84,7 @@ class FlexibleShutdowns(Shutdowns):
 
     def adapt(self, operation_interval: Interval) -> bool:
         for i, interval in enumerate(self.intervals):
-            if not Interval.disjoint(operation_interval, interval):
+            if not Interval.disjoint(operation_interval, interval) and interval.end > env.now():
                 interval.translate(operation_interval.end - interval.start)
                 self.rearrange(i)
                 return True
