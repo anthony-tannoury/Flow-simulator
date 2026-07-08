@@ -1,7 +1,7 @@
 import salabim as sim
 
 from simulation import env
-from .triggerable import Triggerable
+from .ables import Triggerable
 from .interval import Interval
 from .shift_manager import ShiftManager, HasShifts
 from .distribution import Distribution

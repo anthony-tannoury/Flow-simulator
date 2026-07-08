@@ -18,12 +18,15 @@ class Breakdown(Component, ABC):
     def setup(self, task: Task, mtbf: Distribution, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
         from .resource_task import ResourceTask
         from .piece_task import PieceTask
-        
+
         if outlets is None:
             outlets = []
 
         if outlets and isinstance(task, ResourceTask):
             raise ValueError("Breakdown on resource task cannot have outlets")
+        
+        if not outlets and isinstance(task, PieceTask):
+            raise ValueError("Breakdowns on piece tasks must have outlets")
     
         self.task = task
         self.mtbf = mtbf
@@ -91,16 +94,23 @@ class FlexibleShutdowns(Shutdowns):
     @override
     def process(self):
         while True:
-            self.wait((self.task.active_carriers.num_carriers, 0))
-
             next_shutdown = self.get_next_shutdown()
             if next_shutdown is None:
                 break
 
-            self.hold(till=next_shutdown.start, cap_now=True)
+            if env.now() < next_shutdown.start:
+                self.hold(till=next_shutdown.start)
+                continue
+
+            self.wait((self.task.active_carriers.num_carriers, 0))
+
+            current = self.get_next_shutdown()
+            if current is None or env.now() < current.start:
+                continue
+
             self.task.abort()
             self.task.is_in_shutdown.set(True)
-            self.hold(till=next_shutdown.end, cap_now=True)
+            self.hold(till=current.end, cap_now=True)
             self.task.is_in_shutdown.set(False)
             self.task.is_frozen.set(False)
 

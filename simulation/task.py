@@ -3,24 +3,25 @@ import salabim as sim
 from simulation import env
 from .component import Component
 from .shift_manager import HasShifts, ShiftManager
-from .interrupters import Interruptible, NonFlexibleShutdowns, FlexibleShutdowns
+from .interrupters import NonFlexibleShutdowns, FlexibleShutdowns
 from .interval import Interval
 from .operator import Alternative
 from .distribution import Distribution
 from .operator import OperatorGroup
 from .protocols import *
+from .ables import Dispatchable, Donnable
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
 
 
-class Carrier(Component, ABC):
+class Carrier(Component, Dispatchable, Donnable, ABC):
     def setup(self, task: Task):
+        Dispatchable.__init__(self)
+        Donnable.__init__(self)
         self.task = task
-        self.allow_dispatch = sim.State(value=False)
         self.loaded = sim.State(value=False)
-        self.done = sim.State(value=False)
 
     @abstractmethod
     def handle_restock(self) -> None:
@@ -168,10 +169,10 @@ class Scope(Enum):
     PER_TASK = auto()
 
 
-class TaskStarter(Component):
+class TaskStarter(Component, Donnable):
     def setup(self, task: Task):
+        Donnable.__init__(self)
         self.task = task
-        self.done = sim.State(value=False)
     
     def process(self):
         duration = self.task.config.startup_duration.sample_now()

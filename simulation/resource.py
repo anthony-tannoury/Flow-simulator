@@ -1,6 +1,6 @@
 import salabim as sim
 
-from .triggerable import Triggerable
+from .ables import Triggerable
 from .component import Component
 from .distribution import Distribution
 

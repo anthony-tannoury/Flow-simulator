@@ -2,7 +2,7 @@ import salabim as sim
 import numpy as np
 
 from .piece import Model, PickyPieceTaker
-from .triggerable import Triggerable
+from .ables import Triggerable
 from .helpers import check_probabilities
 from .distribution import Distribution
 
