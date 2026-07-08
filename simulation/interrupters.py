@@ -1,20 +1,24 @@
+from __future__ import annotations
+
 import salabim as sim
 
 from simulation import env
 from .component import Component
 from .interval import Interval, IntervalWaiter
-from .distribution import Distribution
-from .task import Task
-from .piece_task import PieceTask
-from .resource_task import ResourceTask
-from .outlet import Outlet
-from .helpers import check_outlet_validity
 from abc import ABC
-from typing import override
+from typing import override, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .task import Task
+    from .distribution import Distribution
+    from .outlet import Outlet
 
 
 class Breakdown(Component, ABC):
     def setup(self, task: Task, mtbf: Distribution, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
+        from .resource_task import ResourceTask
+        from .piece_task import PieceTask
+        
         if outlets is None:
             outlets = []
 
@@ -57,7 +61,7 @@ class Shutdowns(IntervalWaiter):
     
     @override
     def on_enter(self, *args):
-        self.task.abort(self.task.inlets)
+        self.task.abort()
         self.task.is_in_shutdown.set(True)
 
     @override
@@ -94,7 +98,7 @@ class FlexibleShutdowns(Shutdowns):
                 break
 
             self.hold(till=next_shutdown.start, cap_now=True)
-            self.task.abort(self.task.inlets)
+            self.task.abort()
             self.task.is_in_shutdown.set(True)
             self.hold(till=next_shutdown.end, cap_now=True)
             self.task.is_in_shutdown.set(False)
