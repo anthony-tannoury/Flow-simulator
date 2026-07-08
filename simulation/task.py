@@ -34,14 +34,14 @@ class Carrier(Component, ABC):
     def freeze_abort_if(self, condition: bool) -> None:
         pass
 
-    def handle_operators(self, operators: list[tuple[OperatorGroup, int]], ideal_duration: float, handle_restock: bool) -> None:
+    def handle_operators(self, operators: list[tuple[OperatorGroup, int]], ideal_duration: float, handle_restock: bool) -> float:
         if not operators:
-            return
+            return ideal_duration
         
         productivity = operators[0][0].productivity
 
         if handle_restock:
-            self.task.handle_restock()
+            self.handle_restock()
 
         match self.task.config.protocols.operators_self_conscious.decide():
             case ConsciousnessState.CONSCIOUS:
@@ -54,21 +54,20 @@ class Carrier(Component, ABC):
         task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), duration)
 
         self.freeze_abort_if(operator_shift_constraint_decision is Action.ABORT or task_shift_constraint_decision is Action.ABORT)
+        return duration
 
     def handle_batch_operators(self, operators: Alternative, earliest_deadline: float, ideal_duration: float, fail_before: float, handle_restock: bool) -> None:
         recuperated = operators.request(demander=self, fail_at=earliest_deadline - fail_before)
         self.freeze_abort_if(self.failed())
         assert recuperated is not None
-        duration = ideal_duration
 
-        self.handle_operators(recuperated, ideal_duration, handle_restock)
+        duration = self.handle_operators(recuperated, ideal_duration, handle_restock)
         
         self.hold(duration)
         self.release(*recuperated)
 
     def handle_task_operators(self, ideal_duration: float) -> None:
-        duration = ideal_duration
-        self.handle_operators(self.task.task_operators, ideal_duration, True)
+        duration = self.handle_operators(self.task.task_operators, ideal_duration, True)
         self.hold(duration)
 
     @abstractmethod
@@ -208,7 +207,6 @@ class TaskConfig:
     startup_operators: Alternative
     loading_operators: Alternative
     operators: Alternative
-    shutdown_operators: Alternative
     operator_scope: Scope
     resource_scope: Scope
 
@@ -233,7 +231,6 @@ class Task(Component, HasShifts, ABC):
         if not 0 <= config.priority <= 10:
             raise ValueError("Task priority must be in [0,10]")
 
-        Interruptible.__init__(self)
         HasShifts.__init__(self, config.task_shifts)
 
         self.shift_manager = ShiftManager(entity=self)
@@ -258,7 +255,7 @@ class Task(Component, HasShifts, ABC):
         self.skip_downtime_check = False
 
     @abstractmethod
-    def abort(self, *args) -> None:
+    def abort(self, *args):
         pass
 
     def get_earliest_shutdown(self) -> Interval | None:
@@ -300,12 +297,13 @@ class Task(Component, HasShifts, ABC):
 
             if not self.started_up:
                 self.handle_startup()
-
-            if self.is_frozen() and not self.skip_frozen_check:
+    
+            if (self.is_frozen() and not self.skip_frozen_check) or (not self.started_up):
                 continue
 
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
+            self.wait(new_carrier.done)
 
             if len(self.pending_carriers) >= self.config.min_carriers:
                 dispatched = []
