@@ -63,6 +63,10 @@ class GreedyResourceCollector(ResourceCollector):
                 self.request((self.task.vacant_slots, requested_quantity_per_resource), request_priority=self.task.request_priority)
                 self.request((r, requested_quantity_per_resource), request_priority=self.task.request_priority)
                 self.requested_quantities[i] += requested_quantity_per_resource
+
+            if sum(self.requested_quantities) >= self.task.config.min_carrier_capacity:
+                break
+
             self.wait(*self.triggers)
 
         assert sum(self.requested_quantities) == self.task.config.min_carrier_capacity
@@ -125,6 +129,8 @@ class ResourceTaskConfig(TaskConfig):
     resources_out_distr: list[tuple[Resource, sim.Bounded]]
     duration: Distribution
     resource_collector_type: ResourceCollectorType
+    min_carrier_capacity: float
+    max_carrier_capacity: float
 
 
 class ResourceCarrier(Carrier):
@@ -139,8 +145,8 @@ class ResourceCarrier(Carrier):
 
     @override
     def handle_restock(self) -> None:
-        assert isinstance(self.config, ResourceTaskConfig)
-        for resource, _ in self.config.non_transformed_resources:
+        assert isinstance(self.task.config, ResourceTaskConfig)
+        for resource, _ in self.task.config.non_transformed_resources:
             if isinstance(resource, RestockableResource):
                 resource.restock(demander=self)
         
@@ -187,7 +193,7 @@ class ResourceCarrier(Carrier):
     
     @override
     def request_resources(self, fail_at: float) -> None:
-        mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else len(self.resource_collector.requested_quantity)
+        mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else self.resource_collector.requested_quantity
         resources = [(r, q*mult) for r, q in self.task.config.non_transformed_resources]
         self.request(*resources, fail_at=fail_at)
         self.freeze_abort_if(self.failed())
@@ -197,6 +203,7 @@ class ResourceCarrier(Carrier):
         for resource_out, distr in self.task.config.resources_out_distr:
             resource_out.replenish(demander=self, quantity=distr.sample())
 
+        self.resource_collector.cancel()
         self.done.set(True)
         self.task.pending_carriers.remove(self)
         self.task.active_carriers.remove(self)
