@@ -25,12 +25,13 @@ class ResourceCollector(Component, Dispatchable, Donnable):
         Dispatchable.__init__(self)
         Donnable.__init__(self)
         self.task = task
-        self.requested_quantity = 0
+        self.requested_quantity = 0.0
         assert isinstance(task.config, ResourceTaskConfig)
         self.triggers = [r.trigger for r, _, _ in task.config.transformed_resources_salvageable]
-        self.requested_quantities = [0 for _ in task.config.transformed_resources_salvageable]
+        self.requested_quantities = [0.0 for _ in task.config.transformed_resources_salvageable]
 
     def balance_mix(self) -> None:
+        assert isinstance(self.task.config, ResourceTaskConfig)
         limiting_factor = min(self.requested_quantities[i] / p for i, (_, p, _) in enumerate(self.task.config.transformed_resources_salvageable))
 
         excess_slots = sum(self.requested_quantities) - limiting_factor
@@ -45,6 +46,7 @@ class ResourceCollector(Component, Dispatchable, Donnable):
         self.requested_quantity = limiting_factor
 
     def top_up(self) -> None:
+        assert isinstance(self.task.config, ResourceTaskConfig)
         available = min([r.available_quantity() / p for r, p, _ in self.task.config.transformed_resources_salvageable])
 
         additional_request = 0
@@ -67,6 +69,7 @@ class ResourceCollector(Component, Dispatchable, Donnable):
 
 class GreedyResourceCollector(ResourceCollector):
     def process(self):
+        assert isinstance(self.task.config, ResourceTaskConfig)
         self.wait(self.allow_dispatch)
         deadline = env.now() + self.task.config.timeout
         timed_out = False
@@ -98,6 +101,7 @@ class GreedyResourceCollector(ResourceCollector):
 
 class AltruisticResourceCollector(ResourceCollector):
     def process(self):
+        assert isinstance(self.task.config, ResourceTaskConfig)
         self.wait(self.allow_dispatch)
         deadline = env.now() + self.task.config.timeout
 
@@ -149,7 +153,7 @@ class ResourceCarrier(Carrier):
             if isinstance(resource, RestockableResource):
                 resource.restock(demander=self)
         
-        for resource, _, _ in self.config.transformed_resources_salvageable:
+        for resource, _, _ in self.task.config.transformed_resources_salvageable:
             if isinstance(resource, RestockableResource):
                 resource.restock(demander=self)
 
@@ -161,7 +165,6 @@ class ResourceCarrier(Carrier):
                 r.replenish(demander=self, quantity=p*self.resource_collector.requested_quantities[i])
 
         self.resource_collector.done.set(True)
-        self.resource_collector.timeout_manager.cancel()
         self.resource_collector.cancel()
 
         self.loaded.set(True)
@@ -188,10 +191,12 @@ class ResourceCarrier(Carrier):
     
     @override
     def get_ideal_duration(self) -> float:
+        assert isinstance(self.task.config, ResourceTaskConfig)
         return self.task.config.duration.sample_now()
     
     @override
     def request_resources(self, fail_at: float) -> None:
+        assert isinstance(self.task.config, ResourceTaskConfig)
         mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else self.resource_collector.requested_quantity
         resources = [(r, q*mult) for r, q in self.task.config.non_transformed_resources]
         self.request(*resources, fail_at=fail_at)
@@ -199,6 +204,7 @@ class ResourceCarrier(Carrier):
 
     @override
     def successfully_end_process(self):
+        assert isinstance(self.task.config, ResourceTaskConfig)
         for resource_out, distr in self.task.config.resources_out_distr:
             resource_out.replenish(demander=self, quantity=distr.sample())
 

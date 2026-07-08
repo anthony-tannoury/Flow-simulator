@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import salabim as sim
 
 from simulation import env
@@ -104,6 +106,7 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
 
         ideal_loading_duration = self.get_ideal_loading_duration()
         ideal_duration = self.get_ideal_duration()
+        self.freeze_abort_if(env.now() > earliest_deadline - (ideal_duration + ideal_loading_duration))
 
         self.request_resources(fail_at=earliest_deadline - (ideal_duration + ideal_loading_duration))
 
