@@ -1,6 +1,6 @@
 import salabim as sim
 
-from .resource import Triggerable, Resource
+from .triggerable import Triggerable
 
 
 class Component(sim.Component):
@@ -8,6 +8,7 @@ class Component(sim.Component):
         super().request(*args, fail_at=fail_at, fail_delay=fail_delay, mode=mode, urgent=urgent, request_priority=request_priority, priority=priority, cap_now=cap_now, oneof=oneof, called_from=called_from)
 
         if not self.failed():
+            from .resource import Resource
             for r, q in args:
                 if isinstance(r, Resource) and r.lifespan < float('inf'):
                     r.shave(q)
@@ -15,7 +16,8 @@ class Component(sim.Component):
                     r.trigger.trigger()
 
     def release(self, *args):
-        for r in self.requested_resources():
+        resources = [a[0] if isinstance(a, tuple) else a for a in args] or list(self.claimed_resources())
+        for r in resources:
             if isinstance(r, Triggerable):
                 r.trigger.trigger()
         super().release(*args)
