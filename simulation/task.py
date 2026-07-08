@@ -319,6 +319,8 @@ class Task(Component, HasShifts, ABC):
 
                 if not self.config.independent_carriers:
                     self.wait(*[carrier.done for carrier in dispatched], all=True)
+                else:
+                    self.wait(*[carrier.loaded for carrier in dispatched], all=True)
 
             elif self.is_frozen():
                 decision = self.config.protocols.pending_carriers_pre_flexible_shutdowns.decide(self.config.min_carriers, len(self.pending_carriers))

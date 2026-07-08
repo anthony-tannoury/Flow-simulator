@@ -23,12 +23,16 @@ class Interruptible:
 class Breakdown(Component, ABC):
     def setup(self, task: Task, mtbf: Distribution, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
         from .resource_task import ResourceTask  # deferred: resource_task.py imports task.py which imports this module
+        from .piece_task import PieceTask
 
         if outlets is None:
             outlets = []
 
         if outlets and isinstance(task, ResourceTask):
             raise ValueError("Breakdown on resource task cannot have outlets")
+
+        if not outlets and isinstance(task, PieceTask):
+            raise ValueError("Breakdown on piece task must have outlets")
 
         self.task = task
         self.mtbf = mtbf
