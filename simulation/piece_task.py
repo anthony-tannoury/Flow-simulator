@@ -1,4 +1,5 @@
-import salabim as sim
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 from enum import Enum, auto
@@ -90,6 +91,7 @@ class NonDiscriminatingGreedyPieceCollector(PieceCollector):
 
 class DiscriminatingGreedyPieceCollector(PieceCollector):
     def process(self):
+        assert isinstance(self.task.config, PieceTaskConfig)
         self.wait(self.allow_dispatch)
         deadline = env.now() + self.task.config.timeout
 
@@ -101,7 +103,7 @@ class DiscriminatingGreedyPieceCollector(PieceCollector):
                 self.ensure_one()
             focus_on = self.collected_pieces[0].model
 
-        model_config = self.task.config.models_configs[focus_on]
+        model_config = self.task.config.get_model_config(focus_on)
         focus_filter = lambda p: self.task.can_take(p) and p.model is focus_on
 
         timed_out = self.collect_until(deadline, model_config.min_carrier_capacity, focus_filter)
@@ -126,12 +128,26 @@ class AltruisticMixin:
             truncate = min(max_carrier_capacity, self.task.vacant_slots.available_quantity() + min_carrier_capacity)
             valid_pieces = valid_pieces[:truncate]
 
-            if len(valid_pieces) >= min_carrier_capacity - len(self.collected_pieces):
+            if len(valid_pieces) >= min_carrier_capacity:
+                additional = len(valid_pieces) - min_carrier_capacity
+                if additional > 0:
+                    self.request((self.task.vacant_slots, additional), fail_delay=0, request_priority=self.task.request_priority)
+                    if self.failed():
+                        additional = 0
+                        valid_pieces = valid_pieces[:min_carrier_capacity]
+
+                valid_pieces = [pb for pb in valid_pieces if pb[0] in pb[1]]
+                if len(valid_pieces) < min_carrier_capacity:
+                    if additional > 0:
+                        self.release((self.task.vacant_slots, additional))
+                    continue
+
+                surplus = additional - (len(valid_pieces) - min_carrier_capacity)
+                if surplus > 0:
+                    self.release((self.task.vacant_slots, surplus))
+
                 for piece, buffer in valid_pieces:
-                    if piece not in buffer:
-                        continue
                     piece.leave(buffer)
-                    self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority)
                     self.collected_pieces.append(piece)
 
                 if not self.task.config.contiguous_carriers:
@@ -147,6 +163,7 @@ class AltruisticMixin:
 
 class NonDiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
     def process(self):
+        assert isinstance(self.task.config, PieceTaskConfig)
         model_config = next(iter(self.task.config.models_configs.values()))
 
         self.wait(self.allow_dispatch)
@@ -161,6 +178,7 @@ class NonDiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin)
 
 class DiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
     def process(self):
+        assert isinstance(self.task.config, PieceTaskConfig)
         self.wait(self.allow_dispatch)
         deadline = env.now() + self.task.config.timeout
         timed_out = False
@@ -173,7 +191,7 @@ class DiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
 
         if not timed_out:
             focus_on = Counter(present_models).most_common(1)[0][0]
-            model_config = self.task.config.models_configs[focus_on]
+            model_config = self.task.config.get_model_config(focus_on)
             timed_out = self.collect_batch(deadline, model_config.min_carrier_capacity, model_config.max_carrier_capacity,
                                            lambda p: self.task.can_take(p) and p.model is focus_on)
 
@@ -196,6 +214,14 @@ class ModelConfig:
 class PieceTaskConfig(TaskConfig):
     models_configs: dict[Model, ModelConfig]
     piece_collector_type: PieceCollectorType
+
+    def get_model_config(self, model: Model) -> ModelConfig:
+        m = model
+        while m is not None:
+            if m in self.models_configs:
+                return self.models_configs[m]
+            m = m.parent
+        raise KeyError(f"No model config for {model.name} or any of its ancestors")
 
 
 class PieceCarrier(Carrier):
@@ -223,6 +249,7 @@ class PieceCarrier(Carrier):
 
     @override
     def abort(self, *args):
+        assert isinstance(self.task, PieceTask)
         outlets = args[0] if args else self.task.inlets
         self.piece_collector.done.set(True)
         self.piece_collector.cancel()
@@ -253,20 +280,23 @@ class PieceCarrier(Carrier):
     
     @override
     def get_ideal_duration(self):
+        assert isinstance(self.task.config, PieceTaskConfig)
         model = self.piece_collector.collected_pieces[0].model
-        model_config = self.task.config.models_configs[model]
+        model_config = self.task.config.get_model_config(model)
         return model_config.duration.sample_now()
     
     @override
     def request_resources(self, fail_at):
+        assert isinstance(self.task.config, PieceTaskConfig)
         model = self.piece_collector.collected_pieces[0].model
         mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else len(self.piece_collector.collected_pieces)
-        resources = [(r, q*mult) for r, q in self.task.config.models_configs[model].resources]
+        resources = [(r, q*mult) for r, q in self.task.config.get_model_config(model).resources]
         self.request(*resources, fail_at=fail_at)
         self.freeze_abort_if(self.failed())
 
     @override
     def successfully_end_process(self):
+        assert isinstance(self.task, PieceTask)
         self.piece_collector.cancel()
         place(self.piece_collector.collected_pieces, self.task.outlets)
         self.done.set(True)
@@ -282,11 +312,11 @@ class PieceTask(Task, PickyPieceTaker):
             if not all(cfg.duration is first_config.duration for cfg in config.models_configs.values()):
                 raise ValueError("Piece task cannot have different durations for models and not discriminate")
             
-            if not all(cfg.min_carrier_capacity != first_config.min_carrier_capacity for cfg in config.models_configs.values()):
-                raise Value("Piece task cannot have different min_carrrier_capacity for models and not discriminate")
+            if not all(cfg.min_carrier_capacity == first_config.min_carrier_capacity for cfg in config.models_configs.values()):
+                raise ValueError("Piece task cannot have different min_carrrier_capacity for models and not discriminate")
             
-            if not all(cfg.max_carrier_capacity != first_config.max_carrier_capacity for cfg in config.models_configs.values()):
-                raise Value("Piece task cannot have different max_carrrier_capacity for models and not discriminate")
+            if not all(cfg.max_carrier_capacity == first_config.max_carrier_capacity for cfg in config.models_configs.values()):
+                raise ValueError("Piece task cannot have different max_carrrier_capacity for models and not discriminate")
 
         PickyPieceTaker.__init__(self, list(config.models_configs.keys()))
         check_outlet_validity(self, outlets)

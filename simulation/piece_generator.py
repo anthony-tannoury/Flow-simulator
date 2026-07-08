@@ -1,6 +1,7 @@
 import salabim as sim
 import numpy as np
 
+from simulation import env
 from .component import Component
 from .piece import PickyPieceTaker, Model, Piece
 from .outlet import Outlet
@@ -33,12 +34,16 @@ class PieceGenerator(Component, PickyPieceTaker, HasShifts):
 
     def process(self):
         while sum(self.generated) < self.total_goal:
-            self.wait((self.is_in_downtime, False), (self.is_in_shutdown, False), (self.is_in_breakdown, False), all=True)
+            self.wait((self.is_in_downtime, False))
+
+            current_shift = self.current_or_last_shift()
+            shift_time_left = current_shift.end - env.now() if current_shift is not None else float('inf')
+            if self.gap > shift_time_left:
+                self.hold(shift_time_left)
+                continue
+
             self.update_probs()
-            inter_arrival_time = self.gap
-            if self.current_or_last_shift() is not None:
-                inter_arrival_time = min(inter_arrival_time, self.current_or_last_shift.end)
-            self.hold(inter_arrival_time)
+            self.hold(self.gap)
             idx = np.random.choice(len(self.models), p=self.probs)
             piece = Piece(model=self.models[idx])
             place([piece], self.outlets)

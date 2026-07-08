@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import salabim as sim
 import numpy as np
 

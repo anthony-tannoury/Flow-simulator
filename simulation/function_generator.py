@@ -24,6 +24,8 @@ class Exponential:
     def generate(x1: float, y1: float, x2: float, y2: float, limit: float) -> Callable[[float], float]:
         if x1 == x2:
             raise ValueError("Cannot generate vertical exponential function")
+        if (y1 - limit) * (y2 - limit) <= 0:
+            raise ValueError("y1 and y2 in exponential function must be on the same side compared to limit")
         
         def exponential(t: float) -> float:
             beta = np.log((y1 - limit) / (y2 - limit)) / (x1 - x2)
@@ -51,6 +53,7 @@ class Bathtub:
         while iters < max_iters and integral < threshold:
             integral += bathtub_curve(t) * tolerance
             t += tolerance
+            iters += 1
 
         if integral < threshold:
             raise ValueError(f"Integral did not cross threshold after {max_iters} iterations")

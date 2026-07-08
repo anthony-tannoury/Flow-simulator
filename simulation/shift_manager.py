@@ -19,7 +19,7 @@ class HasShifts:
                 return self.shifts[i - 1] if i > 0 else None
             if shift.end >= env.now():
                 return shift
-        return self.shifts[-1]
+        return self.shifts[-1] if self.shifts else None
 
 
 class ShiftManager(IntervalWaiter):

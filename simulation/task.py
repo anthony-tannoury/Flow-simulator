@@ -304,7 +304,7 @@ class Task(Component, HasShifts, ABC):
 
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
-            self.wait(new_carrier.done)
+            self.wait(new_carrier.loaded)
 
             if len(self.pending_carriers) >= self.config.min_carriers:
                 dispatched = []
