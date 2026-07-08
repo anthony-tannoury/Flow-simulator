@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import salabim as sim
 
 from simulation import env
-from .interval import Interval
-from .piece import PickyPieceTaker
-from .outlet import Outlet
-from .piece import Piece
+from .piece import PickyPieceTaker, Piece
 
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .interval import Interval
+    from .outlet import Outlet
 
 
 def sample_distr_or_func(obj: sim.Distribution | Callable[[float], float]) -> float:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import salabim as sim
 from dataclasses import dataclass
 from typing import override
@@ -47,8 +49,8 @@ class PieceTimeoutManager(Component):
             return
         self.piece_collector.interrupt()
         if not self.piece_collector.collected_pieces:
-            piece = self.from_store(self.piece_collector.task.inlets, filter=self.piece_collector.task.can_take, request_priority=self.piece_collector.task.config.priority)
-            self.request((self.piece_collector.task.vacant_slots, 1), request_priority=self.piece_collector.task.config.priority)
+            piece = self.from_store(self.piece_collector.task.inlets, filter=self.piece_collector.task.can_take, request_priority=self.piece_collector.task.request_priority)
+            self.request((self.piece_collector.task.vacant_slots, 1), request_priority=self.piece_collector.task.request_priority)
             self.piece_collector.collected_pieces.append(piece)
         self.piece_collector.done.set(True)
         self.passivate()
@@ -235,14 +237,16 @@ class PieceCarrier(Carrier):
 
     @override
     def handle_restock(self) -> None:
-        assert isinstance(self.config, PieceTaskConfig)
-        for config in self.config.models_configs.values():
+        assert isinstance(self.task.config, PieceTaskConfig)
+        for config in self.task.config.models_configs.values():
             for resource, _ in config.resources:
                 if isinstance(resource, RestockableResource):
                     resource.restock(demander=self)
 
     @override
-    def abort(self, lifeboats: list[Outlet]):
+    def abort(self, lifeboats: list[Outlet] | None = None):
+        if lifeboats is None:
+            lifeboats = self.task.inlets
         self.piece_collector.done.set(True)
         self.piece_collector.timeout_manager.cancel()
         self.piece_collector.cancel()
@@ -299,7 +303,7 @@ class PieceTask(Task, PickyPieceTaker):
     def setup(self, config: PieceTaskConfig, inlets: list[Buffer], outlets: list[Outlet]) -> None:
         if not PieceCollectorType.is_discriminating(config.piece_collector_type):
             first = next(iter(config.models_configs.values())).duration
-            if not all(distr is first for distr in config.models_configs.values()):
+            if not all(mc.duration is first for mc in config.models_configs.values()):
                 raise ValueError("Piece task cannot have different durations for models and not discriminate")
 
         PickyPieceTaker.__init__(self, list(config.models_configs.keys()))

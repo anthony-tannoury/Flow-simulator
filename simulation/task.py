@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import salabim as sim
 
 from simulation import env
@@ -34,14 +36,14 @@ class Carrier(Component, ABC):
     def freeze_abort_if(self, condition: bool) -> None:
         pass
 
-    def handle_operators(self, operators: list[tuple[OperatorGroup, int]], ideal_duration: float, handle_restock: bool) -> None:
+    def handle_operators(self, operators: list[tuple[OperatorGroup, int]], ideal_duration: float, handle_restock: bool) -> float:
         if not operators:
-            return
-        
+            return ideal_duration
+
         productivity = operators[0][0].productivity
 
         if handle_restock:
-            self.task.handle_restock()
+            self.handle_restock()
 
         match self.task.config.protocols.operators_self_conscious.decide():
             case ConsciousnessState.CONSCIOUS:
@@ -54,21 +56,20 @@ class Carrier(Component, ABC):
         task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), duration)
 
         self.freeze_abort_if(operator_shift_constraint_decision is Action.ABORT or task_shift_constraint_decision is Action.ABORT)
+        return duration
 
     def handle_batch_operators(self, operators: Alternative, earliest_deadline: float, ideal_duration: float, fail_before: float, handle_restock: bool) -> None:
         recuperated = operators.request(demander=self, fail_at=earliest_deadline - fail_before)
         self.freeze_abort_if(self.failed())
         assert recuperated is not None
-        duration = ideal_duration
 
-        self.handle_operators(recuperated, ideal_duration, handle_restock)
-        
+        duration = self.handle_operators(recuperated, ideal_duration, handle_restock)
+
         self.hold(duration)
         self.release(*recuperated)
 
     def handle_task_operators(self, ideal_duration: float) -> None:
-        duration = ideal_duration
-        self.handle_operators(self.task.task_operators, ideal_duration, True)
+        duration = self.handle_operators(self.task.task_operators, ideal_duration, True)
         self.hold(duration)
 
     @abstractmethod
@@ -243,8 +244,6 @@ class Task(Component, HasShifts, ABC):
 
         self.non_flexible_shutdowns = NonFlexibleShutdowns(task=self, intervals=[])
         self.flexible_shutdowns = FlexibleShutdowns(task=self, intervals=[])
-        self.is_in_breakdown = sim.State(value=False)
-        self.is_in_shutdown = sim.State(value=False)
         self.is_frozen = sim.State(value=False)
 
         self.task_operators: list[tuple[OperatorGroup, int]] | None = None

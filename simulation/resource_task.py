@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import salabim as sim
 
 from enum import Enum, auto
@@ -63,7 +65,8 @@ class GreedyResourceCollector(ResourceCollector):
                 self.request((self.task.vacant_slots, requested_quantity_per_resource), request_priority=self.task.request_priority)
                 self.request((r, requested_quantity_per_resource), request_priority=self.task.request_priority)
                 self.requested_quantities[i] += requested_quantity_per_resource
-            self.wait(*self.triggers)
+            if sum(self.requested_quantities) < self.task.config.min_carrier_capacity:
+                self.wait(*self.triggers)
 
         assert sum(self.requested_quantities) == self.task.config.min_carrier_capacity
         self.requested_quantity = sum(self.requested_quantities)
@@ -95,8 +98,7 @@ class AltruisticResourceCollector(ResourceCollector):
         self.timeout_manager.allow_dispatch.set(True)
         self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity), request_priority=self.task.request_priority)
 
-        self.request(*[(r,p*self.task.config.min_carrier_capacity) for r, p, _ in self.task.config.transformed_resources_salvageable], fail_delay=0, request_priority=self.task.request_priority)
-        assert not self.failed()
+        self.request(*[(r,p*self.task.config.min_carrier_capacity) for r, p, _ in self.task.config.transformed_resources_salvageable], request_priority=self.task.request_priority)
         self.requested_quantity = self.task.config.min_carrier_capacity
 
         available = min([r.available_quantity() / p for r, p, _ in self.task.config.transformed_resources_salvageable])
@@ -125,6 +127,8 @@ class ResourceTaskConfig(TaskConfig):
     resources_out_distr: list[tuple[Resource, sim.Bounded]]
     duration: Distribution
     resource_collector_type: ResourceCollectorType
+    min_carrier_capacity: float
+    max_carrier_capacity: float
 
 
 class ResourceCarrier(Carrier):
@@ -139,12 +143,12 @@ class ResourceCarrier(Carrier):
 
     @override
     def handle_restock(self) -> None:
-        assert isinstance(self.config, ResourceTaskConfig)
-        for resource, _ in self.config.non_transformed_resources:
+        assert isinstance(self.task.config, ResourceTaskConfig)
+        for resource, _ in self.task.config.non_transformed_resources:
             if isinstance(resource, RestockableResource):
                 resource.restock(demander=self)
-        
-        for resource, _, _ in self.config.transformed_resources_salvageable:
+
+        for resource, _, _ in self.task.config.transformed_resources_salvageable:
             if isinstance(resource, RestockableResource):
                 resource.restock(demander=self)
 
@@ -187,13 +191,14 @@ class ResourceCarrier(Carrier):
     
     @override
     def request_resources(self, fail_at: float) -> None:
-        mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else len(self.resource_collector.requested_quantity)
+        mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else self.resource_collector.requested_quantity
         resources = [(r, q*mult) for r, q in self.task.config.non_transformed_resources]
         self.request(*resources, fail_at=fail_at)
         self.freeze_abort_if(self.failed())
 
     @override
     def successfully_end_process(self):
+        self.resource_collector.cancel()
         for resource_out, distr in self.task.config.resources_out_distr:
             resource_out.replenish(demander=self, quantity=distr.sample())
 

@@ -6,7 +6,7 @@ from .piece import PickyPieceTaker, Model, Piece
 from .outlet import Outlet
 from .helpers import check_outlet_validity, place
 from .interrupters import Interruptible
-from .shift_manager import HasShifts
+from .shift_manager import HasShifts, ShiftManager
 from .interval import Interval
 
 
@@ -16,6 +16,7 @@ class PieceGenerator(Component, PickyPieceTaker, Interruptible, HasShifts):
         PickyPieceTaker.__init__(self, self.models)
         Interruptible.__init__(self)
         HasShifts.__init__(self, shifts)
+        self.shift_manager = ShiftManager(entity=self)
         check_outlet_validity(self, outlets)
 
         self.outlets = outlets

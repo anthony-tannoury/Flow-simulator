@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import salabim as sim
 
 from .triggerable import Triggerable
@@ -12,6 +14,7 @@ class Resource(sim.Resource, Triggerable):
         super().__init__(*args, **kwargs)
 
     def setup(self, initial_capacity: float | None = None, lifespan: float = float('inf')) -> None:
+        Triggerable.__init__(self)
         if initial_capacity is None:
             initial_capacity = self.capacity()
         self.expiry_managers = [ExpiryManager(resource=self, quantity=initial_capacity)]

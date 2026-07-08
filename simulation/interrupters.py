@@ -1,26 +1,35 @@
+from __future__ import annotations
+
 import salabim as sim
 
 from simulation import env
 from .component import Component
 from .interval import Interval, IntervalWaiter
-from .distribution import Distribution
-from .task import Task
-from .piece_task import PieceTask
-from .resource_task import ResourceTask
-from .outlet import Outlet
-from .helpers import check_outlet_validity
 from abc import ABC
-from typing import override
+from typing import override, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .task import Task
+    from .distribution import Distribution
+    from .outlet import Outlet
+
+
+class Interruptible:
+    def __init__(self) -> None:
+        self.is_in_breakdown = sim.State(value=False)
+        self.is_in_shutdown = sim.State(value=False)
 
 
 class Breakdown(Component, ABC):
     def setup(self, task: Task, mtbf: Distribution, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
+        from .resource_task import ResourceTask  # deferred: resource_task.py imports task.py which imports this module
+
         if outlets is None:
             outlets = []
 
         if outlets and isinstance(task, ResourceTask):
             raise ValueError("Breakdown on resource task cannot have outlets")
-    
+
         self.task = task
         self.mtbf = mtbf
         self.mttr = mttr
@@ -54,10 +63,10 @@ class Shutdowns(IntervalWaiter):
     def get_deadline(self) -> float:
         next_shutdown = self.get_next_shutdown()
         return next_shutdown.start if next_shutdown is not None else float('inf')
-    
+
     @override
     def on_enter(self, *args):
-        self.task.abort(self.task.inlets)
+        self.task.abort(getattr(self.task, 'inlets', []))
         self.task.is_in_shutdown.set(True)
 
     @override
@@ -83,7 +92,7 @@ class FlexibleShutdowns(Shutdowns):
                 return True
 
         return False
-    
+
     @override
     def process(self):
         while True:
@@ -94,7 +103,7 @@ class FlexibleShutdowns(Shutdowns):
                 break
 
             self.hold(till=next_shutdown.start, cap_now=True)
-            self.task.abort(self.task.inlets)
+            self.task.abort(getattr(self.task, 'inlets', []))
             self.task.is_in_shutdown.set(True)
             self.hold(till=next_shutdown.end, cap_now=True)
             self.task.is_in_shutdown.set(False)
