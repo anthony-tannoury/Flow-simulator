@@ -7,7 +7,7 @@ from collections import Counter
 
 from simulation import env
 from .resource import Resource, RestockableResource
-from .distribution import Distribution
+from .sampler import Distribution
 from .task import TaskConfig, Task, Carrier, Scope
 from .piece import Model, Piece, PickyPieceTaker
 from .helpers import check_outlet_validity, place
