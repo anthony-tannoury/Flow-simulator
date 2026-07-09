@@ -521,7 +521,7 @@ class SoftBufferNode(SimNode):
 class FirstTaskNode(SimNode):
     """PieceGenerator: per-model integer goals over chosen shifts -> outlets.
     Only childless (leaf) models can be generated."""
-    NODE_NAME = "Source (PieceGenerator)"
+    NODE_NAME = "Piece Generator"
     kind = "FirstTask"
     color = (145, 80, 80)
 
@@ -555,8 +555,8 @@ class TaskNode(SimNode):
         super().__init__()
         self.add_input("bufs_in", multi_input=True, color=PORT_COLORS["buffer"])
         self.add_input("shutdowns", multi_input=True, color=PORT_COLORS["shutdown"])
+        self.add_input("breakdowns", multi_input=True, color=PORT_COLORS["breakdown"])
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
-        self.add_output("task_ref", multi_output=True, color=PORT_COLORS["breakdown"])
 
         # per-model: {model, duration:<sampler>, resources:[{resource,value}],
         #             min_carrier_capacity, max_carrier_capacity}
@@ -603,13 +603,14 @@ class TaskNode(SimNode):
             "bufs_in": connected_refs_from_port(self, "bufs_in", "input"),
             "bufs_out": get_output_refs(self, "bufs_out"),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),
+            "breakdowns": connected_refs_from_port(self, "breakdowns", "input"),
             "position": [self.x_pos(), self.y_pos()],
         }
 
 
 class ResourceTaskNode(SimNode):
     """ResourceTask. Consumes/transforms resources into output resources. No piece
-    flow; connects to breakdowns via task_ref and to shutdown cards."""
+    flow; breakdown and shutdown cards wire directly into it."""
     NODE_NAME = "Resource Task"
     kind = "ResourceTask"
     color = (150, 120, 60)
@@ -617,7 +618,7 @@ class ResourceTaskNode(SimNode):
     def __init__(self):
         super().__init__()
         self.add_input("shutdowns", multi_input=True, color=PORT_COLORS["shutdown"])
-        self.add_output("task_ref", multi_output=True, color=PORT_COLORS["breakdown"])
+        self.add_input("breakdowns", multi_input=True, color=PORT_COLORS["breakdown"])
 
         self.create_property("non_transformed_resources", "[]")   # [{resource, value(quantity)}]
         self.create_property("transformed_resources", "[]")       # [{resource, proportion, salvageable}]
@@ -670,6 +671,7 @@ class ResourceTaskNode(SimNode):
             "timeout": as_float(self.get_property("timeout"), 1e9),
             "priority": as_int(self.get_property("priority"), 5),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),
+            "breakdowns": connected_refs_from_port(self, "breakdowns", "input"),
             "position": [self.x_pos(), self.y_pos()],
         }
 
@@ -683,17 +685,18 @@ class BreakdownNode(SimNode):
 
     def __init__(self):
         super().__init__()
-        self.add_input("task", color=PORT_COLORS["breakdown"])
+        self.add_output("breakdown", color=PORT_COLORS["breakdown"])   # wires directly into the task
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
         self.create_property("mtbf", "{}")   # {"mode": "distribution"|"bathtub", ...}
         self.create_property("mttr", "")     # <sampler>
 
     def to_clean_json(self) -> dict:
+        tasks = get_output_refs(self, "breakdown")
         return {
             "id": node_uid(self),
             "kind": self.kind,
             "name": self.name(),
-            "task": get_input_ref(self, "task"),
+            "task": tasks[0] if tasks else None,
             "mtbf": get_property_json(self, "mtbf", {}),
             "mttr": get_property_json(self, "mttr", None),
             "outlets": get_output_refs(self, "bufs_out"),
@@ -794,9 +797,9 @@ def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str
     if out_kind == "SoftBuffer" and out_port == "to_buffers":
         return in_kind in {"HardBuffer", "SoftBuffer"} and in_port == "from_task"
 
-    # Technical task reference for breakdowns.
-    if out_kind in {"Task", "ResourceTask"} and out_port == "task_ref":
-        return in_kind == "Breakdown" and in_port == "task"
+    # Breakdowns attach directly to a task (piece or resource), like shutdowns.
+    if out_kind == "Breakdown" and out_port == "breakdown":
+        return in_kind in {"Task", "ResourceTask"} and in_port == "breakdowns"
 
     return False
 
@@ -2323,10 +2326,12 @@ class ResourcePickerWidget(QtWidgets.QWidget):
     """Rows of (resource-name, float). Used for per-model resources (quantity) and
     resource-task non-transformed inputs (quantity). Value: [{"resource","value"}]."""
 
-    def __init__(self, resource_names, value_label="quantity", entries=None, parent=None):
+    def __init__(self, resource_names, value_label="quantity", entries=None,
+                 add_label="resource", integer=False, parent=None):
         super().__init__(parent)
         self._names = list(resource_names)
         self._label = value_label
+        self._int = integer
         self._rows = []
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -2334,7 +2339,7 @@ class ResourcePickerWidget(QtWidgets.QWidget):
         self._vl = QtWidgets.QVBoxLayout(self._host)
         self._vl.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._host)
-        add = QtWidgets.QPushButton(f"+ resource")
+        add = QtWidgets.QPushButton(f"+ {add_label}")
         add.clicked.connect(lambda: self._add())
         lay.addWidget(add)
         for e in (entries or []):
@@ -2363,7 +2368,8 @@ class ResourcePickerWidget(QtWidgets.QWidget):
         out = []
         for _, combo, edit in self._rows:
             if combo.currentText():
-                out.append({"resource": combo.currentText(), "value": as_float(edit.text())})
+                value = as_int(edit.text()) if self._int else as_float(edit.text())
+                out.append({"resource": combo.currentText(), "value": value})
         return out
 
 
@@ -2390,7 +2396,7 @@ class AlternativesWidget(QtWidgets.QWidget):
     def _add_alt(self, members=None):
         box = QtWidgets.QGroupBox(f"alternative {len(self._alts) + 1} (all needed together)")
         bl = QtWidgets.QVBoxLayout(box)
-        picker = ResourcePickerWidget(self._names, value_label="count",
+        picker = ResourcePickerWidget(self._names, value_label="count", add_label="operator group", integer=True,
                                       entries=[{"resource": m.get("operator"), "value": m.get("count", 1)} for m in (members or [])])
         bl.addWidget(picker)
         rm = QtWidgets.QPushButton("remove alternative")
@@ -2718,40 +2724,64 @@ class ModelConfigsWidget(QtWidgets.QWidget):
         return out
 
 
-def _carrier_common_tab(node, operator_names, shift_names, collector_types):
-    """Build the shared 'operators / carriers / policies / shifts' tabs for a task node.
+def _carrier_common_tab(node, operator_names, shift_names, collector_types, extra=None):
+    """Build the shared task-config tabs, one concept per tab (durations, operators,
+    carriers, scopes, policies, shifts). `extra` injects caller-owned rows into a tab:
+    {"durations": [(label, widget)], "carriers": [...], "scopes": [...]}; those widgets
+    are read back by the caller, not by _apply_carrier_common.
     Returns (list-of-(label, widget), accessor-dict)."""
+    extra = extra or {}
     tabs = []
     acc = {}
 
-    # operators & durations
-    t1 = QtWidgets.QWidget(); f1 = QtWidgets.QVBoxLayout(t1)
-    f1.addWidget(QtWidgets.QLabel("startup duration:")); acc["startup_duration"] = SamplerWidget(get_property_json(node, "startup_duration", None)); f1.addWidget(acc["startup_duration"])
-    f1.addWidget(QtWidgets.QLabel("loading duration:")); acc["loading_duration"] = SamplerWidget(get_property_json(node, "loading_duration", None)); f1.addWidget(acc["loading_duration"])
-    f1.addWidget(QtWidgets.QLabel("operators (alternatives):")); acc["operators"] = AlternativesWidget(operator_names, get_property_json(node, "operators", [])); f1.addWidget(acc["operators"])
-    f1.addWidget(QtWidgets.QLabel("loading operators:")); acc["loading_operators"] = AlternativesWidget(operator_names, get_property_json(node, "loading_operators", [])); f1.addWidget(acc["loading_operators"])
-    f1.addWidget(QtWidgets.QLabel("startup operators:")); acc["startup_operators"] = AlternativesWidget(operator_names, get_property_json(node, "startup_operators", [])); f1.addWidget(acc["startup_operators"])
-    tabs.append(("Operators & durations", _scroll(t1)))
+    # durations
+    t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
+    f.addWidget(QtWidgets.QLabel("startup duration:")); acc["startup_duration"] = SamplerWidget(get_property_json(node, "startup_duration", None)); f.addWidget(acc["startup_duration"])
+    f.addWidget(QtWidgets.QLabel("loading duration:")); acc["loading_duration"] = SamplerWidget(get_property_json(node, "loading_duration", None)); f.addWidget(acc["loading_duration"])
+    for label, wdg in extra.get("durations", []):
+        f.addWidget(QtWidgets.QLabel(label)); f.addWidget(wdg)
+    f.addStretch(1)
+    tabs.append(("Durations", _scroll(t)))
 
-    # carriers & scopes
-    t2 = QtWidgets.QWidget(); f2 = QtWidgets.QFormLayout(t2)
+    # operators
+    t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
+    f.addWidget(QtWidgets.QLabel("operators (alternatives):")); acc["operators"] = AlternativesWidget(operator_names, get_property_json(node, "operators", [])); f.addWidget(acc["operators"])
+    f.addWidget(QtWidgets.QLabel("loading operators:")); acc["loading_operators"] = AlternativesWidget(operator_names, get_property_json(node, "loading_operators", [])); f.addWidget(acc["loading_operators"])
+    f.addWidget(QtWidgets.QLabel("startup operators:")); acc["startup_operators"] = AlternativesWidget(operator_names, get_property_json(node, "startup_operators", [])); f.addWidget(acc["startup_operators"])
+    tabs.append(("Operators", _scroll(t)))
+
+    # carriers
+    t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
+    for key, default in (("min_carriers", 1), ("max_capacity", 1.0), ("timeout", 1e9), ("priority", 5)):
+        acc[key] = QtWidgets.QLineEdit(str(node.get_property(key))); f.addRow(key, acc[key])
+    acc["contiguous_carriers"] = QtWidgets.QCheckBox(); acc["contiguous_carriers"].setChecked(bool(node.get_property("contiguous_carriers"))); f.addRow("contiguous carriers", acc["contiguous_carriers"])
+    acc["independent_carriers"] = QtWidgets.QCheckBox(); acc["independent_carriers"].setChecked(bool(node.get_property("independent_carriers"))); f.addRow("independent carriers", acc["independent_carriers"])
+    for label, wdg in extra.get("carriers", []):
+        f.addRow(label, wdg)
+    tabs.append(("Carriers", _scroll(t)))
+
+    # scopes
+    t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
     acc["operator_scope"] = QtWidgets.QComboBox(); acc["operator_scope"].addItems(["PER_BATCH", "PER_TASK"]); acc["operator_scope"].setCurrentText(node.get_property("operator_scope"))
     acc["resource_scope"] = QtWidgets.QComboBox(); acc["resource_scope"].addItems(["PER_UNIT", "PER_BATCH"]); acc["resource_scope"].setCurrentText(node.get_property("resource_scope"))
-    f2.addRow("operator scope", acc["operator_scope"]); f2.addRow("resource scope", acc["resource_scope"])
+    f.addRow("operator scope", acc["operator_scope"]); f.addRow("resource scope", acc["resource_scope"])
     if collector_types is not None:
         acc["collector_type"] = QtWidgets.QComboBox(); acc["collector_type"].addItems(collector_types); acc["collector_type"].setCurrentText(node.get_property("collector_type") if node.has_property("collector_type") else collector_types[0])
-        f2.addRow("collector type", acc["collector_type"])
-    for key, default in (("min_carriers", 1), ("max_capacity", 1.0), ("timeout", 1e9), ("priority", 5)):
-        acc[key] = QtWidgets.QLineEdit(str(node.get_property(key))); f2.addRow(key, acc[key])
-    acc["contiguous_carriers"] = QtWidgets.QCheckBox(); acc["contiguous_carriers"].setChecked(bool(node.get_property("contiguous_carriers"))); f2.addRow("contiguous carriers", acc["contiguous_carriers"])
-    acc["independent_carriers"] = QtWidgets.QCheckBox(); acc["independent_carriers"].setChecked(bool(node.get_property("independent_carriers"))); f2.addRow("independent carriers", acc["independent_carriers"])
-    tabs.append(("Carriers & scopes", t2))
+        f.addRow("collector type", acc["collector_type"])
+    for label, wdg in extra.get("scopes", []):
+        f.addRow(label, wdg)
+    tabs.append(("Scopes", _scroll(t)))
 
-    # policies & shifts
-    t3 = QtWidgets.QWidget(); f3 = QtWidgets.QVBoxLayout(t3)
-    acc["policies"] = PoliciesWidget(get_property_json(node, "policies", {})); f3.addWidget(acc["policies"])
-    f3.addWidget(QtWidgets.QLabel("task shifts:")); acc["task_shifts"] = ShiftPickerWidget(shift_names, get_property_json(node, "task_shifts", [])); f3.addWidget(acc["task_shifts"])
-    tabs.append(("Policies & shifts", _scroll(t3)))
+    # policies
+    t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
+    acc["policies"] = PoliciesWidget(get_property_json(node, "policies", {})); f.addWidget(acc["policies"]); f.addStretch(1)
+    tabs.append(("Policies", _scroll(t)))
+
+    # shifts
+    t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
+    f.addWidget(QtWidgets.QLabel("task shifts:")); acc["task_shifts"] = ShiftPickerWidget(shift_names, get_property_json(node, "task_shifts", [])); f.addWidget(acc["task_shifts"]); f.addStretch(1)
+    tabs.append(("Shifts", _scroll(t)))
+
     return tabs, acc
 
 
@@ -2810,9 +2840,8 @@ class ResourceTaskMenuDialog(QtWidgets.QDialog):
         rnames = _names(win.resource_registry)
         lay = QtWidgets.QVBoxLayout(self)
         tabs = QtWidgets.QTabWidget(); lay.addWidget(tabs)
-        # resources tab
+        # resources tab (resource I/O only)
         t0 = QtWidgets.QWidget(); f0 = QtWidgets.QVBoxLayout(t0)
-        f0.addWidget(QtWidgets.QLabel("duration:")); self.duration = SamplerWidget(get_property_json(node, "duration", None)); f0.addWidget(self.duration)
         f0.addWidget(QtWidgets.QLabel("non-transformed inputs (quantity consumed):"))
         self.non_transformed = ResourcePickerWidget(rnames, "quantity",
             [{"resource": e.get("resource"), "value": e.get("value", e.get("quantity", 1.0))} for e in get_property_json(node, "non_transformed_resources", [])])
@@ -2823,14 +2852,18 @@ class ResourceTaskMenuDialog(QtWidgets.QDialog):
         f0.addWidget(QtWidgets.QLabel("outputs produced (bounded distribution, ≥ 0):"))
         self.outputs = _OutputsWidget(rnames, get_property_json(node, "resources_out", []))
         f0.addWidget(self.outputs)
-        f1 = QtWidgets.QFormLayout()
+        tabs.addTab(_scroll(t0), "Resources")
+        # resource-task-specific fields, injected into the shared tabs where they belong
+        self.duration = SamplerWidget(get_property_json(node, "duration", None))
         self.min_cc = QtWidgets.QLineEdit(str(node.get_property("min_carrier_capacity")))
         self.max_cc = QtWidgets.QLineEdit(str(node.get_property("max_carrier_capacity")))
         self.rct = QtWidgets.QComboBox(); self.rct.addItems(RESOURCE_COLLECTOR_TYPES); self.rct.setCurrentText(node.get_property("resource_collector_type"))
-        f1.addRow("min carrier capacity", self.min_cc); f1.addRow("max carrier capacity", self.max_cc); f1.addRow("collector type", self.rct)
-        f0.addLayout(f1)
-        tabs.addTab(_scroll(t0), "Resources")
-        common, self.acc = _carrier_common_tab(node, _names(win.operator_registry), _names(win.shift_registry), None)
+        extra = {
+            "durations": [("duration:", self.duration)],
+            "carriers": [("min carrier capacity", self.min_cc), ("max carrier capacity", self.max_cc)],
+            "scopes": [("resource collector type", self.rct)],
+        }
+        common, self.acc = _carrier_common_tab(node, _names(win.operator_registry), _names(win.shift_registry), None, extra=extra)
         for label, wdg in common:
             tabs.addTab(wdg, label)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -2997,7 +3030,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             ("Shutdowns", "simulation.flow.ShutdownsNode"),
             ("Buffer", "simulation.flow.HardBufferNode"),
             ("Router", "simulation.flow.SoftBufferNode"),
-            ("Source (PieceGenerator)", "simulation.flow.FirstTaskNode"),
+            ("Piece Generator", "simulation.flow.FirstTaskNode"),
             ("Piece Task", "simulation.flow.TaskNode"),
             ("Resource Task", "simulation.flow.ResourceTaskNode"),
             ("Breakdown", "simulation.flow.BreakdownNode"),
@@ -3525,7 +3558,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         connect_ports_by_name(operator_resource, "resource", task, "operators")
         connect_ports_by_name(startup_operator, "resource", task, "startup_operators")
         connect_ports_by_name(shutdowns, "shutdowns", task, "shutdowns")
-        connect_ports_by_name(task, "task_ref", breakdown, "task")
+        connect_ports_by_name(breakdown, "breakdown", task, "breakdowns")
         connect_ports_by_name(mttr, "distribution", breakdown, "mttr")
 
         # Defaults.
