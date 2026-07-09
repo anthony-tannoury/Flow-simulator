@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-import salabim as sim
-
 from simulation import env
 from .component import Component
 from .interval import Interval, IntervalWaiter
+from .protocols import Action
 from abc import ABC
 from typing import override, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .task import Task
-    from .distribution import Distribution
+    from .sampler import Sampler, Distribution
     from .outlet import Outlet
 
 
 class Breakdown(Component, ABC):
-    def setup(self, task: Task, mtbf: Distribution, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
+    def setup(self, task: Task, mtbf: Sampler, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
         from .resource_task import ResourceTask
         from .piece_task import PieceTask
 
@@ -102,7 +101,10 @@ class FlexibleShutdowns(Shutdowns):
                 self.hold(till=next_shutdown.start)
                 continue
 
-            self.wait((self.task.active_carriers.num_carriers, 0))
+            if self.task.config.protocols.pending_carriers_pre_flexible_shutdowns.decide(self.task.config.min_carriers, len(self.task.pending_carriers)) is Action.WAIT:
+                self.wait((self.task.active_carriers.num_carriers, 0), (self.task.pending_carriers.num_carriers, 0), all=True)
+            else:
+                self.wait((self.task.active_carriers.num_carriers, 0))
 
             current = self.get_next_shutdown()
             if current is None or env.now() < current.start:
