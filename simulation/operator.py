@@ -6,7 +6,7 @@ from simulation import env
 from .ables import Triggerable
 from .interval import Interval
 from .shift_manager import ShiftManager, HasShifts
-from .distribution import Distribution
+from .sampler import Distribution
 
 from typing import override
 
