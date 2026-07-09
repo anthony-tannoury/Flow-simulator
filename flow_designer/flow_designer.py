@@ -30,6 +30,15 @@ DISTRIBUTION_SPECS = {
     "LogNormal": [("mean", float, 0.0), ("sigma", float, 1.0)],
 }
 
+# A distribution parameter (or productivity / router probability) is either constant or a
+# function of time. Each form's dynamic float fields:
+FUNCTION_SPECS = {
+    "constant":    [("value", 0.0)],
+    "linear":      [("x1", 0.0), ("y1", 0.0), ("x2", 1.0), ("y2", 1.0)],
+    "exponential": [("x1", 0.0), ("y1", 1.0), ("x2", 1.0), ("y2", 2.0), ("limit", 0.0)],
+    "step":        [("x1", 0.0), ("y1", 0.0), ("x2", 1.0), ("y2", 1.0), ("step_size", 1.0)],
+}
+
 # CollectorType (piece tasks): discriminating x greedy/altruistic.
 COLLECTOR_TYPES = [
     "NON_DISCRIMINATING_GREEDY",
@@ -2001,6 +2010,425 @@ class ResourceTaskConfigDialog(QtWidgets.QDialog):
 # Main window
 # ============================================================
 
+# ============================================================
+# Stage 1: reusable distribution/function widget + registries
+# (Resources / Operators / Shifts). Distributions, resources and
+# operators are no longer cards; they live in menus and are picked
+# by name inside the cards that use them.
+# ============================================================
+
+def _clear_layout(layout):
+    while layout.count():
+        item = layout.takeAt(0)
+        w = item.widget()
+        if w is not None:
+            w.setParent(None)
+            w.deleteLater()
+
+
+class TimeFunctionWidget(QtWidgets.QWidget):
+    """One numeric quantity that is either constant or a function of time.
+    Value: {"kind": "constant"|"linear"|"exponential"|"step", ...float params...}."""
+
+    def __init__(self, value=None, parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.kind = QtWidgets.QComboBox()
+        self.kind.addItems(list(FUNCTION_SPECS.keys()))
+        lay.addWidget(self.kind)
+        self._host = QtWidgets.QWidget()
+        self._play = QtWidgets.QHBoxLayout(self._host)
+        self._play.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        lay.addStretch(1)
+        self._edits = {}
+        self.kind.currentTextChanged.connect(self._rebuild)
+        self.set_value(value or {"kind": "constant", "value": 0.0})
+
+    def _rebuild(self, *_):
+        _clear_layout(self._play)
+        self._edits = {}
+        for name, default in FUNCTION_SPECS[self.kind.currentText()]:
+            self._play.addWidget(QtWidgets.QLabel(f"{name}:"))
+            e = QtWidgets.QLineEdit(str(default))
+            e.setMaximumWidth(64)
+            self._play.addWidget(e)
+            self._edits[name] = e
+
+    def set_value(self, value):
+        value = value or {}
+        kind = value.get("kind", "constant")
+        if kind not in FUNCTION_SPECS:
+            kind = "constant"
+        blocked = self.kind.blockSignals(True)
+        self.kind.setCurrentText(kind)
+        self.kind.blockSignals(blocked)
+        self._rebuild()
+        for name, _ in FUNCTION_SPECS[kind]:
+            if name in value and name in self._edits:
+                self._edits[name].setText(str(value[name]))
+
+    def get_value(self):
+        kind = self.kind.currentText()
+        out = {"kind": kind}
+        for name, _ in FUNCTION_SPECS[kind]:
+            out[name] = as_float(self._edits[name].text())
+        return out
+
+
+class SamplerWidget(QtWidgets.QWidget):
+    """A distribution whose every parameter is a TimeFunctionWidget.
+    Value: {"dist_type": <name>, "params": {<pname>: <time-function>}}."""
+
+    def __init__(self, value=None, parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        top = QtWidgets.QHBoxLayout()
+        top.addWidget(QtWidgets.QLabel("type:"))
+        self.dist = QtWidgets.QComboBox()
+        self.dist.addItems(list(DISTRIBUTION_SPECS.keys()))
+        top.addWidget(self.dist)
+        top.addStretch(1)
+        lay.addLayout(top)
+        self._host = QtWidgets.QWidget()
+        self._form = QtWidgets.QFormLayout(self._host)
+        self._form.setContentsMargins(12, 2, 0, 0)
+        lay.addWidget(self._host)
+        self._params = {}
+        self.dist.currentTextChanged.connect(self._rebuild)
+        self.set_value(value or {"dist_type": "Constant",
+                                 "params": {"value": {"kind": "constant", "value": 0.0}}})
+
+    def _rebuild(self, *_):
+        while self._form.rowCount():
+            self._form.removeRow(0)
+        self._params = {}
+        for pname, _ptype, pdefault in DISTRIBUTION_SPECS[self.dist.currentText()]:
+            tf = TimeFunctionWidget(value={"kind": "constant", "value": pdefault})
+            self._form.addRow(f"{pname}", tf)
+            self._params[pname] = tf
+
+    def set_value(self, value):
+        value = value or {}
+        dist_type = value.get("dist_type", "Constant")
+        if dist_type not in DISTRIBUTION_SPECS:
+            dist_type = "Constant"
+        blocked = self.dist.blockSignals(True)
+        self.dist.setCurrentText(dist_type)
+        self.dist.blockSignals(blocked)
+        self._rebuild()
+        params = value.get("params", {})
+        for pname, tf in self._params.items():
+            if pname in params:
+                tf.set_value(params[pname])
+
+    def get_value(self):
+        return {"dist_type": self.dist.currentText(),
+                "params": {n: w.get_value() for n, w in self._params.items()}}
+
+
+class InfFloatWidget(QtWidgets.QWidget):
+    """A float that can also be infinite (checkbox). Value: number or the string "inf"."""
+
+    def __init__(self, value="inf", parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.chk = QtWidgets.QCheckBox("infinite")
+        self.edit = QtWidgets.QLineEdit()
+        self.edit.setMaximumWidth(90)
+        lay.addWidget(self.chk)
+        lay.addWidget(self.edit)
+        lay.addStretch(1)
+        self.chk.toggled.connect(self.edit.setDisabled)
+        self.set_value(value)
+
+    def set_value(self, value):
+        infinite = (value in ("inf", "Infinity") or (isinstance(value, float) and value == float("inf")))
+        self.chk.setChecked(infinite)
+        self.edit.setDisabled(infinite)
+        self.edit.setText("" if infinite else str(value))
+
+    def get_value(self):
+        return "inf" if self.chk.isChecked() else as_float(self.edit.text())
+
+
+WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+class _IntervalRow(QtWidgets.QWidget):
+    def __init__(self, start=480.0, end=1020.0, on_remove=None, parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.start = QtWidgets.QLineEdit(str(start)); self.start.setMaximumWidth(70)
+        self.end = QtWidgets.QLineEdit(str(end)); self.end.setMaximumWidth(70)
+        lay.addWidget(QtWidgets.QLabel("start:")); lay.addWidget(self.start)
+        lay.addWidget(QtWidgets.QLabel("end:")); lay.addWidget(self.end)
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
+        if on_remove:
+            rm.clicked.connect(lambda: on_remove(self))
+        lay.addWidget(rm); lay.addStretch(1)
+
+    def data(self):
+        return {"start": as_float(self.start.text()), "end": as_float(self.end.text())}
+
+
+class _DayRow(QtWidgets.QWidget):
+    """One weekday: a working toggle + a list of shift intervals (minutes 0..1440)."""
+
+    def __init__(self, label, working=False, intervals=None, parent=None):
+        super().__init__(parent)
+        outer = QtWidgets.QHBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self.chk = QtWidgets.QCheckBox(label)
+        self.chk.setMinimumWidth(48)
+        outer.addWidget(self.chk, 0, QtCore.Qt.AlignTop)
+        self._box = QtWidgets.QWidget()
+        self._vl = QtWidgets.QVBoxLayout(self._box)
+        self._vl.setContentsMargins(0, 0, 0, 0)
+        self._rows = []
+        add = QtWidgets.QPushButton("+ interval")
+        add.clicked.connect(lambda: self._add())
+        self._vl.addWidget(add)
+        outer.addWidget(self._box, 1)
+        self.chk.toggled.connect(self._box.setEnabled)
+        for iv in (intervals or []):
+            self._add(iv.get("start", 480.0), iv.get("end", 1020.0))
+        self.chk.setChecked(working)
+        self._box.setEnabled(working)
+
+    def _add(self, start=480.0, end=1020.0):
+        row = _IntervalRow(start, end, on_remove=self._remove)
+        self._rows.append(row)
+        self._vl.insertWidget(self._vl.count() - 1, row)  # keep the add button last
+
+    def _remove(self, row):
+        if row in self._rows:
+            self._rows.remove(row)
+            row.setParent(None)
+            row.deleteLater()
+
+    def data(self):
+        return {"working": self.chk.isChecked(),
+                "intervals": [r.data() for r in self._rows]}
+
+
+class ShiftEditorDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, entry=None):
+        super().__init__(parent)
+        self.setWindowTitle("Shift definition")
+        entry = entry or {}
+        lay = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+        self.name = QtWidgets.QLineEdit(entry.get("name", ""))
+        form.addRow("name", self.name)
+        lay.addLayout(form)
+        lay.addWidget(QtWidgets.QLabel("Shifts per weekday (times in minutes from midnight, 0–1440):"))
+        days = entry.get("days", [])
+        self.day_rows = []
+        for i, label in enumerate(WEEKDAYS):
+            d = days[i] if i < len(days) else {}
+            row = _DayRow(label, d.get("working", False), d.get("intervals"))
+            self.day_rows.append(row)
+            lay.addWidget(row)
+        form2 = QtWidgets.QFormLayout()
+        self.days_off = QtWidgets.QLineEdit(",".join(str(d) for d in entry.get("days_off", [])))
+        form2.addRow("days off (integer day numbers from t=0, comma-separated)", self.days_off)
+        hz = entry.get("horizon", {"start": 0, "end": 7})
+        hbox = QtWidgets.QHBoxLayout()
+        self.h_start = QtWidgets.QLineEdit(str(hz.get("start", 0))); self.h_start.setMaximumWidth(70)
+        self.h_end = QtWidgets.QLineEdit(str(hz.get("end", 7))); self.h_end.setMaximumWidth(70)
+        hbox.addWidget(QtWidgets.QLabel("start day:")); hbox.addWidget(self.h_start)
+        hbox.addWidget(QtWidgets.QLabel("end day:")); hbox.addWidget(self.h_end); hbox.addStretch(1)
+        hw = QtWidgets.QWidget(); hw.setLayout(hbox)
+        form2.addRow("horizon (in days)", hw)
+        lay.addLayout(form2)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def data(self):
+        days_off = [as_int(x) for x in self.days_off.text().split(",") if x.strip() != ""]
+        return {
+            "name": self.name.text().strip(),
+            "days": [r.data() for r in self.day_rows],
+            "days_off": days_off,
+            "horizon": {"start": as_int(self.h_start.text()), "end": as_int(self.h_end.text())},
+        }
+
+
+class OperatorEditorDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, entry=None, shift_names=None):
+        super().__init__(parent)
+        self.setWindowTitle("Operator group")
+        entry = entry or {}
+        lay = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+        self.name = QtWidgets.QLineEdit(entry.get("name", ""))
+        self.capacity = QtWidgets.QLineEdit(str(entry.get("capacity", 1)))
+        form.addRow("name", self.name)
+        form.addRow("capacity (number of operators)", self.capacity)
+        lay.addLayout(form)
+        lay.addWidget(QtWidgets.QLabel("productivity:"))
+        self.prod = SamplerWidget(entry.get("productivity"))
+        lay.addWidget(self.prod)
+        lay.addWidget(QtWidgets.QLabel("shifts (their concatenation is the group's schedule):"))
+        self.shifts = QtWidgets.QListWidget()
+        chosen = set(entry.get("shifts", []))
+        for nm in (shift_names or []):
+            it = QtWidgets.QListWidgetItem(nm)
+            it.setFlags(it.flags() | QtCore.Qt.ItemIsUserCheckable)
+            it.setCheckState(QtCore.Qt.Checked if nm in chosen else QtCore.Qt.Unchecked)
+            self.shifts.addItem(it)
+        lay.addWidget(self.shifts)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def data(self):
+        shifts = [self.shifts.item(i).text() for i in range(self.shifts.count())
+                  if self.shifts.item(i).checkState() == QtCore.Qt.Checked]
+        return {
+            "name": self.name.text().strip(),
+            "capacity": as_int(self.capacity.text(), 1),
+            "productivity": self.prod.get_value(),
+            "shifts": shifts,
+        }
+
+
+class ResourceEditorDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, entry=None):
+        super().__init__(parent)
+        self.setWindowTitle("Resource")
+        entry = entry or {}
+        lay = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+        self.name = QtWidgets.QLineEdit(entry.get("name", ""))
+        self.lifespan = InfFloatWidget(entry.get("lifespan", "inf"))
+        self.max_cap = QtWidgets.QLineEdit(str(entry.get("max_capacity", 1.0)))
+        self.init_cap = QtWidgets.QLineEdit(str(entry.get("initial_capacity", entry.get("max_capacity", 1.0))))
+        self.restockable = QtWidgets.QCheckBox("restockable")
+        form.addRow("name", self.name)
+        form.addRow("lifespan", self.lifespan)
+        form.addRow("max storage capacity", self.max_cap)
+        form.addRow("initial capacity (in [0, max])", self.init_cap)
+        form.addRow("", self.restockable)
+        lay.addLayout(form)
+        self.restock_box = QtWidgets.QGroupBox("restocking")
+        rlay = QtWidgets.QVBoxLayout(self.restock_box)
+        rlay.addWidget(QtWidgets.QLabel("order duration:"))
+        self.order = SamplerWidget(entry.get("order_duration"))
+        rlay.addWidget(self.order)
+        rlay.addWidget(QtWidgets.QLabel("delivery duration:"))
+        self.delivery = SamplerWidget(entry.get("delivery_duration"))
+        rlay.addWidget(self.delivery)
+        tform = QtWidgets.QFormLayout()
+        self.threshold = QtWidgets.QLineEdit(str(entry.get("threshold", 0.0)))
+        tform.addRow("reorder threshold", self.threshold)
+        rlay.addLayout(tform)
+        lay.addWidget(self.restock_box)
+        self.restockable.toggled.connect(self.restock_box.setVisible)
+        self.restockable.setChecked(bool(entry.get("restockable", False)))
+        self.restock_box.setVisible(self.restockable.isChecked())
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def data(self):
+        out = {
+            "name": self.name.text().strip(),
+            "restockable": self.restockable.isChecked(),
+            "lifespan": self.lifespan.get_value(),
+            "max_capacity": as_float(self.max_cap.text()),
+            "initial_capacity": as_float(self.init_cap.text()),
+        }
+        if self.restockable.isChecked():
+            out["order_duration"] = self.order.get_value()
+            out["delivery_duration"] = self.delivery.get_value()
+            out["threshold"] = as_float(self.threshold.text())
+        return out
+
+
+class _RegistryDialog(QtWidgets.QDialog):
+    """List of named entries with Add / Edit / Remove; subclasses supply the item editor."""
+    reg_title = "Registry"
+
+    def __init__(self, parent=None, entries=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.reg_title)
+        self.resize(560, 420)
+        self._entries = [dict(e) for e in (entries or [])]
+        lay = QtWidgets.QVBoxLayout(self)
+        self.listw = QtWidgets.QListWidget()
+        self.listw.itemDoubleClicked.connect(lambda *_: self._edit())
+        lay.addWidget(self.listw)
+        btns = QtWidgets.QHBoxLayout()
+        for label, cb in [("Add", self._add), ("Edit", self._edit), ("Remove", self._remove)]:
+            b = QtWidgets.QPushButton(label); b.clicked.connect(cb); btns.addWidget(b)
+        lay.addLayout(btns)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+        self._refresh()
+
+    def _refresh(self):
+        self.listw.clear()
+        for e in self._entries:
+            self.listw.addItem(e.get("name", "(unnamed)"))
+
+    def _make_editor(self, entry):
+        raise NotImplementedError
+
+    def _add(self):
+        dlg = self._make_editor(None)
+        if dlg.exec():
+            self._entries.append(dlg.data()); self._refresh()
+
+    def _edit(self):
+        row = self.listw.currentRow()
+        if row < 0:
+            return
+        dlg = self._make_editor(self._entries[row])
+        if dlg.exec():
+            self._entries[row] = dlg.data(); self._refresh()
+
+    def _remove(self):
+        row = self.listw.currentRow()
+        if row >= 0:
+            del self._entries[row]; self._refresh()
+
+    def entries(self):
+        return self._entries
+
+
+class ResourceRegistryDialog(_RegistryDialog):
+    reg_title = "Resources"
+
+    def _make_editor(self, entry):
+        return ResourceEditorDialog(self, entry)
+
+
+class ShiftRegistryDialog(_RegistryDialog):
+    reg_title = "Shifts"
+
+    def _make_editor(self, entry):
+        return ShiftEditorDialog(self, entry)
+
+
+class OperatorRegistryDialog(_RegistryDialog):
+    reg_title = "Operators"
+
+    def __init__(self, parent=None, entries=None, shift_names=None):
+        self._shift_names = shift_names or []
+        super().__init__(parent, entries)
+
+    def _make_editor(self, entry):
+        return OperatorEditorDialog(self, entry, self._shift_names)
+
+
 class FlowEditorWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -2015,17 +2443,20 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
-        # Right-angle (horizontal/vertical) pipes for an uncluttered canvas.
+        # Curved pipes (NodeGraphQt default look).
         try:
             from NodeGraphQt.constants import PipeLayoutEnum
-            self.graph.set_pipe_style(PipeLayoutEnum.ANGLE.value)
+            self.graph.set_pipe_style(PipeLayoutEnum.CURVED.value)
         except Exception:
             try:
-                self.graph.set_pipe_style(1)  # 1 == angled in most NodeGraphQt builds
+                self.graph.set_pipe_style(0)  # 0 == curved in most NodeGraphQt builds
             except Exception:
                 pass
 
         self.model_registry = []
+        self.resource_registry = []
+        self.operator_registry = []
+        self.shift_registry = []
 
         self.graph.register_nodes([
             DistributionNode,
@@ -2066,6 +2497,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
         model_menu = self.menuBar().addMenu("Models")
         model_menu.addAction("Edit models...").triggered.connect(self.edit_models)
+
+        registries_menu = self.menuBar().addMenu("Registries")
+        registries_menu.addAction("Edit resources...").triggered.connect(self.edit_resources)
+        registries_menu.addAction("Edit operators...").triggered.connect(self.edit_operators)
+        registries_menu.addAction("Edit shifts...").triggered.connect(self.edit_shifts)
 
         edit_menu = self.menuBar().addMenu("Edit")
         delete_action = edit_menu.addAction("Delete selected")
@@ -2228,6 +2664,25 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 self.statusBar().showMessage(f"{len(self.model_registry)} models defined.")
             except Exception as e:
                 qmessage(self, "Invalid models", str(e), QtWidgets.QMessageBox.Warning)
+
+    def edit_resources(self):
+        dlg = ResourceRegistryDialog(self, self.resource_registry)
+        if dlg.exec():
+            self.resource_registry = dlg.entries()
+            self.statusBar().showMessage(f"{len(self.resource_registry)} resources defined.")
+
+    def edit_operators(self):
+        shift_names = [s.get("name", "") for s in self.shift_registry if s.get("name")]
+        dlg = OperatorRegistryDialog(self, self.operator_registry, shift_names=shift_names)
+        if dlg.exec():
+            self.operator_registry = dlg.entries()
+            self.statusBar().showMessage(f"{len(self.operator_registry)} operator groups defined.")
+
+    def edit_shifts(self):
+        dlg = ShiftRegistryDialog(self, self.shift_registry)
+        if dlg.exec():
+            self.shift_registry = dlg.entries()
+            self.statusBar().showMessage(f"{len(self.shift_registry)} shift definitions.")
 
     def on_node_double_clicked(self, node):
         kind = node_kind(node)
