@@ -442,69 +442,18 @@ class SimNode(BaseNode):
         }
 
 
-class DistributionNode(SimNode):
-    NODE_NAME = "Distribution"
-    kind = "Distribution"
-    color = (80, 100, 160)
-
-    def __init__(self):
-        super().__init__()
-        self.add_output("distribution", color=PORT_COLORS["duration"])
-        self.create_property("dist_type", "Constant")
-        self.create_property("params", {"value": 0.0})
-
-    def to_clean_json(self) -> dict:
-        params = self.get_property("params")
-        if isinstance(params, str):
-            try:
-                params = json.loads(params)
-            except Exception:
-                params = {}
-        return {
-            "id": node_uid(self),
-            "kind": self.kind,
-            "name": self.name(),
-            "distribution": {
-                "type": self.get_property("dist_type"),
-                "params": params or {},
-            },
-            "position": [self.x_pos(), self.y_pos()],
-        }
-
-
-class IntervalNode(SimNode):
-    NODE_NAME = "Interval"
-    kind = "Interval"
-    color = (110, 90, 160)
-
-    def __init__(self):
-        super().__init__()
-        self.add_output("interval", color=PORT_COLORS["interval"])
-        add_float_input(self, "start", "start", 0.0)
-        add_float_input(self, "end", "end", 1.0)
-
-    def to_clean_json(self) -> dict:
-        return {
-            "id": node_uid(self),
-            "kind": self.kind,
-            "name": self.name(),
-            "start": as_float(self.get_property("start")),
-            "end": as_float(self.get_property("end")),
-            "position": [self.x_pos(), self.y_pos()],
-        }
-
-
 class ShutdownsNode(SimNode):
-    """NonFlexibleShutdowns or FlexibleShutdowns (chosen via the type toggle)."""
+    """NonFlexibleShutdowns or FlexibleShutdowns (chosen via the type toggle).
+    Intervals are edited in the card menu ('+ interval')."""
     NODE_NAME = "Shutdowns"
     kind = "Shutdowns"
     color = (125, 80, 130)
 
     def __init__(self):
         super().__init__()
-        self.add_input("intervals", multi_input=True, color=PORT_COLORS["interval"])
         self.add_output("shutdowns", color=PORT_COLORS["shutdown"])
         add_combo_input(self, "shutdown_type", "type", SHUTDOWN_TYPES, "NON_FLEXIBLE")
+        self.create_property("intervals", "[]")  # [{start, end}]
 
     def to_clean_json(self) -> dict:
         return {
@@ -512,55 +461,7 @@ class ShutdownsNode(SimNode):
             "kind": self.kind,
             "name": self.name(),
             "shutdown_type": self.get_property("shutdown_type") if self.has_property("shutdown_type") else "NON_FLEXIBLE",
-            "intervals": connected_refs_from_port(self, "intervals", "input"),
-            "position": [self.x_pos(), self.y_pos()],
-        }
-
-
-class ResourceNode(SimNode):
-    NODE_NAME = "Resource"
-    kind = "Resource"
-    color = (120, 100, 60)
-
-    def __init__(self):
-        super().__init__()
-        self.add_output("resource", color=PORT_COLORS["resource"])
-        add_float_input(self, "desired_capacity", "capacity", 1.0)
-        self.create_property("anonymous", False)
-
-    def to_clean_json(self) -> dict:
-        return {
-            "id": node_uid(self),
-            "kind": self.kind,
-            "name": self.name(),
-            "capacity": read_capacity(self, 1.0),
-            "anonymous": False,
-            "position": [self.x_pos(), self.y_pos()],
-        }
-
-
-class RestockableResourceNode(SimNode):
-    NODE_NAME = "Restockable Resource"
-    kind = "RestockableResource"
-    color = (140, 105, 55)
-
-    def __init__(self):
-        super().__init__()
-        self.add_input("order_duration", color=PORT_COLORS["duration"])
-        self.add_input("delivery_duration", color=PORT_COLORS["duration"])
-        self.add_output("resource", color=PORT_COLORS["resource"])
-        add_float_input(self, "desired_capacity", "capacity", 100.0)
-        add_float_input(self, "threshold", "threshold", 20.0)
-
-    def to_clean_json(self) -> dict:
-        return {
-            "id": node_uid(self),
-            "kind": self.kind,
-            "name": self.name(),
-            "capacity": read_capacity(self, 100.0),
-            "threshold": as_float(self.get_property("threshold"), 20.0),
-            "order_duration": get_input_ref(self, "order_duration"),
-            "delivery_duration": get_input_ref(self, "delivery_duration"),
+            "intervals": get_property_json(self, "intervals", []),
             "position": [self.x_pos(), self.y_pos()],
         }
 
@@ -577,7 +478,6 @@ class HardBufferNode(SimNode):
         self.add_output("monitor", multi_output=True, color=PORT_COLORS["monitor"])
         self.create_property("valid_models", "[]")
         self.create_property("capacity", "inf")
-        add_combo_input(self, "buffer_role", "role", BUFFER_ROLES, "Normal")
 
     def to_clean_json(self) -> dict:
         return {
@@ -586,7 +486,6 @@ class HardBufferNode(SimNode):
             "name": self.name(),
             "valid_models": get_property_json(self, "valid_models", []),
             "capacity": self.get_property("capacity"),
-            "buffer_role": self.get_property("buffer_role") if self.has_property("buffer_role") else "Normal",
             "inputs_from": connected_refs_from_port(self, "from_task", "input"),
             "outputs_to": connected_refs_from_port(self, "to_task", "output"),
             "position": [self.x_pos(), self.y_pos()],
@@ -602,28 +501,26 @@ class SoftBufferNode(SimNode):
         super().__init__()
         self.add_input("from_task", multi_input=True, color=PORT_COLORS["task"])
         self.add_output("to_buffers", multi_output=True, color=PORT_COLORS["buffer"])
-        self.create_property("buffer_probs", "{}")
-        add_combo_input(self, "buffer_role", "role", BUFFER_ROLES, "Normal")
+        self.create_property("buffer_probs", "{}")  # {buffer_id: <time-function>}
 
     def to_clean_json(self) -> dict:
         connected_buffers = connected_refs_from_port(self, "to_buffers", "output")
         prob_map = get_property_json(self, "buffer_probs", {})
-        buffer_probs = []
-        for buffer_id in connected_buffers:
-            buffer_probs.append({"buffer": buffer_id, "probability": as_float(prob_map.get(buffer_id, 0.0), 0.0)})
+        buffer_probs = [{"buffer": b, "probability": prob_map.get(b, {"kind": "constant", "value": 0.0})}
+                        for b in connected_buffers]
         return {
             "id": node_uid(self),
             "kind": self.kind,
             "name": self.name(),
             "inputs_from": connected_refs_from_port(self, "from_task", "input"),
-            "buffer_role": self.get_property("buffer_role") if self.has_property("buffer_role") else "Normal",
             "buffer_probs": buffer_probs,
             "position": [self.x_pos(), self.y_pos()],
         }
 
 
 class FirstTaskNode(SimNode):
-    """PieceGenerator: {model: integer goal} over working_hours -> outlets."""
+    """PieceGenerator: per-model integer goals over chosen shifts -> outlets.
+    Only childless (leaf) models can be generated."""
     NODE_NAME = "Source (PieceGenerator)"
     kind = "FirstTask"
     color = (145, 80, 80)
@@ -632,7 +529,7 @@ class FirstTaskNode(SimNode):
         super().__init__()
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
         self.create_property("models_goals", "[]")  # [{model, goal}]
-        add_float_input(self, "working_hours", "working_hours", 480.0)
+        self.create_property("shifts", "[]")         # [shift_name]
 
     def to_clean_json(self) -> dict:
         return {
@@ -640,14 +537,16 @@ class FirstTaskNode(SimNode):
             "kind": self.kind,
             "name": self.name(),
             "models_goals": get_property_json(self, "models_goals", []),
-            "working_hours": as_float(self.get_property("working_hours"), 480.0),
+            "shifts": get_property_json(self, "shifts", []),
             "outlets": get_output_refs(self, "bufs_out"),
             "position": [self.x_pos(), self.y_pos()],
         }
 
 
 class TaskNode(SimNode):
-    """PieceTask. Per-model duration + resources (models_configs)."""
+    """PieceTask. Everything except the piece-flow wiring lives in the card menu:
+    per-model configs, task-level durations, operator alternatives, scopes, policies,
+    task shifts, carrier settings."""
     NODE_NAME = "Piece Task"
     kind = "Task"
     color = (150, 90, 60)
@@ -655,160 +554,129 @@ class TaskNode(SimNode):
     def __init__(self):
         super().__init__()
         self.add_input("bufs_in", multi_input=True, color=PORT_COLORS["buffer"])
-        self.add_input("durations", multi_input=True, color=PORT_COLORS["duration"])
-        self.add_input("resources", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_input("operators", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_input("startup_operators", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_input("startup_duration", color=PORT_COLORS["duration"])
         self.add_input("shutdowns", multi_input=True, color=PORT_COLORS["shutdown"])
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
         self.add_output("task_ref", multi_output=True, color=PORT_COLORS["breakdown"])
 
-        # models_configs = [{model, duration(dist id),
-        #                    resource_groups:[{resource_id: qty}, ...]}]  (OR of AND groups)
+        # per-model: {model, duration:<sampler>, resources:[{resource,value}],
+        #             min_carrier_capacity, max_carrier_capacity}
         self.create_property("models_configs", "[]")
-        self.create_property("resources_scope", "PER_BATCH")   # PER_PIECE | PER_BATCH
-        self.create_property("operators_scope", "PER_BATCH")   # PER_BATCH | PER_TASK
-        self.create_property("operator_quantities", "{}")
-        self.create_property("startup_operator_quantities", "{}")
+        self.create_property("startup_duration", "")   # <sampler>
+        self.create_property("loading_duration", "")   # <sampler>
+        self.create_property("operators", "[]")        # <alternatives>
+        self.create_property("loading_operators", "[]")
+        self.create_property("startup_operators", "[]")
+        self.create_property("task_shifts", "[]")      # [shift_name]
+        self.create_property("policies", "{}")
+        self.create_property("operator_scope", "PER_BATCH")   # PER_BATCH | PER_TASK
+        self.create_property("resource_scope", "PER_BATCH")   # PER_UNIT | PER_BATCH
         self.create_property("min_carriers", 1)
-        self.create_property("max_capacity", 1)
-        self.create_property("min_carrier_capacity", 1)
-        self.create_property("max_carrier_capacity", 1)
+        self.create_property("max_capacity", 1.0)
         self.create_property("contiguous_carriers", False)
-        self.create_property("collector_type", "NON_DISCRIMINATING_GREEDY")
         self.create_property("independent_carriers", False)
+        self.create_property("timeout", 1000000000.0)
+        self.create_property("priority", 5)
+        self.create_property("collector_type", "NON_DISCRIMINATING_GREEDY")
 
     def to_clean_json(self) -> dict:
-        model_configs = get_property_json(self, "models_configs", [])
-        capability = [mc.get("model") for mc in model_configs if mc.get("model")]
-        models_configs = []
-        for mc in model_configs:
-            models_configs.append({
-                "model": mc.get("model"),
-                "duration": mc.get("duration"),
-                "resources": model_config_resource_dnf(mc),
-            })
-
-        oq = get_property_json(self, "operator_quantities", {})
-        soq = get_property_json(self, "startup_operator_quantities", {})
         return {
             "id": node_uid(self),
             "kind": self.kind,
             "name": self.name(),
-            "capability": capability,
-            "models_configs": models_configs,
+            "models_configs": get_property_json(self, "models_configs", []),
+            "startup_duration": get_property_json(self, "startup_duration", None),
+            "loading_duration": get_property_json(self, "loading_duration", None),
+            "operators": get_property_json(self, "operators", []),
+            "loading_operators": get_property_json(self, "loading_operators", []),
+            "startup_operators": get_property_json(self, "startup_operators", []),
+            "task_shifts": get_property_json(self, "task_shifts", []),
+            "policies": get_property_json(self, "policies", {}),
+            "operator_scope": self.get_property("operator_scope"),
+            "resource_scope": self.get_property("resource_scope"),
+            "min_carriers": as_int(self.get_property("min_carriers"), 1),
+            "max_capacity": as_float(self.get_property("max_capacity"), 1.0),
+            "contiguous_carriers": bool(self.get_property("contiguous_carriers")),
+            "independent_carriers": bool(self.get_property("independent_carriers")),
+            "timeout": as_float(self.get_property("timeout"), 1e9),
+            "priority": as_int(self.get_property("priority"), 5),
+            "collector_type": self.get_property("collector_type"),
             "bufs_in": connected_refs_from_port(self, "bufs_in", "input"),
             "bufs_out": get_output_refs(self, "bufs_out"),
-            "operators": resolve_operator_dnf(self, "operators", oq, integer=True),
-            "operators_scope": self.get_property("operators_scope"),
-            "resources_scope": self.get_property("resources_scope"),
-            "startup_operators": resolve_operator_dnf(self, "startup_operators", soq, integer=True),
-            "startup_duration": get_input_ref(self, "startup_duration"),
-            "min_carriers": as_int(self.get_property("min_carriers"), 1),
-            "max_capacity": as_int(self.get_property("max_capacity"), 1),
-            "min_carrier_capacity": as_int(self.get_property("min_carrier_capacity"), 1),
-            "max_carrier_capacity": as_int(self.get_property("max_carrier_capacity"), 1),
-            "contiguous_carriers": bool(self.get_property("contiguous_carriers")),
-            "collector_type": self.get_property("collector_type"),
-            "independent_carriers": bool(self.get_property("independent_carriers")),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),
             "position": [self.x_pos(), self.y_pos()],
         }
 
 
 class ResourceTaskNode(SimNode):
-    """ResourceTask (experimental in the sim). Transforms quantities of resources."""
+    """ResourceTask. Consumes/transforms resources into output resources. No piece
+    flow; connects to breakdowns via task_ref and to shutdown cards."""
     NODE_NAME = "Resource Task"
     kind = "ResourceTask"
     color = (150, 120, 60)
 
     def __init__(self):
         super().__init__()
-        self.add_input("non_transformed_resources", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_input("transformed_resources", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_input("resources_out", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_input("operators", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_input("startup_operators", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_input("task_duration", color=PORT_COLORS["duration"])
-        self.add_input("startup_duration", color=PORT_COLORS["duration"])
         self.add_input("shutdowns", multi_input=True, color=PORT_COLORS["shutdown"])
         self.add_output("task_ref", multi_output=True, color=PORT_COLORS["breakdown"])
 
-        self.create_property("resources_scope", "PER_BATCH")
-        self.create_property("operators_scope", "PER_BATCH")
+        self.create_property("non_transformed_resources", "[]")   # [{resource, value(quantity)}]
+        self.create_property("transformed_resources", "[]")       # [{resource, proportion, salvageable}]
+        self.create_property("resources_out", "[]")               # [{resource, distribution:<sampler>}]
+        self.create_property("duration", "")                      # <sampler>
+        self.create_property("startup_duration", "")              # <sampler>
+        self.create_property("loading_duration", "")              # <sampler>
+        self.create_property("operators", "[]")                   # <alternatives>
+        self.create_property("loading_operators", "[]")
+        self.create_property("startup_operators", "[]")
+        self.create_property("task_shifts", "[]")
+        self.create_property("policies", "{}")
+        self.create_property("resource_scope", "PER_BATCH")
+        self.create_property("operator_scope", "PER_BATCH")
         self.create_property("resource_collector_type", "GREEDY")
         self.create_property("min_carriers", 1)
-        self.create_property("max_capacity", 1)
-        self.create_property("min_carrier_capacity", 1)
-        self.create_property("max_carrier_capacity", 1)
+        self.create_property("max_capacity", 1.0)
+        self.create_property("min_carrier_capacity", 1.0)
+        self.create_property("max_carrier_capacity", 1.0)
         self.create_property("contiguous_carriers", False)
         self.create_property("independent_carriers", False)
-        self.create_property("non_transformed_quantities", "{}")   # {rid: qty}
-        self.create_property("operator_quantities", "{}")
-        self.create_property("startup_operator_quantities", "{}")
-        self.create_property("transformed_specs", "{}")            # {rid: {proportion, salvageable}}
-        self.create_property("out_specs", "{}")                    # {rid: {dist_type, params, low, high}}
+        self.create_property("timeout", 1000000000.0)
+        self.create_property("priority", 5)
 
     def to_clean_json(self) -> dict:
-        non_transformed = connected_refs_from_port(self, "non_transformed_resources", "input")
-        transformed = connected_refs_from_port(self, "transformed_resources", "input")
-        out_resources = connected_refs_from_port(self, "resources_out", "input")
-
-        ntq = get_property_json(self, "non_transformed_quantities", {})
-        oq = get_property_json(self, "operator_quantities", {})
-        soq = get_property_json(self, "startup_operator_quantities", {})
-        tspecs = get_property_json(self, "transformed_specs", {})
-        ospecs = get_property_json(self, "out_specs", {})
-
-        transformed_out = []
-        for rid in transformed:
-            spec = tspecs.get(rid, {})
-            transformed_out.append({
-                "resource": rid,
-                "proportion": as_float(spec.get("proportion", 1.0), 1.0),
-                "salvageable": bool(spec.get("salvageable", True)),
-            })
-
-        resources_out_distr = []
-        for rid in out_resources:
-            spec = ospecs.get(rid, {})
-            resources_out_distr.append({
-                "resource": rid,
-                "distribution": {
-                    "type": spec.get("dist_type", "Normal"),
-                    "params": spec.get("params", {"mean": 1.0, "std": 0.0}),
-                },
-                "low": as_float(spec.get("low", 0.0), 0.0),
-                "high": as_float(spec.get("high", 1.0), 1.0),
-            })
-
         return {
             "id": node_uid(self),
             "kind": self.kind,
             "name": self.name(),
-            "non_transformed_resources": [{"resource": rid, "quantity": as_float(ntq.get(rid, 1.0), 1.0)} for rid in non_transformed],
-            "transformed_resources_salvageable": transformed_out,
-            "resources_out_distr": resources_out_distr,
-            "operators": resolve_operator_dnf(self, "operators", oq, integer=True),
-            "startup_operators": resolve_operator_dnf(self, "startup_operators", soq, integer=True),
-            "operators_scope": self.get_property("operators_scope"),
-            "resources_scope": self.get_property("resources_scope"),
+            "non_transformed_resources": get_property_json(self, "non_transformed_resources", []),
+            "transformed_resources_salvageable": get_property_json(self, "transformed_resources", []),
+            "resources_out_distr": get_property_json(self, "resources_out", []),
+            "duration": get_property_json(self, "duration", None),
+            "startup_duration": get_property_json(self, "startup_duration", None),
+            "loading_duration": get_property_json(self, "loading_duration", None),
+            "operators": get_property_json(self, "operators", []),
+            "loading_operators": get_property_json(self, "loading_operators", []),
+            "startup_operators": get_property_json(self, "startup_operators", []),
+            "task_shifts": get_property_json(self, "task_shifts", []),
+            "policies": get_property_json(self, "policies", {}),
+            "resource_scope": self.get_property("resource_scope"),
+            "operator_scope": self.get_property("operator_scope"),
             "resource_collector_type": self.get_property("resource_collector_type"),
-            "task_duration": get_input_ref(self, "task_duration"),
-            "startup_duration": get_input_ref(self, "startup_duration"),
             "min_carriers": as_int(self.get_property("min_carriers"), 1),
-            "max_capacity": as_int(self.get_property("max_capacity"), 1),
-            "min_carrier_capacity": as_int(self.get_property("min_carrier_capacity"), 1),
-            "max_carrier_capacity": as_int(self.get_property("max_carrier_capacity"), 1),
+            "max_capacity": as_float(self.get_property("max_capacity"), 1.0),
+            "min_carrier_capacity": as_float(self.get_property("min_carrier_capacity"), 1.0),
+            "max_carrier_capacity": as_float(self.get_property("max_carrier_capacity"), 1.0),
             "contiguous_carriers": bool(self.get_property("contiguous_carriers")),
             "independent_carriers": bool(self.get_property("independent_carriers")),
+            "timeout": as_float(self.get_property("timeout"), 1e9),
+            "priority": as_int(self.get_property("priority"), 5),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),
             "position": [self.x_pos(), self.y_pos()],
         }
 
 
 class BreakdownNode(SimNode):
+    """Breakdown on a task. mtbf is a distribution or a bathtub failure-rate;
+    mttr is a distribution. Piece-task breakdowns need lifeboat outlets."""
     NODE_NAME = "Breakdown"
     kind = "Breakdown"
     color = (150, 65, 85)
@@ -816,13 +684,9 @@ class BreakdownNode(SimNode):
     def __init__(self):
         super().__init__()
         self.add_input("task", color=PORT_COLORS["breakdown"])
-        self.add_input("mttr", color=PORT_COLORS["duration"])
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
-        add_float_input(self, "A", "A (early-life)", 0.0)
-        add_float_input(self, "tau", "tau", 1.0)
-        add_float_input(self, "c", "c (constant rate)", 0.01)
-        add_float_input(self, "beta", "beta (wear shape)", 1.0)
-        add_float_input(self, "eta", "eta (wear scale)", 1.0)
+        self.create_property("mtbf", "{}")   # {"mode": "distribution"|"bathtub", ...}
+        self.create_property("mttr", "")     # <sampler>
 
     def to_clean_json(self) -> dict:
         return {
@@ -830,9 +694,8 @@ class BreakdownNode(SimNode):
             "kind": self.kind,
             "name": self.name(),
             "task": get_input_ref(self, "task"),
-            "failure_rate": {k: as_float(self.get_property(k), d) for k, d in
-                             (("A", 0.0), ("tau", 1.0), ("c", 0.01), ("beta", 1.0), ("eta", 1.0))},
-            "mttr": get_input_ref(self, "mttr"),
+            "mtbf": get_property_json(self, "mtbf", {}),
+            "mttr": get_property_json(self, "mttr", None),
             "outlets": get_output_refs(self, "bufs_out"),
             "position": [self.x_pos(), self.y_pos()],
         }
@@ -862,71 +725,6 @@ class MonitorNode(SimNode):
             "position": [self.x_pos(), self.y_pos()],
         }
 
-
-class AndGroupNode(SimNode):
-    """One AND group: every wired-in resource is needed together.
-
-    Feeds an OR card (as one alternative) or a task's operator port directly
-    (as a single-alternative requirement). Quantities per member are edited by
-    double-clicking the card.
-    """
-    NODE_NAME = "AND (all of)"
-    kind = "AndGroup"
-    color = (95, 140, 95)
-
-    def __init__(self):
-        super().__init__()
-        self.add_input("members", multi_input=True, color=PORT_COLORS["resource"])
-        self.add_output("group", multi_output=True, color=PORT_COLORS["group"])
-        self.create_property("member_quantities", "{}")  # {resource_id: qty}
-
-    def to_clean_json(self) -> dict:
-        quantities = get_property_json(self, "member_quantities", {})
-        members = direct_resource_nodes(self, "members")
-        return {
-            "id": node_uid(self),
-            "kind": self.kind,
-            "name": self.name(),
-            "members": [{"resource": node_uid(m), "quantity": as_float(quantities.get(node_uid(m), 1), 1.0)}
-                        for m in members],
-            "position": [self.x_pos(), self.y_pos()],
-        }
-
-
-class OrGroupNode(SimNode):
-    """A set of alternatives: any one wired-in group (or resource) satisfies the task.
-
-    AND cards plug into `groups`; bare resources may plug in too as one-member
-    alternatives (their quantity is edited by double-clicking this card).
-    """
-    NODE_NAME = "OR (any of)"
-    kind = "OrGroup"
-    color = (150, 125, 70)
-
-    def __init__(self):
-        super().__init__()
-        self.add_input("groups", multi_input=True, color=PORT_COLORS["group"])
-        self.add_output("out", multi_output=True, color=PORT_COLORS["group"])
-        self.create_property("member_quantities", "{}")  # quantities for directly-wired resources
-
-    def to_clean_json(self) -> dict:
-        # The alternatives are resolved by whichever task consumes this card;
-        # here we persist quantities for any directly-wired resources (one-member
-        # alternatives) so they round-trip.
-        quantities = get_property_json(self, "member_quantities", {})
-        direct = direct_resource_nodes(self, "groups")
-        return {
-            "id": node_uid(self),
-            "kind": self.kind,
-            "name": self.name(),
-            "member_quantities": {node_uid(m): as_float(quantities.get(node_uid(m), 1), 1.0) for m in direct},
-            "position": [self.x_pos(), self.y_pos()],
-        }
-
-
-# ============================================================
-# Validation
-# ============================================================
 
 def port_signature(port) -> Tuple[str, str, str]:
     n = port.node()
@@ -2429,6 +2227,691 @@ class OperatorRegistryDialog(_RegistryDialog):
         return OperatorEditorDialog(self, entry, self._shift_names)
 
 
+# ============================================================
+# Stage 2: selection widgets that reference the registries
+# ============================================================
+
+POLICY_OPTIONS = {
+    "pending_carriers_pre_flexible_shutdowns": (["AbortPendingCarriers", "WaitForCarriers", "AbortOrWaitForCarriers"], "AbortPendingCarriers"),
+    "pending_carrier_pre_task_shift_end": (["AbortPendingCarriers", "WaitForCarriers", "AbortOrWaitForCarriers"], "AbortPendingCarriers"),
+    "operator_shift_constraint": (["ConstrainedByShift", "NotConstrainedByShift"], "ConstrainedByShift"),
+    "task_shift_constraint": (["ConstrainedByShift", "NotConstrainedByShift"], "ConstrainedByShift"),
+    "operators_self_conscious": (["Conscious", "Unconscious"], "Conscious"),
+}
+
+
+class ModelTreeWidget(QtWidgets.QTreeWidget):
+    """Checkable model hierarchy with cascade: checking a model checks all its
+    descendants; unchecking a model unchecks its ancestors. If leaves_only, only
+    childless models are selectable (used by the piece generator)."""
+
+    def __init__(self, model_registry, checked=None, leaves_only=False, parent=None):
+        super().__init__(parent)
+        self.setHeaderHidden(True)
+        self._leaves_only = leaves_only
+        self._items = {}
+        checked = set(checked or [])
+        children_of = {}
+        for m in model_registry:
+            children_of.setdefault(m.get("parent"), []).append(m["name"])
+        has_children = {m["name"]: bool(children_of.get(m["name"])) for m in model_registry}
+
+        def add(name, parent_item):
+            item = QtWidgets.QTreeWidgetItem(parent_item, [name])
+            selectable = not (leaves_only and has_children.get(name))
+            if selectable:
+                item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
+                item.setCheckState(0, QtCore.Qt.Checked if name in checked else QtCore.Qt.Unchecked)
+            else:
+                item.setFlags(QtCore.Qt.ItemIsEnabled)
+            self._items[name] = item
+            for child in children_of.get(name, []):
+                add(child, item)
+
+        for root in children_of.get(None, []):
+            add(root, self)
+        self.expandAll()
+        self._guard = False
+        self.itemChanged.connect(self._on_changed)
+
+    def _on_changed(self, item, col):
+        if self._guard:
+            return
+        self._guard = True
+        state = item.checkState(0)
+        if state == QtCore.Qt.Checked:
+            self._set_descendants(item, QtCore.Qt.Checked)
+        else:
+            # unchecking a node unchecks its ancestors (child deselect -> parent deselect)
+            p = item.parent()
+            while p is not None:
+                if p.flags() & QtCore.Qt.ItemIsUserCheckable:
+                    p.setCheckState(0, QtCore.Qt.Unchecked)
+                p = p.parent()
+        self._guard = False
+
+    def _set_descendants(self, item, state):
+        for i in range(item.childCount()):
+            ch = item.child(i)
+            if ch.flags() & QtCore.Qt.ItemIsUserCheckable:
+                ch.setCheckState(0, state)
+            self._set_descendants(ch, state)
+
+    def checked_models(self):
+        return [name for name, it in self._items.items()
+                if (it.flags() & QtCore.Qt.ItemIsUserCheckable) and it.checkState(0) == QtCore.Qt.Checked]
+
+
+class ShiftPickerWidget(QtWidgets.QListWidget):
+    """Multi-select of shift-definition names (their concatenation is the schedule)."""
+
+    def __init__(self, shift_names, chosen=None, parent=None):
+        super().__init__(parent)
+        chosen = set(chosen or [])
+        for nm in shift_names:
+            it = QtWidgets.QListWidgetItem(nm)
+            it.setFlags(it.flags() | QtCore.Qt.ItemIsUserCheckable)
+            it.setCheckState(QtCore.Qt.Checked if nm in chosen else QtCore.Qt.Unchecked)
+            self.addItem(it)
+
+    def chosen(self):
+        return [self.item(i).text() for i in range(self.count())
+                if self.item(i).checkState() == QtCore.Qt.Checked]
+
+
+class ResourcePickerWidget(QtWidgets.QWidget):
+    """Rows of (resource-name, float). Used for per-model resources (quantity) and
+    resource-task non-transformed inputs (quantity). Value: [{"resource","value"}]."""
+
+    def __init__(self, resource_names, value_label="quantity", entries=None, parent=None):
+        super().__init__(parent)
+        self._names = list(resource_names)
+        self._label = value_label
+        self._rows = []
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget()
+        self._vl = QtWidgets.QVBoxLayout(self._host)
+        self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton(f"+ resource")
+        add.clicked.connect(lambda: self._add())
+        lay.addWidget(add)
+        for e in (entries or []):
+            self._add(e.get("resource"), e.get("value", e.get("quantity", e.get("proportion", 1.0))))
+
+    def _add(self, resource=None, value=1.0):
+        row = QtWidgets.QWidget()
+        h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
+        combo = QtWidgets.QComboBox(); combo.addItems(self._names)
+        if resource in self._names:
+            combo.setCurrentText(resource)
+        edit = QtWidgets.QLineEdit(str(value)); edit.setMaximumWidth(70)
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
+        h.addWidget(combo); h.addWidget(QtWidgets.QLabel(self._label + ":")); h.addWidget(edit); h.addWidget(rm); h.addStretch(1)
+        entry = (row, combo, edit)
+        rm.clicked.connect(lambda: self._remove(entry))
+        self._rows.append(entry)
+        self._vl.addWidget(row)
+
+    def _remove(self, entry):
+        if entry in self._rows:
+            self._rows.remove(entry)
+            entry[0].setParent(None); entry[0].deleteLater()
+
+    def entries(self):
+        out = []
+        for _, combo, edit in self._rows:
+            if combo.currentText():
+                out.append({"resource": combo.currentText(), "value": as_float(edit.text())})
+        return out
+
+
+class AlternativesWidget(QtWidgets.QWidget):
+    """An operator Alternative = OR of ANDs. Each alternative is a set of
+    (operator-group, count). Value: [[{"operator","count"}, ...], ...]."""
+
+    def __init__(self, operator_names, value=None, parent=None):
+        super().__init__(parent)
+        self._names = list(operator_names)
+        self._alts = []
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget()
+        self._vl = QtWidgets.QVBoxLayout(self._host)
+        self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton("+ alternative (OR)")
+        add.clicked.connect(lambda: self._add_alt())
+        lay.addWidget(add)
+        for alt in (value or []):
+            self._add_alt(alt)
+
+    def _add_alt(self, members=None):
+        box = QtWidgets.QGroupBox(f"alternative {len(self._alts) + 1} (all needed together)")
+        bl = QtWidgets.QVBoxLayout(box)
+        picker = ResourcePickerWidget(self._names, value_label="count",
+                                      entries=[{"resource": m.get("operator"), "value": m.get("count", 1)} for m in (members or [])])
+        bl.addWidget(picker)
+        rm = QtWidgets.QPushButton("remove alternative")
+        bl.addWidget(rm)
+        entry = (box, picker)
+        rm.clicked.connect(lambda: self._remove_alt(entry))
+        self._alts.append(entry)
+        self._vl.addWidget(box)
+
+    def _remove_alt(self, entry):
+        if entry in self._alts:
+            self._alts.remove(entry)
+            entry[0].setParent(None); entry[0].deleteLater()
+
+    def get_value(self):
+        out = []
+        for _, picker in self._alts:
+            members = [{"operator": e["resource"], "count": int(e["value"])} for e in picker.entries()]
+            if members:
+                out.append(members)
+        return out
+
+
+class PoliciesWidget(QtWidgets.QWidget):
+    """The five task protocols with their defaults; AbortOrWaitForCarriers exposes
+    a tolerance_fraction. Value: {policy_name: {"type", ...params}}."""
+
+    def __init__(self, value=None, parent=None):
+        super().__init__(parent)
+        value = value or {}
+        form = QtWidgets.QFormLayout(self)
+        self._combos = {}
+        self._tol = {}
+        for name, (options, default) in POLICY_OPTIONS.items():
+            row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
+            combo = QtWidgets.QComboBox(); combo.addItems(options)
+            combo.setCurrentText(value.get(name, {}).get("type", default))
+            h.addWidget(combo)
+            tol = QtWidgets.QLineEdit(str(value.get(name, {}).get("tolerance_fraction", 0.5)))
+            tol.setMaximumWidth(60)
+            tol_lbl = QtWidgets.QLabel("tolerance:")
+            h.addWidget(tol_lbl); h.addWidget(tol); h.addStretch(1)
+            self._combos[name] = combo
+            self._tol[name] = (tol_lbl, tol)
+            def _upd(_=None, n=name):
+                on = self._combos[n].currentText() == "AbortOrWaitForCarriers"
+                self._tol[n][0].setVisible(on); self._tol[n][1].setVisible(on)
+            combo.currentTextChanged.connect(_upd)
+            _upd()
+            form.addRow(name, row)
+
+    def get_value(self):
+        out = {}
+        for name, combo in self._combos.items():
+            t = combo.currentText()
+            entry = {"type": t}
+            if t == "AbortOrWaitForCarriers":
+                entry["tolerance_fraction"] = as_float(self._tol[name][1].text(), 0.5)
+            out[name] = entry
+        return out
+
+
+# ============================================================
+# Stage 2: card menus (dialogs). They read/write node properties and
+# reference the window's registries (models/resources/operators/shifts).
+# ============================================================
+
+def _names(reg):
+    return [e.get("name", "") for e in reg if e.get("name")]
+
+
+def _leaf_model_names(model_registry):
+    parents = {m.get("parent") for m in model_registry}
+    return [m["name"] for m in model_registry if m["name"] not in parents]
+
+
+class IntervalListWidget(QtWidgets.QWidget):
+    """A list of {start, end} intervals with '+ interval'."""
+
+    def __init__(self, intervals=None, parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton("+ interval"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        self._rows = []
+        for iv in (intervals or []):
+            self._add(iv.get("start", 0.0), iv.get("end", 1.0))
+
+    def _add(self, start=0.0, end=1.0):
+        row = _IntervalRow(start, end, on_remove=self._remove)
+        self._rows.append(row); self._vl.addWidget(row)
+
+    def _remove(self, row):
+        if row in self._rows:
+            self._rows.remove(row); row.setParent(None); row.deleteLater()
+
+    def value(self):
+        return [r.data() for r in self._rows]
+
+
+class NameValuePicker(QtWidgets.QWidget):
+    """Rows of (name-combo, int/float). Generic; used for generator model goals."""
+
+    def __init__(self, names, value_label="goal", integer=True, entries=None, key="model", parent=None):
+        super().__init__(parent)
+        self._names = list(names); self._label = value_label; self._int = integer; self._key = key
+        self._rows = []
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton("+"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        for e in (entries or []):
+            self._add(e.get(key), e.get("value", e.get("goal", 1)))
+
+    def _add(self, name=None, value=1):
+        row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
+        combo = QtWidgets.QComboBox(); combo.addItems(self._names)
+        if name in self._names:
+            combo.setCurrentText(name)
+        edit = QtWidgets.QLineEdit(str(value)); edit.setMaximumWidth(70)
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
+        h.addWidget(combo); h.addWidget(QtWidgets.QLabel(self._label + ":")); h.addWidget(edit); h.addWidget(rm); h.addStretch(1)
+        entry = (row, combo, edit); rm.clicked.connect(lambda: self._remove(entry))
+        self._rows.append(entry); self._vl.addWidget(row)
+
+    def _remove(self, entry):
+        if entry in self._rows:
+            self._rows.remove(entry); entry[0].setParent(None); entry[0].deleteLater()
+
+    def value(self):
+        out = []
+        for _, combo, edit in self._rows:
+            if combo.currentText():
+                v = as_int(edit.text()) if self._int else as_float(edit.text())
+                out.append({self._key: combo.currentText(), "value": v})
+        return out
+
+
+class ShutdownsMenuDialog(QtWidgets.QDialog):
+    def __init__(self, parent, node):
+        super().__init__(parent)
+        self.node = node
+        self.setWindowTitle("Shutdowns")
+        lay = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+        self.type = QtWidgets.QComboBox(); self.type.addItems(SHUTDOWN_TYPES)
+        self.type.setCurrentText(node.get_property("shutdown_type") if node.has_property("shutdown_type") else "NON_FLEXIBLE")
+        form.addRow("type", self.type)
+        lay.addLayout(form)
+        lay.addWidget(QtWidgets.QLabel("intervals:"))
+        self.intervals = IntervalListWidget(get_property_json(node, "intervals", []))
+        lay.addWidget(self.intervals)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+
+    def apply(self):
+        self.node.set_property("shutdown_type", self.type.currentText())
+        set_property_json(self.node, "intervals", self.intervals.value())
+
+
+class BufferMenuDialog(QtWidgets.QDialog):
+    def __init__(self, parent, node, model_registry):
+        super().__init__(parent)
+        self.node = node
+        self.setWindowTitle("Buffer")
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.addWidget(QtWidgets.QLabel("valid models (selecting a model selects its children):"))
+        self.models = ModelTreeWidget(model_registry, checked=get_property_json(node, "valid_models", []))
+        lay.addWidget(self.models)
+        form = QtWidgets.QFormLayout()
+        self.capacity = InfFloatWidget(node.get_property("capacity") if node.has_property("capacity") else "inf")
+        form.addRow("capacity", self.capacity)
+        lay.addLayout(form)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+
+    def apply(self):
+        set_property_json(self.node, "valid_models", self.models.checked_models())
+        self.node.set_property("capacity", self.capacity.get_value())
+
+
+class RouterMenuDialog(QtWidgets.QDialog):
+    def __init__(self, parent, node):
+        super().__init__(parent)
+        self.node = node
+        self.setWindowTitle("Router probabilities")
+        lay = QtWidgets.QVBoxLayout(self)
+        self._buffers = connected_nodes_from_port(node, "to_buffers", "output")
+        current = get_property_json(node, "buffer_probs", {})
+        self._widgets = {}
+        if not self._buffers:
+            lay.addWidget(QtWidgets.QLabel("Wire this router's 'to_buffers' output into buffers first."))
+        form = QtWidgets.QFormLayout()
+        for b in self._buffers:
+            bid = node_uid(b)
+            tf = TimeFunctionWidget(current.get(bid, {"kind": "constant", "value": 0.0}))
+            self._widgets[bid] = tf
+            form.addRow(b.name(), tf)
+        lay.addLayout(form)
+        lay.addWidget(QtWidgets.QLabel("(probabilities are checked to sum to 1 when sampled)"))
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+
+    def apply(self):
+        set_property_json(self.node, "buffer_probs", {bid: w.get_value() for bid, w in self._widgets.items()})
+
+
+class GeneratorMenuDialog(QtWidgets.QDialog):
+    def __init__(self, parent, node, model_registry, shift_names):
+        super().__init__(parent)
+        self.node = node
+        self.setWindowTitle("Piece generator")
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.addWidget(QtWidgets.QLabel("model goals (only leaf models can be generated):"))
+        goals = [{"model": e.get("model"), "value": e.get("goal", e.get("value", 1))}
+                 for e in get_property_json(node, "models_goals", [])]
+        self.goals = NameValuePicker(_leaf_model_names(model_registry), "goal", integer=True, entries=goals, key="model")
+        lay.addWidget(self.goals)
+        lay.addWidget(QtWidgets.QLabel("shifts:"))
+        self.shifts = ShiftPickerWidget(shift_names, get_property_json(node, "shifts", []))
+        lay.addWidget(self.shifts)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+
+    def apply(self):
+        set_property_json(self.node, "models_goals",
+                          [{"model": e["model"], "goal": e["value"]} for e in self.goals.value()])
+        set_property_json(self.node, "shifts", self.shifts.chosen())
+
+
+class BreakdownMenuDialog(QtWidgets.QDialog):
+    def __init__(self, parent, node):
+        super().__init__(parent)
+        self.node = node
+        self.setWindowTitle("Breakdown")
+        lay = QtWidgets.QVBoxLayout(self)
+        mtbf = get_property_json(node, "mtbf", {}) or {}
+        lay.addWidget(QtWidgets.QLabel("mtbf (mean time between failures):"))
+        self.mode = QtWidgets.QComboBox(); self.mode.addItems(["distribution", "bathtub"])
+        self.mode.setCurrentText(mtbf.get("mode", "distribution"))
+        lay.addWidget(self.mode)
+        self.dist = SamplerWidget(mtbf.get("distribution"))
+        lay.addWidget(self.dist)
+        self.bathtub_box = QtWidgets.QGroupBox("bathtub failure-rate a·e^(t/tau)+c+(beta/eta)(t/eta)^(beta-1)")
+        bl = QtWidgets.QFormLayout(self.bathtub_box)
+        self.bt = {}
+        for k, d in (("a", 0.001), ("tau", 500.0), ("c", 0.01), ("beta", 2.0), ("eta", 300.0),
+                     ("tolerance", 60.0), ("max_iters", 10000)):
+            e = QtWidgets.QLineEdit(str(mtbf.get(k, d))); self.bt[k] = e; bl.addRow(k, e)
+        lay.addWidget(self.bathtub_box)
+        self.mode.currentTextChanged.connect(self._upd)
+        lay.addWidget(QtWidgets.QLabel("mttr (mean time to repair) distribution:"))
+        self.mttr = SamplerWidget(get_property_json(node, "mttr", None))
+        lay.addWidget(self.mttr)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+        self._upd()
+
+    def _upd(self, *_):
+        bathtub = self.mode.currentText() == "bathtub"
+        self.bathtub_box.setVisible(bathtub); self.dist.setVisible(not bathtub)
+
+    def apply(self):
+        if self.mode.currentText() == "distribution":
+            mtbf = {"mode": "distribution", "distribution": self.dist.get_value()}
+        else:
+            mtbf = {"mode": "bathtub"}
+            for k, e in self.bt.items():
+                mtbf[k] = as_int(e.text()) if k == "max_iters" else as_float(e.text())
+        set_property_json(self.node, "mtbf", mtbf)
+        set_property_json(self.node, "mttr", self.mttr.get_value())
+
+
+class ModelConfigsWidget(QtWidgets.QWidget):
+    """Per-model configs for a piece task: list of {model, duration, resources, min/max carrier capacity}."""
+
+    def __init__(self, model_names, resource_names, entries=None, parent=None):
+        super().__init__(parent)
+        self._models = list(model_names); self._resources = list(resource_names)
+        self._rows = []
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton("+ model config"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        for e in (entries or []):
+            self._add(e)
+
+    def _add(self, entry=None):
+        entry = entry or {}
+        box = QtWidgets.QGroupBox(); bl = QtWidgets.QFormLayout(box)
+        combo = QtWidgets.QComboBox(); combo.addItems(self._models)
+        if entry.get("model") in self._models:
+            combo.setCurrentText(entry["model"])
+        bl.addRow("model", combo)
+        dur = SamplerWidget(entry.get("duration")); bl.addRow("duration", dur)
+        res = ResourcePickerWidget(self._resources, "quantity",
+                                   [{"resource": r.get("resource"), "value": r.get("value", r.get("quantity", 1.0))}
+                                    for r in entry.get("resources", [])])
+        bl.addRow("resources", res)
+        mn = QtWidgets.QLineEdit(str(entry.get("min_carrier_capacity", 1))); mn.setMaximumWidth(60)
+        mx = QtWidgets.QLineEdit(str(entry.get("max_carrier_capacity", 1))); mx.setMaximumWidth(60)
+        bl.addRow("min carrier capacity", mn); bl.addRow("max carrier capacity", mx)
+        rm = QtWidgets.QPushButton("remove model"); bl.addRow(rm)
+        rec = (box, combo, dur, res, mn, mx)
+        rm.clicked.connect(lambda: self._remove(rec))
+        self._rows.append(rec); self._vl.addWidget(box)
+
+    def _remove(self, rec):
+        if rec in self._rows:
+            self._rows.remove(rec); rec[0].setParent(None); rec[0].deleteLater()
+
+    def value(self):
+        out = []
+        for _, combo, dur, res, mn, mx in self._rows:
+            if not combo.currentText():
+                continue
+            out.append({
+                "model": combo.currentText(),
+                "duration": dur.get_value(),
+                "resources": res.entries(),
+                "min_carrier_capacity": as_int(mn.text(), 1),
+                "max_carrier_capacity": as_int(mx.text(), 1),
+            })
+        return out
+
+
+def _carrier_common_tab(node, operator_names, shift_names, collector_types):
+    """Build the shared 'operators / carriers / policies / shifts' tabs for a task node.
+    Returns (list-of-(label, widget), accessor-dict)."""
+    tabs = []
+    acc = {}
+
+    # operators & durations
+    t1 = QtWidgets.QWidget(); f1 = QtWidgets.QVBoxLayout(t1)
+    f1.addWidget(QtWidgets.QLabel("startup duration:")); acc["startup_duration"] = SamplerWidget(get_property_json(node, "startup_duration", None)); f1.addWidget(acc["startup_duration"])
+    f1.addWidget(QtWidgets.QLabel("loading duration:")); acc["loading_duration"] = SamplerWidget(get_property_json(node, "loading_duration", None)); f1.addWidget(acc["loading_duration"])
+    f1.addWidget(QtWidgets.QLabel("operators (alternatives):")); acc["operators"] = AlternativesWidget(operator_names, get_property_json(node, "operators", [])); f1.addWidget(acc["operators"])
+    f1.addWidget(QtWidgets.QLabel("loading operators:")); acc["loading_operators"] = AlternativesWidget(operator_names, get_property_json(node, "loading_operators", [])); f1.addWidget(acc["loading_operators"])
+    f1.addWidget(QtWidgets.QLabel("startup operators:")); acc["startup_operators"] = AlternativesWidget(operator_names, get_property_json(node, "startup_operators", [])); f1.addWidget(acc["startup_operators"])
+    tabs.append(("Operators & durations", _scroll(t1)))
+
+    # carriers & scopes
+    t2 = QtWidgets.QWidget(); f2 = QtWidgets.QFormLayout(t2)
+    acc["operator_scope"] = QtWidgets.QComboBox(); acc["operator_scope"].addItems(["PER_BATCH", "PER_TASK"]); acc["operator_scope"].setCurrentText(node.get_property("operator_scope"))
+    acc["resource_scope"] = QtWidgets.QComboBox(); acc["resource_scope"].addItems(["PER_UNIT", "PER_BATCH"]); acc["resource_scope"].setCurrentText(node.get_property("resource_scope"))
+    f2.addRow("operator scope", acc["operator_scope"]); f2.addRow("resource scope", acc["resource_scope"])
+    if collector_types is not None:
+        acc["collector_type"] = QtWidgets.QComboBox(); acc["collector_type"].addItems(collector_types); acc["collector_type"].setCurrentText(node.get_property("collector_type") if node.has_property("collector_type") else collector_types[0])
+        f2.addRow("collector type", acc["collector_type"])
+    for key, default in (("min_carriers", 1), ("max_capacity", 1.0), ("timeout", 1e9), ("priority", 5)):
+        acc[key] = QtWidgets.QLineEdit(str(node.get_property(key))); f2.addRow(key, acc[key])
+    acc["contiguous_carriers"] = QtWidgets.QCheckBox(); acc["contiguous_carriers"].setChecked(bool(node.get_property("contiguous_carriers"))); f2.addRow("contiguous carriers", acc["contiguous_carriers"])
+    acc["independent_carriers"] = QtWidgets.QCheckBox(); acc["independent_carriers"].setChecked(bool(node.get_property("independent_carriers"))); f2.addRow("independent carriers", acc["independent_carriers"])
+    tabs.append(("Carriers & scopes", t2))
+
+    # policies & shifts
+    t3 = QtWidgets.QWidget(); f3 = QtWidgets.QVBoxLayout(t3)
+    acc["policies"] = PoliciesWidget(get_property_json(node, "policies", {})); f3.addWidget(acc["policies"])
+    f3.addWidget(QtWidgets.QLabel("task shifts:")); acc["task_shifts"] = ShiftPickerWidget(shift_names, get_property_json(node, "task_shifts", [])); f3.addWidget(acc["task_shifts"])
+    tabs.append(("Policies & shifts", _scroll(t3)))
+    return tabs, acc
+
+
+def _scroll(widget):
+    sc = QtWidgets.QScrollArea(); sc.setWidgetResizable(True); sc.setWidget(widget); return sc
+
+
+def _apply_carrier_common(node, acc):
+    set_property_json(node, "startup_duration", acc["startup_duration"].get_value())
+    set_property_json(node, "loading_duration", acc["loading_duration"].get_value())
+    set_property_json(node, "operators", acc["operators"].get_value())
+    set_property_json(node, "loading_operators", acc["loading_operators"].get_value())
+    set_property_json(node, "startup_operators", acc["startup_operators"].get_value())
+    node.set_property("operator_scope", acc["operator_scope"].currentText())
+    node.set_property("resource_scope", acc["resource_scope"].currentText())
+    if "collector_type" in acc:
+        node.set_property("collector_type", acc["collector_type"].currentText())
+    node.set_property("min_carriers", as_int(acc["min_carriers"].text(), 1))
+    node.set_property("max_capacity", as_float(acc["max_capacity"].text(), 1.0))
+    node.set_property("timeout", as_float(acc["timeout"].text(), 1e9))
+    node.set_property("priority", as_int(acc["priority"].text(), 5))
+    node.set_property("contiguous_carriers", acc["contiguous_carriers"].isChecked())
+    node.set_property("independent_carriers", acc["independent_carriers"].isChecked())
+    set_property_json(node, "policies", acc["policies"].get_value())
+    set_property_json(node, "task_shifts", acc["task_shifts"].chosen())
+
+
+class PieceTaskMenuDialog(QtWidgets.QDialog):
+    def __init__(self, parent, node, win):
+        super().__init__(parent)
+        self.node = node
+        self.setWindowTitle("Piece task"); self.resize(640, 640)
+        lay = QtWidgets.QVBoxLayout(self)
+        tabs = QtWidgets.QTabWidget(); lay.addWidget(tabs)
+        t0 = QtWidgets.QWidget(); f0 = QtWidgets.QVBoxLayout(t0)
+        self.models = ModelConfigsWidget(_names(win.model_registry), _names(win.resource_registry),
+                                         get_property_json(node, "models_configs", []))
+        f0.addWidget(self.models)
+        tabs.addTab(_scroll(t0), "Models")
+        common, self.acc = _carrier_common_tab(node, _names(win.operator_registry), _names(win.shift_registry), COLLECTOR_TYPES)
+        for label, wdg in common:
+            tabs.addTab(wdg, label)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+
+    def apply(self):
+        set_property_json(self.node, "models_configs", self.models.value())
+        _apply_carrier_common(self.node, self.acc)
+
+
+class ResourceTaskMenuDialog(QtWidgets.QDialog):
+    def __init__(self, parent, node, win):
+        super().__init__(parent)
+        self.node = node
+        self.setWindowTitle("Resource task"); self.resize(640, 640)
+        rnames = _names(win.resource_registry)
+        lay = QtWidgets.QVBoxLayout(self)
+        tabs = QtWidgets.QTabWidget(); lay.addWidget(tabs)
+        # resources tab
+        t0 = QtWidgets.QWidget(); f0 = QtWidgets.QVBoxLayout(t0)
+        f0.addWidget(QtWidgets.QLabel("duration:")); self.duration = SamplerWidget(get_property_json(node, "duration", None)); f0.addWidget(self.duration)
+        f0.addWidget(QtWidgets.QLabel("non-transformed inputs (quantity consumed):"))
+        self.non_transformed = ResourcePickerWidget(rnames, "quantity",
+            [{"resource": e.get("resource"), "value": e.get("value", e.get("quantity", 1.0))} for e in get_property_json(node, "non_transformed_resources", [])])
+        f0.addWidget(self.non_transformed)
+        f0.addWidget(QtWidgets.QLabel("transformed inputs (proportion + salvageable):"))
+        self.transformed = _TransformedWidget(rnames, get_property_json(node, "transformed_resources", []))
+        f0.addWidget(self.transformed)
+        f0.addWidget(QtWidgets.QLabel("outputs produced (bounded distribution, ≥ 0):"))
+        self.outputs = _OutputsWidget(rnames, get_property_json(node, "resources_out", []))
+        f0.addWidget(self.outputs)
+        f1 = QtWidgets.QFormLayout()
+        self.min_cc = QtWidgets.QLineEdit(str(node.get_property("min_carrier_capacity")))
+        self.max_cc = QtWidgets.QLineEdit(str(node.get_property("max_carrier_capacity")))
+        self.rct = QtWidgets.QComboBox(); self.rct.addItems(RESOURCE_COLLECTOR_TYPES); self.rct.setCurrentText(node.get_property("resource_collector_type"))
+        f1.addRow("min carrier capacity", self.min_cc); f1.addRow("max carrier capacity", self.max_cc); f1.addRow("collector type", self.rct)
+        f0.addLayout(f1)
+        tabs.addTab(_scroll(t0), "Resources")
+        common, self.acc = _carrier_common_tab(node, _names(win.operator_registry), _names(win.shift_registry), None)
+        for label, wdg in common:
+            tabs.addTab(wdg, label)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+
+    def apply(self):
+        set_property_json(self.node, "duration", self.duration.get_value())
+        set_property_json(self.node, "non_transformed_resources", self.non_transformed.entries())
+        set_property_json(self.node, "transformed_resources", self.transformed.value())
+        set_property_json(self.node, "resources_out", self.outputs.value())
+        self.node.set_property("min_carrier_capacity", as_float(self.min_cc.text(), 1.0))
+        self.node.set_property("max_carrier_capacity", as_float(self.max_cc.text(), 1.0))
+        self.node.set_property("resource_collector_type", self.rct.currentText())
+        _apply_carrier_common(self.node, self.acc)
+
+
+class _TransformedWidget(QtWidgets.QWidget):
+    def __init__(self, resource_names, entries=None, parent=None):
+        super().__init__(parent)
+        self._names = list(resource_names); self._rows = []
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton("+ transformed resource"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        for e in (entries or []):
+            self._add(e)
+
+    def _add(self, entry=None):
+        entry = entry or {}
+        row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
+        combo = QtWidgets.QComboBox(); combo.addItems(self._names)
+        if entry.get("resource") in self._names:
+            combo.setCurrentText(entry["resource"])
+        prop = QtWidgets.QLineEdit(str(entry.get("proportion", 1.0))); prop.setMaximumWidth(60)
+        salv = QtWidgets.QCheckBox("salvageable"); salv.setChecked(bool(entry.get("salvageable", True)))
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
+        h.addWidget(combo); h.addWidget(QtWidgets.QLabel("proportion:")); h.addWidget(prop); h.addWidget(salv); h.addWidget(rm); h.addStretch(1)
+        rec = (row, combo, prop, salv); rm.clicked.connect(lambda: self._remove(rec))
+        self._rows.append(rec); self._vl.addWidget(row)
+
+    def _remove(self, rec):
+        if rec in self._rows:
+            self._rows.remove(rec); rec[0].setParent(None); rec[0].deleteLater()
+
+    def value(self):
+        return [{"resource": c.currentText(), "proportion": as_float(p.text()), "salvageable": s.isChecked()}
+                for _, c, p, s in self._rows if c.currentText()]
+
+
+class _OutputsWidget(QtWidgets.QWidget):
+    def __init__(self, resource_names, entries=None, parent=None):
+        super().__init__(parent)
+        self._names = list(resource_names); self._rows = []
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton("+ output resource"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        for e in (entries or []):
+            self._add(e)
+
+    def _add(self, entry=None):
+        entry = entry or {}
+        box = QtWidgets.QGroupBox(); bl = QtWidgets.QFormLayout(box)
+        combo = QtWidgets.QComboBox(); combo.addItems(self._names)
+        if entry.get("resource") in self._names:
+            combo.setCurrentText(entry["resource"])
+        bl.addRow("resource", combo)
+        dist = SamplerWidget(entry.get("distribution")); bl.addRow("amount (≥0)", dist)
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24); bl.addRow(rm)
+        rec = (box, combo, dist); rm.clicked.connect(lambda: self._remove(rec))
+        self._rows.append(rec); self._vl.addWidget(box)
+
+    def _remove(self, rec):
+        if rec in self._rows:
+            self._rows.remove(rec); rec[0].setParent(None); rec[0].deleteLater()
+
+    def value(self):
+        return [{"resource": c.currentText(), "distribution": d.get_value(), "lowerbound": 0.0, "upperbound": "inf"}
+                for _, c, d in self._rows if c.currentText()]
+
+
 class FlowEditorWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -2459,11 +2942,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.shift_registry = []
 
         self.graph.register_nodes([
-            DistributionNode,
-            IntervalNode,
             ShutdownsNode,
-            ResourceNode,
-            RestockableResourceNode,
             HardBufferNode,
             SoftBufferNode,
             FirstTaskNode,
@@ -2471,8 +2950,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             ResourceTaskNode,
             BreakdownNode,
             MonitorNode,
-            AndGroupNode,
-            OrGroupNode,
         ])
 
         self.setCentralWidget(self.graph.widget)
@@ -2513,27 +2990,18 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         tools_menu.addAction("Frame all").triggered.connect(self.frame_all)
 
         templates_menu = self.menuBar().addMenu("Templates")
-        templates_menu.addAction("Add Piece Task Template").triggered.connect(self.add_task_template)
-        templates_menu.addAction("Add Source Template").triggered.connect(self.add_first_task_template)
-        templates_menu.addAction("Add Operator Alternatives (OR of ANDs)").triggered.connect(self.add_operator_alternatives_template)
         templates_menu.addAction("Add Backdrop Around Selection").triggered.connect(self.add_backdrop_around_selection)
 
         create_menu = self.menuBar().addMenu("Create")
         for label, cls_name in [
-            ("Distribution", "simulation.flow.DistributionNode"),
-            ("Interval", "simulation.flow.IntervalNode"),
             ("Shutdowns", "simulation.flow.ShutdownsNode"),
-            ("Resource", "simulation.flow.ResourceNode"),
-            ("Restockable Resource", "simulation.flow.RestockableResourceNode"),
-            ("Hard Buffer", "simulation.flow.HardBufferNode"),
-            ("Soft Buffer (Router)", "simulation.flow.SoftBufferNode"),
+            ("Buffer", "simulation.flow.HardBufferNode"),
+            ("Router", "simulation.flow.SoftBufferNode"),
             ("Source (PieceGenerator)", "simulation.flow.FirstTaskNode"),
             ("Piece Task", "simulation.flow.TaskNode"),
             ("Resource Task", "simulation.flow.ResourceTaskNode"),
             ("Breakdown", "simulation.flow.BreakdownNode"),
             ("Monitor", "simulation.flow.MonitorNode"),
-            ("AND (all of)", "simulation.flow.AndGroupNode"),
-            ("OR (any of)", "simulation.flow.OrGroupNode"),
         ]:
             action = create_menu.addAction(label)
             action.triggered.connect(lambda checked=False, t=cls_name: self.create_node(t))
@@ -2686,80 +3154,23 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
     def on_node_double_clicked(self, node):
         kind = node_kind(node)
-
-        if kind == "Distribution":
-            params = node.get_property("params")
-            if isinstance(params, str):
-                try:
-                    params = json.loads(params)
-                except Exception:
-                    params = {}
-            dlg = DistributionDialog(self, node.get_property("dist_type"), params or {})
-            if dlg.exec():
-                dist_type, params = dlg.value()
-                node.set_property("dist_type", dist_type)
-                node.set_property("params", params)
-                node.set_name(f"{dist_type} distribution")
-
+        dlg = None
+        if kind == "Shutdowns":
+            dlg = ShutdownsMenuDialog(self, node)
         elif kind == "HardBuffer":
-            current = get_property_json(node, "valid_models", [])
-            dlg = MultiModelPickerDialog(self, self.model_registry, current)
-            if dlg.exec():
-                set_property_json(node, "valid_models", dlg.selected_models())
-
-        elif kind == "FirstTask":
-            current = get_property_json(node, "models_goals", [])
-            dlg = ModelGoalsDialog(self, self.model_registry, current)
-            if dlg.exec():
-                set_property_json(node, "models_goals", dlg.values())
-
+            dlg = BufferMenuDialog(self, node, self.model_registry)
         elif kind == "SoftBuffer":
-            connected_buffers = connected_nodes_from_port(node, "to_buffers", "output")
-            current = get_property_json(node, "buffer_probs", {})
-            dlg = SoftBufferProbabilityDialog(self, connected_buffers, current)
-            if dlg.exec():
-                set_property_json(node, "buffer_probs", dlg.values())
-
-        elif kind == "Task":
-            TaskConfigDialog(self, node, self.model_registry).exec()
-
-        elif kind == "ResourceTask":
-            ResourceTaskConfigDialog(self, node).exec()
-
-        elif kind in {"Resource", "RestockableResource"}:
-            ResourceConfigDialog(self, node).exec()
-
-        elif kind == "AndGroup":
-            connected = direct_resource_nodes(node, "members")
-            if not connected:
-                qmessage(self, "AND group",
-                         "Wire Resource cards into this AND card's 'members' port first,\n"
-                         "then double-click to set how many of each are needed together.")
-            else:
-                current = get_property_json(node, "member_quantities", {})
-                dlg = QuantityDialog(self, "AND group member quantities", connected, current, integer=True)
-                if dlg.exec():
-                    set_property_json(node, "member_quantities", dlg.values())
-
-        elif kind == "OrGroup":
-            connected = direct_resource_nodes(node, "groups")
-            if not connected:
-                qmessage(self, "OR group",
-                         "Wire AND cards (or single Resource cards) into this OR card's 'groups'\n"
-                         "port. Each input is one alternative. Only resources wired directly need a\n"
-                         "quantity here; grouped resources are edited on their AND card.")
-            else:
-                current = get_property_json(node, "member_quantities", {})
-                dlg = QuantityDialog(self, "OR group direct-resource quantities", connected, current, integer=True)
-                if dlg.exec():
-                    set_property_json(node, "member_quantities", dlg.values())
-
+            dlg = RouterMenuDialog(self, node)
+        elif kind == "FirstTask":
+            dlg = GeneratorMenuDialog(self, node, self.model_registry, _names(self.shift_registry))
         elif kind == "Breakdown":
-            qmessage(self, "Breakdown card",
-                     "Connect:\n- Task/ResourceTask.task_ref -> Breakdown.task\n"
-                     "- Distribution -> Breakdown.mttr\n"
-                     "- Breakdown.bufs_out -> HardBuffer/SoftBuffer (emergency)\n\n"
-                     "Set the bathtub failure-rate params (A, tau, c, beta, eta) on the card.")
+            dlg = BreakdownMenuDialog(self, node)
+        elif kind == "Task":
+            dlg = PieceTaskMenuDialog(self, node, self)
+        elif kind == "ResourceTask":
+            dlg = ResourceTaskMenuDialog(self, node, self)
+        if dlg is not None and dlg.exec():
+            dlg.apply()
 
     def on_port_connected(self, *args):
         ports = [a for a in args if hasattr(a, "node") and hasattr(a, "name")]
