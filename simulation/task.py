@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import salabim as sim
 
 from simulation import env
@@ -249,7 +251,7 @@ class Task(Component, HasShifts, ABC):
         self.is_in_shutdown = sim.State(value=False)
         self.is_frozen = sim.State(value=False)
 
-        self.task_operators: list[tuple[OperatorGroup, int]] | None = None
+        self.task_operators: list[tuple[OperatorGroup, int]] = []
         self.carrier_type = carrier_type
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
         self.started_up = False
