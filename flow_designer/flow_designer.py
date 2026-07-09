@@ -56,8 +56,9 @@ SHUTDOWN_TYPES = ["NON_FLEXIBLE", "FLEXIBLE"]
 
 # Old nomenclature -> new nomenclature, used when importing older clean JSON.
 LEGACY_KIND_ALIASES = {
-    "Buffer": "HardBuffer",
-    "BufferTree": "SoftBuffer",
+    "HardBuffer": "Buffer",
+    "SoftBuffer": "Router",
+    "BufferTree": "Router",
     "ScheduledShutdowns": "Shutdowns",
 }
 
@@ -295,9 +296,9 @@ class ShutdownsNode(SimNode):
         }
 
 
-class HardBufferNode(SimNode):
-    NODE_NAME = "Hard Buffer"
-    kind = "HardBuffer"
+class BufferNode(SimNode):
+    NODE_NAME = "Buffer"
+    kind = "Buffer"
     color = (60, 125, 90)
 
     def __init__(self):
@@ -321,9 +322,9 @@ class HardBufferNode(SimNode):
         }
 
 
-class SoftBufferNode(SimNode):
-    NODE_NAME = "Soft Buffer (Router)"
-    kind = "SoftBuffer"
+class RouterNode(SimNode):
+    NODE_NAME = "Router"
+    kind = "Router"
     color = (60, 115, 125)
 
     def __init__(self):
@@ -578,21 +579,21 @@ def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str
     if out_kind == "Breakdown" and out_port == "breakdown":
         return in_kind in {"Task", "ResourceTask"} and in_port == "breakdowns"
 
-    # HardBuffer feeds task inputs.
-    if out_kind == "HardBuffer" and out_port == "to_task":
+    # Buffer feeds task inputs.
+    if out_kind == "Buffer" and out_port == "to_task":
         return in_kind == "Task" and in_port == "bufs_in"
 
-    # HardBuffer taps a Monitor card.
-    if out_kind == "HardBuffer" and out_port == "monitor":
+    # Buffer taps a Monitor card.
+    if out_kind == "Buffer" and out_port == "monitor":
         return in_kind == "Monitor" and in_port == "buffer"
 
     # Tasks / piece generators / breakdowns feed buffers (breakdown outlets are lifeboats).
     if out_kind in {"Task", "FirstTask", "Breakdown"} and out_port == "bufs_out":
-        return in_kind in {"HardBuffer", "SoftBuffer"} and in_port == "from_task"
+        return in_kind in {"Buffer", "Router"} and in_port == "from_task"
 
-    # SoftBuffer (router) routes to hard or soft buffers with probabilities.
-    if out_kind == "SoftBuffer" and out_port == "to_buffers":
-        return in_kind in {"HardBuffer", "SoftBuffer"} and in_port == "from_task"
+    # Router (router) routes to hard or soft buffers with probabilities.
+    if out_kind == "Router" and out_port == "to_buffers":
+        return in_kind in {"Buffer", "Router"} and in_port == "from_task"
 
     return False
 
@@ -1846,8 +1847,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
         self.graph.register_nodes([
             ShutdownsNode,
-            HardBufferNode,
-            SoftBufferNode,
+            BufferNode,
+            RouterNode,
             FirstTaskNode,
             TaskNode,
             ResourceTaskNode,
@@ -1898,8 +1899,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         create_menu = self.menuBar().addMenu("Create")
         for label, cls_name in [
             ("Shutdowns", "simulation.flow.ShutdownsNode"),
-            ("Buffer", "simulation.flow.HardBufferNode"),
-            ("Router", "simulation.flow.SoftBufferNode"),
+            ("Buffer", "simulation.flow.BufferNode"),
+            ("Router", "simulation.flow.RouterNode"),
             ("Piece Generator", "simulation.flow.FirstTaskNode"),
             ("Piece Task", "simulation.flow.TaskNode"),
             ("Resource Task", "simulation.flow.ResourceTaskNode"),
@@ -2024,9 +2025,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         dlg = None
         if kind == "Shutdowns":
             dlg = ShutdownsMenuDialog(self, node)
-        elif kind == "HardBuffer":
+        elif kind == "Buffer":
             dlg = BufferMenuDialog(self, node, self.model_registry)
-        elif kind == "SoftBuffer":
+        elif kind == "Router":
             dlg = RouterMenuDialog(self, node)
         elif kind == "FirstTask":
             dlg = GeneratorMenuDialog(self, node, self.model_registry, _names(self.shift_registry))
@@ -2204,11 +2205,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 if not get_output_refs(node, "bufs_out"):
                     problems.append(f"Piece Generator '{name}' has no outlets.")
 
-            elif kind == "HardBuffer":
+            elif kind == "Buffer":
                 if not get_property_json(node, "valid_models", []):
                     problems.append(f"Buffer '{name}' has no valid models.")
 
-            elif kind == "SoftBuffer":
+            elif kind == "Router":
                 if not connected_refs_from_port(node, "to_buffers", "output"):
                     problems.append(f"Router '{name}' has no output buffers.")
 
@@ -2320,8 +2321,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def node_type_from_kind(self, kind: str) -> str:
         mapping = {
             "Shutdowns": "simulation.flow.ShutdownsNode",
-            "HardBuffer": "simulation.flow.HardBufferNode",
-            "SoftBuffer": "simulation.flow.SoftBufferNode",
+            "Buffer": "simulation.flow.BufferNode",
+            "Router": "simulation.flow.RouterNode",
             "FirstTask": "simulation.flow.FirstTaskNode",
             "Task": "simulation.flow.TaskNode",
             "ResourceTask": "simulation.flow.ResourceTaskNode",
@@ -2337,7 +2338,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     # from the same-named keys. Structured (JSON) properties vs plain scalars:
     _IMPORT_JSON_PROPS = {
         "Shutdowns": ["intervals"],
-        "HardBuffer": ["valid_models"],
+        "Buffer": ["valid_models"],
         "FirstTask": ["models_goals", "shifts"],
         "Task": ["models_configs", "startup_duration", "loading_duration", "operators",
                  "loading_operators", "startup_operators", "task_shifts", "policies"],
@@ -2348,7 +2349,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     }
     _IMPORT_SCALAR_PROPS = {
         "Shutdowns": ["shutdown_type"],
-        "HardBuffer": ["capacity"],
+        "Buffer": ["capacity"],
         "Task": ["operator_scope", "resource_scope", "min_carriers", "max_capacity",
                  "contiguous_carriers", "independent_carriers", "timeout", "priority", "collector_type"],
         "ResourceTask": ["resource_scope", "operator_scope", "resource_collector_type",
@@ -2375,7 +2376,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 self.set_property_safe(node, key, node_data[key])
 
         # Shapes that differ between the flat export and the stored property:
-        if kind == "SoftBuffer":
+        if kind == "Router":
             prob_map = {}
             for item in node_data.get("buffer_probs", []):
                 bid = item.get("buffer")
