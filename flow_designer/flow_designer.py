@@ -49,29 +49,14 @@ COLLECTOR_TYPES = [
 # ResourceCollectorType (resource tasks).
 RESOURCE_COLLECTOR_TYPES = ["GREEDY", "ALTRUISTIC"]
 
-SCOPES_FOR_OPERATORS = ["PER_BATCH", "PER_TASK"]
-SCOPES_FOR_RESOURCES = ["PER_PIECE", "PER_BATCH"]
-
 SHUTDOWN_TYPES = ["NON_FLEXIBLE", "FLEXIBLE"]
-
-# Old nomenclature -> new nomenclature, used when importing older clean JSON.
-LEGACY_KIND_ALIASES = {
-    "HardBuffer": "Buffer",
-    "SoftBuffer": "Router",
-    "BufferTree": "Router",
-    "ScheduledShutdowns": "Shutdowns",
-}
 
 PORT_COLORS = {
     "buffer": (80, 180, 120),
     "task": (230, 140, 70),
-    "duration": (90, 130, 230),
-    "resource": (230, 190, 80),
     "shutdown": (180, 100, 200),
-    "interval": (160, 110, 220),
     "breakdown": (220, 90, 110),
     "monitor": (110, 180, 200),
-    "group": (200, 170, 90),
 }
 
 # Statistics offered by a Monitor card.
@@ -2329,7 +2314,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "Breakdown": "simulation.flow.BreakdownNode",
             "Monitor": "simulation.flow.MonitorNode",
         }
-        kind = LEGACY_KIND_ALIASES.get(kind, kind)
         if kind not in mapping:
             raise ValueError(f"Unknown node kind in JSON: {kind}")
         return mapping[kind]
@@ -2358,7 +2342,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     }
 
     def apply_clean_json_to_node(self, node, node_data: dict):
-        kind = LEGACY_KIND_ALIASES.get(node_data.get("kind"), node_data.get("kind"))
+        kind = node_data.get("kind")
 
         if node_data.get("id"):
             self.set_property_safe(node, "uid", node_data["id"])
