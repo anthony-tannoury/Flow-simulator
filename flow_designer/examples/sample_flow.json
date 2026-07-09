@@ -394,7 +394,8 @@
           "type": "ConstrainedByShift"
         },
         "task_shift_constraint": {
-          "type": "NotConstrainedByShift"
+          "type": "PartiallyConstrainedByShift",
+          "tolerance": 30.0
         },
         "operators_self_conscious": {
           "type": "Conscious"

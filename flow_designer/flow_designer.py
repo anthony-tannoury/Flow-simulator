@@ -1092,9 +1092,15 @@ class OperatorRegistryDialog(_RegistryDialog):
 POLICY_OPTIONS = {
     "pending_carriers_pre_flexible_shutdowns": (["AbortPendingCarriers", "WaitForCarriers", "AbortOrWaitForCarriers"], "AbortPendingCarriers"),
     "pending_carrier_pre_task_shift_end": (["AbortPendingCarriers", "WaitForCarriers", "AbortOrWaitForCarriers"], "AbortPendingCarriers"),
-    "operator_shift_constraint": (["ConstrainedByShift", "NotConstrainedByShift"], "ConstrainedByShift"),
-    "task_shift_constraint": (["ConstrainedByShift", "NotConstrainedByShift"], "ConstrainedByShift"),
+    "operator_shift_constraint": (["ConstrainedByShift", "NotConstrainedByShift", "PartiallyConstrainedByShift"], "ConstrainedByShift"),
+    "task_shift_constraint": (["ConstrainedByShift", "NotConstrainedByShift", "PartiallyConstrainedByShift"], "ConstrainedByShift"),
     "operators_self_conscious": (["Conscious", "Unconscious"], "Conscious"),
+}
+
+# Protocol types that carry a numeric parameter: type -> (json key, field label, default).
+POLICY_TYPE_PARAMS = {
+    "AbortOrWaitForCarriers": ("tolerance_fraction", "tolerance fraction", 0.5),
+    "PartiallyConstrainedByShift": ("tolerance", "tolerance (time)", 0.0),
 }
 
 
@@ -1276,29 +1282,40 @@ class AlternativesWidget(QtWidgets.QWidget):
 
 
 class PoliciesWidget(QtWidgets.QWidget):
-    """The five task protocols with their defaults; AbortOrWaitForCarriers exposes
-    a tolerance_fraction. Value: {policy_name: {"type", ...params}}."""
+    """The five task protocols with their defaults. Types listed in POLICY_TYPE_PARAMS
+    expose their numeric parameter (AbortOrWaitForCarriers' tolerance_fraction,
+    PartiallyConstrainedByShift's tolerance in time units past the shift end).
+    Value: {protocol_name: {"type", ...param}}."""
 
     def __init__(self, value=None, parent=None):
         super().__init__(parent)
         value = value or {}
         form = QtWidgets.QFormLayout(self)
         self._combos = {}
-        self._tol = {}
+        self._params = {}
         for name, (options, default) in POLICY_OPTIONS.items():
             row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
+            saved = value.get(name, {})
             combo = QtWidgets.QComboBox(); combo.addItems(options)
-            combo.setCurrentText(value.get(name, {}).get("type", default))
+            combo.setCurrentText(saved.get("type", default))
             h.addWidget(combo)
-            tol = QtWidgets.QLineEdit(str(value.get(name, {}).get("tolerance_fraction", 0.5)))
-            tol.setMaximumWidth(60)
-            tol_lbl = QtWidgets.QLabel("tolerance:")
-            h.addWidget(tol_lbl); h.addWidget(tol); h.addStretch(1)
+            lbl = QtWidgets.QLabel("")
+            edit = QtWidgets.QLineEdit(); edit.setMaximumWidth(60)
+            saved_spec = POLICY_TYPE_PARAMS.get(saved.get("type", default))
+            if saved_spec is not None and saved_spec[0] in saved:
+                edit.setText(str(saved[saved_spec[0]]))
+            h.addWidget(lbl); h.addWidget(edit); h.addStretch(1)
             self._combos[name] = combo
-            self._tol[name] = (tol_lbl, tol)
+            self._params[name] = (lbl, edit)
             def _upd(_=None, n=name):
-                on = self._combos[n].currentText() == "AbortOrWaitForCarriers"
-                self._tol[n][0].setVisible(on); self._tol[n][1].setVisible(on)
+                spec = POLICY_TYPE_PARAMS.get(self._combos[n].currentText())
+                p_lbl, p_edit = self._params[n]
+                p_lbl.setVisible(spec is not None)
+                p_edit.setVisible(spec is not None)
+                if spec is not None:
+                    p_lbl.setText(spec[1] + ":")
+                    if not p_edit.text():
+                        p_edit.setText(str(spec[2]))
             combo.currentTextChanged.connect(_upd)
             _upd()
             form.addRow(name, row)
@@ -1308,8 +1325,9 @@ class PoliciesWidget(QtWidgets.QWidget):
         for name, combo in self._combos.items():
             t = combo.currentText()
             entry = {"type": t}
-            if t == "AbortOrWaitForCarriers":
-                entry["tolerance_fraction"] = as_float(self._tol[name][1].text(), 0.5)
+            spec = POLICY_TYPE_PARAMS.get(t)
+            if spec is not None:
+                entry[spec[0]] = as_float(self._params[name][1].text(), spec[2])
             out[name] = entry
         return out
 
@@ -1581,7 +1599,7 @@ class ModelConfigsWidget(QtWidgets.QWidget):
 
 def _carrier_common_tab(node, operator_names, shift_names, collector_types, extra=None):
     """Build the shared task-config tabs, one concept per tab (durations, operators,
-    carriers, scopes, policies, shifts). `extra` injects caller-owned rows into a tab:
+    carriers, scopes, protocols, shifts). `extra` injects caller-owned rows into a tab:
     {"durations": [(label, widget)], "carriers": [...], "scopes": [...]}; those widgets
     are read back by the caller, not by _apply_carrier_common.
     Returns (list-of-(label, widget), accessor-dict)."""
@@ -1627,10 +1645,10 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
         f.addRow(label, wdg)
     tabs.append(("Scopes", _scroll(t)))
 
-    # policies
+    # protocols (stored under the "policies" property/JSON key)
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
     acc["policies"] = PoliciesWidget(get_property_json(node, "policies", {})); f.addWidget(acc["policies"]); f.addStretch(1)
-    tabs.append(("Policies", _scroll(t)))
+    tabs.append(("Protocols", _scroll(t)))
 
     # shifts
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
@@ -2156,6 +2174,13 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         for node in self.all_nodes():
             kind = node_kind(node)
             name = node.name()
+            if kind in ("Task", "ResourceTask"):
+                # the simulation rejects this protocol combination at load time
+                pol = get_property_json(node, "policies", {})
+                if (pol.get("task_shift_constraint", {}).get("type") == "ConstrainedByShift"
+                        and pol.get("pending_carrier_pre_task_shift_end", {}).get("type") == "WaitForCarriers"):
+                    problems.append(f"'{name}': ConstrainedByShift cannot be combined with "
+                                    f"WaitForCarriers on pending_carrier_pre_task_shift_end.")
             if kind == "Task":
                 if not connected_refs_from_port(node, "bufs_in", "input"):
                     problems.append(f"Piece Task '{name}' has no input buffers.")

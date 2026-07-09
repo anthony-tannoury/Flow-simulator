@@ -91,8 +91,10 @@ as **OR-of-ANDs** `[[{operator,count}], …]` (any one inner group satisfies it,
 |---|---|
 | `pending_carriers_pre_flexible_shutdowns` | `AbortPendingCarriers`, `WaitForCarriers`, `AbortOrWaitForCarriers` |
 | `pending_carrier_pre_task_shift_end` | same three |
-| `operator_shift_constraint` | `ConstrainedByShift`, `NotConstrainedByShift` |
-| `task_shift_constraint` | `ConstrainedByShift`, `NotConstrainedByShift` |
+| `operator_shift_constraint` | `ConstrainedByShift`, `NotConstrainedByShift`, `PartiallyConstrainedByShift` |
+| `task_shift_constraint` | `ConstrainedByShift`, `NotConstrainedByShift`, `PartiallyConstrainedByShift` |
 | `operators_self_conscious` | `Conscious`, `Unconscious` |
 
 `AbortOrWaitForCarriers` carries an extra `tolerance_fraction` field.
+`PartiallyConstrainedByShift` carries an extra `tolerance` field: the operation may
+overrun the shift end by at most that many time units.
