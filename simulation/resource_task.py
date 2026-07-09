@@ -10,7 +10,7 @@ from simulation import env
 from .component import Component
 from .task import TaskConfig, Task, Carrier, Scope
 from .resource import Resource, RestockableResource
-from .distribution import Distribution
+from .sampler import Distribution
 from .helpers import check_probabilities
 from .ables import Dispatchable, Donnable
 
