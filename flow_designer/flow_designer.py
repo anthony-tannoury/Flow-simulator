@@ -373,48 +373,6 @@ def model_config_resource_dnf(mc: dict) -> list:
     return dnf
 
 
-def import_resource_groups(resources) -> list:
-    """Parse an exported model `resources` value into internal group dicts `{rid: qty}`.
-
-    Accepts new OR-of-ANDs (`[[{resource, quantity}], ...]`) and the legacy flat
-    form (`[{resource, quantity}, ...]`, one implicit group).
-    """
-    groups = []
-    if isinstance(resources, list) and resources and isinstance(resources[0], list):
-        for grp in resources:
-            d = {it["resource"]: it.get("quantity", 1.0)
-                 for it in (grp or []) if isinstance(it, dict) and it.get("resource")}
-            if d:
-                groups.append(d)
-    elif isinstance(resources, list):  # legacy flat -> one group
-        d = {it["resource"]: it.get("quantity", 1.0)
-             for it in resources if isinstance(it, dict) and it.get("resource")}
-        if d:
-            groups.append(d)
-    return groups
-
-
-def operator_quantities_from_export(operators) -> dict:
-    """Recover per-resource quantities for directly-wired operators from an export.
-
-    In a new OR-of-ANDs export the single-member alternatives are exactly the
-    resources wired straight to the port (their quantity lives on the task);
-    multi-member groups carry their quantities on AND cards and are skipped.
-    Legacy exports are a flat `[{resource, quantity}]` list.
-    """
-    result = {}
-    if not isinstance(operators, list):
-        return result
-    for entry in operators:
-        if isinstance(entry, dict) and entry.get("resource"):  # legacy flat
-            result[entry["resource"]] = entry.get("quantity", 1)
-        elif isinstance(entry, list) and len(entry) == 1:       # single-member alternative
-            it = entry[0]
-            if isinstance(it, dict) and it.get("resource"):
-                result[it["resource"]] = it.get("quantity", 1)
-    return result
-
-
 # ============================================================
 # Base simulation node
 # ============================================================
@@ -649,8 +607,8 @@ class ResourceTaskNode(SimNode):
             "kind": self.kind,
             "name": self.name(),
             "non_transformed_resources": get_property_json(self, "non_transformed_resources", []),
-            "transformed_resources_salvageable": get_property_json(self, "transformed_resources", []),
-            "resources_out_distr": get_property_json(self, "resources_out", []),
+            "transformed_resources": get_property_json(self, "transformed_resources", []),
+            "resources_out": get_property_json(self, "resources_out", []),
             "duration": get_property_json(self, "duration", None),
             "startup_duration": get_property_json(self, "startup_duration", None),
             "loading_duration": get_property_json(self, "loading_duration", None),
@@ -737,49 +695,17 @@ def port_signature(port) -> Tuple[str, str, str]:
 
 
 def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str) -> bool:
-    """Strict connection rules. Central place controlling what can feed what."""
-
-    # Distribution feeds duration slots.
-    if out_kind == "Distribution":
-        return (
-            (in_kind == "Task" and in_port in {"durations", "startup_duration"})
-            or (in_kind == "ResourceTask" and in_port in {"task_duration", "startup_duration"})
-            or (in_kind == "Breakdown" and in_port == "mttr")
-            or (in_kind == "RestockableResource" and in_port in {"order_duration", "delivery_duration"})
-        )
-
-    # Interval feeds shutdowns.
-    if out_kind == "Interval":
-        return in_kind == "Shutdowns" and in_port == "intervals"
+    """Strict connection rules. Central place controlling what can feed what.
+    Distributions/resources/operators/intervals are no longer cards -- they live in
+    the card menus -- so the only wires left are piece flow, shutdowns and breakdowns."""
 
     # Shutdowns feed tasks (piece or resource).
-    if out_kind == "Shutdowns":
+    if out_kind == "Shutdowns" and out_port == "shutdowns":
         return in_kind in {"Task", "ResourceTask"} and in_port == "shutdowns"
 
-    # Resources feed task/resource slots, or group cards (AND/OR).
-    if out_kind in {"Resource", "RestockableResource"}:
-        if in_kind == "Task":
-            return in_port in {"resources", "operators", "startup_operators"}
-        if in_kind == "ResourceTask":
-            return in_port in {
-                "non_transformed_resources", "transformed_resources", "resources_out",
-                "operators", "startup_operators",
-            }
-        if in_kind == "AndGroup":
-            return in_port == "members"
-        if in_kind == "OrGroup":
-            return in_port == "groups"
-        return False
-
-    # AND card carries one group into an OR card or straight to a task operator port.
-    if out_kind == "AndGroup" and out_port == "group":
-        if in_kind == "OrGroup":
-            return in_port == "groups"
-        return in_kind in {"Task", "ResourceTask"} and in_port in {"operators", "startup_operators"}
-
-    # OR card carries the alternatives to a task operator port.
-    if out_kind == "OrGroup" and out_port == "out":
-        return in_kind in {"Task", "ResourceTask"} and in_port in {"operators", "startup_operators"}
+    # Breakdowns attach directly to a task (piece or resource), like shutdowns.
+    if out_kind == "Breakdown" and out_port == "breakdown":
+        return in_kind in {"Task", "ResourceTask"} and in_port == "breakdowns"
 
     # HardBuffer feeds task inputs.
     if out_kind == "HardBuffer" and out_port == "to_task":
@@ -789,17 +715,13 @@ def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str
     if out_kind == "HardBuffer" and out_port == "monitor":
         return in_kind == "Monitor" and in_port == "buffer"
 
-    # Tasks / FirstTasks / Breakdowns feed buffers.
+    # Tasks / piece generators / breakdowns feed buffers (breakdown outlets are lifeboats).
     if out_kind in {"Task", "FirstTask", "Breakdown"} and out_port == "bufs_out":
         return in_kind in {"HardBuffer", "SoftBuffer"} and in_port == "from_task"
 
-    # SoftBuffer routes to hard or soft buffers with probabilities.
+    # SoftBuffer (router) routes to hard or soft buffers with probabilities.
     if out_kind == "SoftBuffer" and out_port == "to_buffers":
         return in_kind in {"HardBuffer", "SoftBuffer"} and in_port == "from_task"
-
-    # Breakdowns attach directly to a task (piece or resource), like shutdowns.
-    if out_kind == "Breakdown" and out_port == "breakdown":
-        return in_kind in {"Task", "ResourceTask"} and in_port == "breakdowns"
 
     return False
 
@@ -3111,42 +3033,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
-    def place_clear_of_existing(self, new_nodes, existing_bounds, padding=160.0, direction="right"):
-        if existing_bounds is None:
-            return
-        nb = self.content_bounds(new_nodes)
-        if nb is None:
-            return
-        ex_left, ex_top, ex_right, ex_bottom = existing_bounds
-        nb_left, nb_top, nb_right, nb_bottom = nb
-        if direction == "below":
-            dx = ex_left - nb_left
-            dy = (ex_bottom + padding) - nb_top
-        else:
-            dx = (ex_right + padding) - nb_left
-            dy = ex_top - nb_top
-        self.shift_nodes(new_nodes, dx, dy)
-
-    def focus_on_nodes(self, nodes):
-        nodes = [n for n in nodes if n is not None]
-        if not nodes:
-            return
-        try:
-            self.graph.clear_selection()
-        except Exception:
-            pass
-        for n in nodes:
-            try:
-                n.set_selected(True)
-            except Exception:
-                pass
-        for attempt in (lambda: self.graph.center_on(nodes), lambda: self.graph.fit_to_selection()):
-            try:
-                attempt()
-                return
-            except Exception:
-                continue
-
     def create_node(self, node_type: str):
         node = self.graph.create_node(node_type)
         x, y = self.current_view_center()
@@ -3298,6 +3184,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         return {
             "editor": {"name": APP_NAME, "version": EDITOR_VERSION, "format": "clean-json"},
             "models": self.model_registry,
+            "resources": self.resource_registry,
+            "operators": self.operator_registry,
+            "shifts": self.shift_registry,
             "nodes": nodes,
             "connections": self.connections_clean(),
             "backdrops": backdrops,
@@ -3333,68 +3222,51 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
         for node in self.all_nodes():
             kind = node_kind(node)
+            name = node.name()
             if kind == "Task":
                 if not connected_refs_from_port(node, "bufs_in", "input"):
-                    problems.append(f"Piece Task '{node.name()}' has no input buffers.")
-                if not get_input_ref(node, "startup_duration"):
-                    problems.append(f"Piece Task '{node.name()}' has no startup_duration distribution.")
+                    problems.append(f"Piece Task '{name}' has no input buffers.")
+                if not get_output_refs(node, "bufs_out"):
+                    problems.append(f"Piece Task '{name}' has no output buffers.")
                 mc = get_property_json(node, "models_configs", [])
                 if not mc:
-                    problems.append(f"Piece Task '{node.name()}' has no model configs.")
+                    problems.append(f"Piece Task '{name}' has no model configs.")
                 else:
                     for m in mc:
                         if not m.get("duration"):
-                            problems.append(f"Piece Task '{node.name()}' model '{m.get('model')}' has no duration.")
+                            problems.append(f"Piece Task '{name}' model '{m.get('model')}' has no duration.")
 
             elif kind == "ResourceTask":
-                if not get_input_ref(node, "task_duration"):
-                    problems.append(f"Resource Task '{node.name()}' has no task_duration distribution.")
-                if not get_input_ref(node, "startup_duration"):
-                    problems.append(f"Resource Task '{node.name()}' has no startup_duration distribution.")
-                if not connected_refs_from_port(node, "resources_out", "input"):
-                    problems.append(f"Resource Task '{node.name()}' has no output resources.")
+                if not get_property_json(node, "duration", None):
+                    problems.append(f"Resource Task '{name}' has no duration.")
+                if not get_property_json(node, "resources_out", []):
+                    problems.append(f"Resource Task '{name}' has no output resources.")
 
             elif kind == "Breakdown":
-                if not get_input_ref(node, "task"):
-                    problems.append(f"Breakdown '{node.name()}' is not attached to a Task.")
-                if not get_input_ref(node, "mttr"):
-                    problems.append(f"Breakdown '{node.name()}' has no mttr distribution.")
+                if not get_output_refs(node, "breakdown"):
+                    problems.append(f"Breakdown '{name}' is not attached to a task.")
+                if not (get_property_json(node, "mtbf", {}) or {}):
+                    problems.append(f"Breakdown '{name}' has no mtbf set.")
+                if not get_property_json(node, "mttr", None):
+                    problems.append(f"Breakdown '{name}' has no mttr distribution.")
 
             elif kind == "FirstTask":
-                mg = get_property_json(node, "models_goals", [])
-                if not mg:
-                    problems.append(f"Source '{node.name()}' has no model goals.")
-                if as_float(node.get_property("working_hours"), 0.0) <= 0:
-                    problems.append(f"Source '{node.name()}' has non-positive working_hours.")
+                if not get_property_json(node, "models_goals", []):
+                    problems.append(f"Piece Generator '{name}' has no model goals.")
                 if not get_output_refs(node, "bufs_out"):
-                    problems.append(f"Source '{node.name()}' has no outlets.")
+                    problems.append(f"Piece Generator '{name}' has no outlets.")
 
             elif kind == "HardBuffer":
                 if not get_property_json(node, "valid_models", []):
-                    problems.append(f"HardBuffer '{node.name()}' has no valid_models.")
+                    problems.append(f"Buffer '{name}' has no valid models.")
 
             elif kind == "SoftBuffer":
-                connected_buffers = connected_refs_from_port(node, "to_buffers", "output")
-                prob_map = get_property_json(node, "buffer_probs", {})
-                total = sum(as_float(prob_map.get(bid, 0.0), 0.0) for bid in connected_buffers)
-                if not connected_buffers:
-                    problems.append(f"SoftBuffer '{node.name()}' has no output buffers.")
-                elif abs(total - 1.0) > 1e-9:
-                    problems.append(f"SoftBuffer '{node.name()}' probabilities sum to {total}, not 1.")
+                if not connected_refs_from_port(node, "to_buffers", "output"):
+                    problems.append(f"Router '{name}' has no output buffers.")
 
-            elif kind == "RestockableResource":
-                if not get_input_ref(node, "delivery_duration"):
-                    problems.append(f"RestockableResource '{node.name()}' has no delivery_duration distribution.")
-                if not get_input_ref(node, "order_duration"):
-                    problems.append(f"RestockableResource '{node.name()}' has no order_duration distribution.")
-
-            elif kind == "AndGroup":
-                if not direct_resource_nodes(node, "members"):
-                    problems.append(f"AND group '{node.name()}' has no resources wired into 'members'.")
-
-            elif kind == "OrGroup":
-                if not connected_nodes_from_port(node, "groups", "input"):
-                    problems.append(f"OR group '{node.name()}' has no alternatives wired into 'groups'.")
+            elif kind == "Monitor":
+                if not get_input_ref(node, "buffer"):
+                    problems.append(f"Monitor '{name}' is not attached to a buffer.")
         return problems
 
     def delete_selected_nodes(self):
@@ -3414,25 +3286,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
-    def make_node(self, node_type: str, name: str, x: float, y: float):
-        base_x, base_y = self.current_view_center()
-        node = self.graph.create_node(node_type)
-        node.set_name(name)
-        self.set_node_position_safe(node, base_x + x, base_y + y)
-        return node
-
-    def existing_model_names(self) -> List[str]:
-        if not hasattr(self, "model_registry"):
-            self.model_registry = []
-        return [m.get("name") for m in self.model_registry if m.get("name")]
-
-    def ensure_template_model_names(self) -> List[str]:
-        names = self.existing_model_names()
-        if names:
-            return names
-        self.model_registry.append({"name": "DummyModel", "parent": None})
-        return ["DummyModel"]
-
     def set_json_property_safe(self, node, prop_name: str, value):
         if node.has_property(prop_name):
             node.set_property(prop_name, json.dumps(value, ensure_ascii=False))
@@ -3444,18 +3297,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             node.set_property(prop_name, value)
         else:
             node.create_property(prop_name, value)
-
-    def create_distribution_template(self, name: str, x: float, y: float, value: float):
-        node = self.make_node("simulation.flow.DistributionNode", name, x, y)
-        self.set_property_safe(node, "dist_type", "Constant")
-        self.set_json_property_safe(node, "params", {"value": value})
-        return node
-
-    def create_resource_template(self, name: str, x: float, y: float, capacity: float):
-        node = self.make_node("simulation.flow.ResourceNode", name, x, y)
-        set_text_prop(node, "desired_capacity", capacity)
-        set_bool_prop(node, "anonymous", False)
-        return node
 
     def add_backdrop_for_nodes(self, nodes, title: str, width=None, height=None):
         if not nodes:
@@ -3528,111 +3369,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             return
         self.add_backdrop_for_nodes(selected, "Group")
 
-    def add_task_template(self):
-        existing_bounds = self.content_bounds()
-        default_model = self.ensure_template_model_names()[0]
-
-        task_duration = self.create_distribution_template("Task Duration", -760, -180, 1.0)
-        startup_duration = self.create_distribution_template("Startup Duration", -760, -40, 0.0)
-
-        restockable = self.make_node("simulation.flow.RestockableResourceNode", "Restockable Resource", -760, 140)
-        set_text_prop(restockable, "desired_capacity", 100.0)
-        set_text_prop(restockable, "threshold", 20.0)
-        order_duration = self.create_distribution_template("Order Duration", -1120, 60, 0.0)
-        delivery_duration = self.create_distribution_template("Delivery Duration", -1120, 220, 10.0)
-
-        operator_resource = self.create_resource_template("Operator", -760, 360, 1.0)
-        startup_operator = self.create_resource_template("Startup Operator", -760, 500, 1.0)
-        shutdowns = self.make_node("simulation.flow.ShutdownsNode", "Shutdowns", -760, 640)
-
-        task = self.make_node("simulation.flow.TaskNode", "Piece Task", -300, 160)
-        mttr = self.create_distribution_template("MTTR", 80, 260, 10.0)
-        breakdown = self.make_node("simulation.flow.BreakdownNode", "Breakdown", 440, 160)
-
-        # Wiring.
-        connect_ports_by_name(order_duration, "distribution", restockable, "order_duration")
-        connect_ports_by_name(delivery_duration, "distribution", restockable, "delivery_duration")
-        connect_ports_by_name(task_duration, "distribution", task, "durations")
-        connect_ports_by_name(startup_duration, "distribution", task, "startup_duration")
-        connect_ports_by_name(restockable, "resource", task, "resources")
-        connect_ports_by_name(operator_resource, "resource", task, "operators")
-        connect_ports_by_name(startup_operator, "resource", task, "startup_operators")
-        connect_ports_by_name(shutdowns, "shutdowns", task, "shutdowns")
-        connect_ports_by_name(breakdown, "breakdown", task, "breakdowns")
-        connect_ports_by_name(mttr, "distribution", breakdown, "mttr")
-
-        # Defaults.
-        self.set_property_safe(task, "resources_scope", "PER_BATCH")
-        self.set_property_safe(task, "operators_scope", "PER_BATCH")
-        self.set_property_safe(task, "min_carriers", 1)
-        self.set_property_safe(task, "max_capacity", 1)
-        self.set_property_safe(task, "min_carrier_capacity", 1)
-        self.set_property_safe(task, "max_carrier_capacity", 1)
-        self.set_property_safe(task, "contiguous_carriers", False)
-        self.set_property_safe(task, "collector_type", "NON_DISCRIMINATING_GREEDY")
-        self.set_property_safe(task, "independent_carriers", False)
-        self.set_json_property_safe(task, "models_configs", [{
-            "model": default_model,
-            "duration": node_uid(task_duration),
-            "resource_groups": [{node_uid(restockable): 1.0}],
-        }])
-        self.set_json_property_safe(task, "operator_quantities", {node_uid(operator_resource): 1})
-        self.set_json_property_safe(task, "startup_operator_quantities", {node_uid(startup_operator): 1})
-
-        group_nodes = [order_duration, delivery_duration, task_duration, startup_duration,
-                       restockable, operator_resource, startup_operator, shutdowns, task, mttr, breakdown]
-        self.place_clear_of_existing(group_nodes, existing_bounds)
-        backdrop = self.add_backdrop_for_nodes(group_nodes, "Piece Task Template")
-        self.focus_on_nodes(group_nodes + ([backdrop] if backdrop else []))
-        self.statusBar().showMessage("Added Piece Task template.")
-
-    def add_operator_alternatives_template(self):
-        """Demonstrate the OR-of-ANDs wiring: (Operator A & Operator B) OR Operator C.
-
-        The OR card's 'out' is left free for the user to wire into a task's
-        'operators' (or 'startup_operators') port.
-        """
-        existing_bounds = self.content_bounds()
-        op_a = self.create_resource_template("Operator A", -520, -80, 1.0)
-        op_b = self.create_resource_template("Operator B", -520, 60, 1.0)
-        op_c = self.create_resource_template("Operator C", -520, 220, 1.0)
-        and_card = self.make_node("simulation.flow.AndGroupNode", "AND (A & B)", -200, -10)
-        or_card = self.make_node("simulation.flow.OrGroupNode", "OR (any alternative)", 120, 80)
-
-        connect_ports_by_name(op_a, "resource", and_card, "members")
-        connect_ports_by_name(op_b, "resource", and_card, "members")
-        connect_ports_by_name(and_card, "group", or_card, "groups")
-        connect_ports_by_name(op_c, "resource", or_card, "groups")
-
-        self.set_json_property_safe(and_card, "member_quantities", {node_uid(op_a): 1, node_uid(op_b): 1})
-        self.set_json_property_safe(or_card, "member_quantities", {node_uid(op_c): 1})
-
-        group_nodes = [op_a, op_b, op_c, and_card, or_card]
-        self.place_clear_of_existing(group_nodes, existing_bounds)
-        backdrop = self.add_backdrop_for_nodes(group_nodes, "Operator Alternatives:  (A & B) OR C")
-        self.focus_on_nodes(group_nodes + ([backdrop] if backdrop else []))
-        self.statusBar().showMessage(
-            "Added operator alternatives. Wire the OR card's 'out' into a task's 'operators' port.")
-
-    def add_first_task_template(self):
-        existing_bounds = self.content_bounds()
-        first_task = self.make_node("simulation.flow.FirstTaskNode", "Source (PieceGenerator)", -120, 80)
-        set_text_prop(first_task, "working_hours", 480.0)
-        self.set_json_property_safe(first_task, "models_goals",
-                                    [{"model": m, "goal": 1} for m in self.ensure_template_model_names()])
-        group_nodes = [first_task]
-        self.place_clear_of_existing(group_nodes, existing_bounds)
-        backdrop = self.add_backdrop_for_nodes(group_nodes, "Source Template")
-        self.focus_on_nodes(group_nodes + ([backdrop] if backdrop else []))
-        self.statusBar().showMessage("Added Source (PieceGenerator) template.")
-
     def node_type_from_kind(self, kind: str) -> str:
         mapping = {
-            "Distribution": "simulation.flow.DistributionNode",
-            "Interval": "simulation.flow.IntervalNode",
             "Shutdowns": "simulation.flow.ShutdownsNode",
-            "Resource": "simulation.flow.ResourceNode",
-            "RestockableResource": "simulation.flow.RestockableResourceNode",
             "HardBuffer": "simulation.flow.HardBufferNode",
             "SoftBuffer": "simulation.flow.SoftBufferNode",
             "FirstTask": "simulation.flow.FirstTaskNode",
@@ -3640,19 +3379,39 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "ResourceTask": "simulation.flow.ResourceTaskNode",
             "Breakdown": "simulation.flow.BreakdownNode",
             "Monitor": "simulation.flow.MonitorNode",
-            "AndGroup": "simulation.flow.AndGroupNode",
-            "OrGroup": "simulation.flow.OrGroupNode",
         }
         kind = LEGACY_KIND_ALIASES.get(kind, kind)
         if kind not in mapping:
             raise ValueError(f"Unknown node kind in JSON: {kind}")
         return mapping[kind]
 
-    def apply_clean_json_to_node(self, node, node_data: dict):
-        kind = node_data.get("kind")
-        kind = LEGACY_KIND_ALIASES.get(kind, kind)
+    # Import is the inverse of each node's to_clean_json: restore stored properties
+    # from the same-named keys. Structured (JSON) properties vs plain scalars:
+    _IMPORT_JSON_PROPS = {
+        "Shutdowns": ["intervals"],
+        "HardBuffer": ["valid_models"],
+        "FirstTask": ["models_goals", "shifts"],
+        "Task": ["models_configs", "startup_duration", "loading_duration", "operators",
+                 "loading_operators", "startup_operators", "task_shifts", "policies"],
+        "ResourceTask": ["non_transformed_resources", "transformed_resources", "resources_out",
+                         "duration", "startup_duration", "loading_duration", "operators",
+                         "loading_operators", "startup_operators", "task_shifts", "policies"],
+        "Breakdown": ["mtbf", "mttr"],
+    }
+    _IMPORT_SCALAR_PROPS = {
+        "Shutdowns": ["shutdown_type"],
+        "HardBuffer": ["capacity"],
+        "Task": ["operator_scope", "resource_scope", "min_carriers", "max_capacity",
+                 "contiguous_carriers", "independent_carriers", "timeout", "priority", "collector_type"],
+        "ResourceTask": ["resource_scope", "operator_scope", "resource_collector_type",
+                         "min_carriers", "max_capacity", "min_carrier_capacity", "max_carrier_capacity",
+                         "contiguous_carriers", "independent_carriers", "timeout", "priority"],
+    }
 
-        if "id" in node_data:
+    def apply_clean_json_to_node(self, node, node_data: dict):
+        kind = LEGACY_KIND_ALIASES.get(node_data.get("kind"), node_data.get("kind"))
+
+        if node_data.get("id"):
             self.set_property_safe(node, "uid", node_data["id"])
         if "name" in node_data:
             node.set_name(node_data["name"])
@@ -3660,115 +3419,26 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         if isinstance(position, list) and len(position) >= 2:
             self.set_node_position_safe(node, position[0], position[1])
 
-        if kind == "Distribution":
-            distribution = node_data.get("distribution", {})
-            self.set_property_safe(node, "dist_type", distribution.get("type", "Constant"))
-            self.set_json_property_safe(node, "params", distribution.get("params", {"value": 0.0}))
+        for key in self._IMPORT_JSON_PROPS.get(kind, []):
+            if key in node_data:
+                self.set_json_property_safe(node, key, node_data[key])
+        for key in self._IMPORT_SCALAR_PROPS.get(kind, []):
+            if key in node_data:
+                self.set_property_safe(node, key, node_data[key])
 
-        elif kind == "Interval":
-            set_text_prop(node, "start", node_data.get("start", 0.0))
-            set_text_prop(node, "end", node_data.get("end", 1.0))
-
-        elif kind == "Shutdowns":
-            self.set_property_safe(node, "shutdown_type", node_data.get("shutdown_type", "NON_FLEXIBLE"))
-
-        elif kind == "Resource":
-            set_text_prop(node, "desired_capacity", node_data.get("capacity", 1.0))
-            set_bool_prop(node, "anonymous", False)
-
-        elif kind == "RestockableResource":
-            set_text_prop(node, "desired_capacity", node_data.get("capacity", 100.0))
-            set_text_prop(node, "threshold", node_data.get("threshold", 20.0))
-
-        elif kind == "HardBuffer":
-            self.set_json_property_safe(node, "valid_models", node_data.get("valid_models", []))
-            self.set_property_safe(node, "capacity", node_data.get("capacity", "inf"))
-            self.set_property_safe(node, "buffer_role", node_data.get("buffer_role", "Normal"))
-
-        elif kind == "SoftBuffer":
+        # Shapes that differ between the flat export and the stored property:
+        if kind == "SoftBuffer":
             prob_map = {}
             for item in node_data.get("buffer_probs", []):
                 bid = item.get("buffer")
                 if bid:
-                    prob_map[bid] = item.get("probability", 0.0)
+                    prob_map[bid] = item.get("probability", {"kind": "constant", "value": 0.0})
             self.set_json_property_safe(node, "buffer_probs", prob_map)
-            self.set_property_safe(node, "buffer_role", node_data.get("buffer_role", "Normal"))
-
-        elif kind == "FirstTask":
-            self.set_json_property_safe(node, "models_goals", node_data.get("models_goals", []))
-            set_text_prop(node, "working_hours", node_data.get("working_hours", 480.0))
 
         elif kind == "Monitor":
             stats = node_data.get("stats", {}) or {}
             for key, _label, default in MONITOR_STATS:
                 set_bool_prop(node, key, bool(stats.get(key, default)))
-
-        elif kind == "Breakdown":
-            fr = node_data.get("failure_rate", {}) or {}
-            for k, d in (("A", 0.0), ("tau", 1.0), ("c", 0.01), ("beta", 1.0), ("eta", 1.0)):
-                set_text_prop(node, k, fr.get(k, d))
-
-        elif kind == "Task":
-            models_configs = []
-            for mc in node_data.get("models_configs", []):
-                models_configs.append({
-                    "model": mc.get("model"),
-                    "duration": mc.get("duration"),
-                    "resource_groups": import_resource_groups(mc.get("resources")),
-                })
-            self.set_json_property_safe(node, "models_configs", models_configs)
-            self.set_property_safe(node, "resources_scope", node_data.get("resources_scope", "PER_BATCH"))
-            self.set_property_safe(node, "operators_scope", node_data.get("operators_scope", "PER_BATCH"))
-            self.set_property_safe(node, "min_carrier_capacity", node_data.get("min_carrier_capacity", 1))
-            self.set_property_safe(node, "max_carrier_capacity", node_data.get("max_carrier_capacity", 1))
-            self.set_property_safe(node, "max_capacity", node_data.get("max_capacity", 1))
-            self.set_property_safe(node, "min_carriers", node_data.get("min_carriers", 1))
-            self.set_property_safe(node, "contiguous_carriers", node_data.get("contiguous_carriers", False))
-            ct = node_data.get("collector_type") or _LEGACY_COLLECTOR.get(node_data.get("batch_collector_type")) \
-                or _LEGACY_COLLECTOR.get(node_data.get("batch_collector"), "NON_DISCRIMINATING_GREEDY")
-            self.set_property_safe(node, "collector_type", ct)
-            self.set_property_safe(node, "independent_carriers", node_data.get("independent_carriers", False))
-            self.set_json_property_safe(node, "operator_quantities", operator_quantities_from_export(node_data.get("operators", [])))
-            self.set_json_property_safe(node, "startup_operator_quantities", operator_quantities_from_export(node_data.get("startup_operators", [])))
-
-        elif kind == "ResourceTask":
-            self.set_property_safe(node, "resources_scope", node_data.get("resources_scope", "PER_BATCH"))
-            self.set_property_safe(node, "operators_scope", node_data.get("operators_scope", "PER_BATCH"))
-            self.set_property_safe(node, "resource_collector_type", node_data.get("resource_collector_type", "GREEDY"))
-            self.set_property_safe(node, "min_carrier_capacity", node_data.get("min_carrier_capacity", 1))
-            self.set_property_safe(node, "max_carrier_capacity", node_data.get("max_carrier_capacity", 1))
-            self.set_property_safe(node, "max_capacity", node_data.get("max_capacity", 1))
-            self.set_property_safe(node, "min_carriers", node_data.get("min_carriers", 1))
-            self.set_property_safe(node, "contiguous_carriers", node_data.get("contiguous_carriers", False))
-            self.set_property_safe(node, "independent_carriers", node_data.get("independent_carriers", False))
-            ntq = {it["resource"]: it.get("quantity", 1.0) for it in node_data.get("non_transformed_resources", []) if it.get("resource")}
-            self.set_json_property_safe(node, "non_transformed_quantities", ntq)
-            tspecs = {}
-            for it in node_data.get("transformed_resources_salvageable", []):
-                if it.get("resource"):
-                    tspecs[it["resource"]] = {"proportion": it.get("proportion", 1.0), "salvageable": it.get("salvageable", True)}
-            self.set_json_property_safe(node, "transformed_specs", tspecs)
-            ospecs = {}
-            for it in node_data.get("resources_out_distr", []):
-                if it.get("resource"):
-                    dist = it.get("distribution", {}) or {}
-                    ospecs[it["resource"]] = {
-                        "dist_type": dist.get("type", "Normal"),
-                        "params": dist.get("params", {"mean": 1.0, "std": 0.0}),
-                        "low": it.get("low", 0.0),
-                        "high": it.get("high", 1.0),
-                    }
-            self.set_json_property_safe(node, "out_specs", ospecs)
-            self.set_json_property_safe(node, "operator_quantities", operator_quantities_from_export(node_data.get("operators", [])))
-            self.set_json_property_safe(node, "startup_operator_quantities", operator_quantities_from_export(node_data.get("startup_operators", [])))
-
-        elif kind == "AndGroup":
-            quantities = {it["resource"]: it.get("quantity", 1)
-                          for it in node_data.get("members", []) if isinstance(it, dict) and it.get("resource")}
-            self.set_json_property_safe(node, "member_quantities", quantities)
-
-        elif kind == "OrGroup":
-            self.set_json_property_safe(node, "member_quantities", node_data.get("member_quantities", {}) or {})
 
     def import_clean_json_dialog(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Import clean JSON", "", "JSON (*.json)")
@@ -3839,10 +3509,25 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                      "These imported models already exist with a different parent and were kept as-is:\n- "
                      + "\n- ".join(conflicts), QtWidgets.QMessageBox.Warning)
 
+    def _merge_named_registry(self, attr: str, imported: list) -> None:
+        """Merge imported registry entries (resources/operators/shifts) by name; existing
+        entries win on a name clash (models are handled separately, with conflict warnings)."""
+        reg = getattr(self, attr, None) or []
+        existing = {e.get("name") for e in reg if e.get("name")}
+        for entry in imported or []:
+            name = entry.get("name")
+            if name and name not in existing:
+                reg.append(dict(entry))
+                existing.add(name)
+        setattr(self, attr, reg)
+
     def import_clean_json(self, data: dict):
         data = self._remap_ids(data)
         data = self._offset_imported_positions(data)
         self._merge_models(data.get("models", []))
+        self._merge_named_registry("resource_registry", data.get("resources", []))
+        self._merge_named_registry("operator_registry", data.get("operators", []))
+        self._merge_named_registry("shift_registry", data.get("shifts", []))
 
         id_to_node = {}
         for card in data.get("nodes", []):
