@@ -333,11 +333,11 @@ class RouterNode(SimNode):
         }
 
 
-class FirstTaskNode(SimNode):
+class PieceGeneratorNode(SimNode):
     """PieceGenerator: per-model integer goals over chosen shifts -> outlets.
     Only childless (leaf) models can be generated."""
     NODE_NAME = "Piece Generator"
-    kind = "FirstTask"
+    kind = "PieceGenerator"
     color = (145, 80, 80)
 
     def __init__(self):
@@ -552,9 +552,9 @@ def port_signature(port) -> Tuple[str, str, str]:
 
 
 def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str) -> bool:
-    """Strict connection rules. Central place controlling what can feed what.
-    Distributions/resources/operators/intervals are no longer cards -- they live in
-    the card menus -- so the only wires left are piece flow, shutdowns and breakdowns."""
+    """Strict connection rules -- the single place controlling what can feed what.
+    The only wires are piece flow (buffers/router/tasks), shutdowns and breakdowns;
+    everything else is configured inside the card menus."""
 
     # Shutdowns feed tasks (piece or resource).
     if out_kind == "Shutdowns" and out_port == "shutdowns":
@@ -573,7 +573,7 @@ def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str
         return in_kind == "Monitor" and in_port == "buffer"
 
     # Tasks / piece generators / breakdowns feed buffers (breakdown outlets are lifeboats).
-    if out_kind in {"Task", "FirstTask", "Breakdown"} and out_port == "bufs_out":
+    if out_kind in {"Task", "PieceGenerator", "Breakdown"} and out_port == "bufs_out":
         return in_kind in {"Buffer", "Router"} and in_port == "from_task"
 
     # Router (router) routes to hard or soft buffers with probabilities.
@@ -668,10 +668,9 @@ class ModelRegistryDialog(QtWidgets.QDialog):
 
 
 # ============================================================
-# Stage 1: reusable distribution/function widget + registries
-# (Resources / Operators / Shifts). Distributions, resources and
-# operators are no longer cards; they live in menus and are picked
-# by name inside the cards that use them.
+# Reusable distribution/function widget + the Resource / Operator /
+# Shift registries. Distributions, resources, operators and shifts are
+# configured in menus and picked by name inside the cards that use them.
 # ============================================================
 
 def _clear_layout(layout):
@@ -1087,7 +1086,7 @@ class OperatorRegistryDialog(_RegistryDialog):
 
 
 # ============================================================
-# Stage 2: selection widgets that reference the registries
+# Selection widgets that reference the registries
 # ============================================================
 
 POLICY_OPTIONS = {
@@ -1316,8 +1315,8 @@ class PoliciesWidget(QtWidgets.QWidget):
 
 
 # ============================================================
-# Stage 2: card menus (dialogs). They read/write node properties and
-# reference the window's registries (models/resources/operators/shifts).
+# Card menus (dialogs). They read/write node properties and reference
+# the window's registries (models/resources/operators/shifts).
 # ============================================================
 
 def _names(reg):
@@ -1834,7 +1833,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             ShutdownsNode,
             BufferNode,
             RouterNode,
-            FirstTaskNode,
+            PieceGeneratorNode,
             TaskNode,
             ResourceTaskNode,
             BreakdownNode,
@@ -1886,7 +1885,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             ("Shutdowns", "simulation.flow.ShutdownsNode"),
             ("Buffer", "simulation.flow.BufferNode"),
             ("Router", "simulation.flow.RouterNode"),
-            ("Piece Generator", "simulation.flow.FirstTaskNode"),
+            ("Piece Generator", "simulation.flow.PieceGeneratorNode"),
             ("Piece Task", "simulation.flow.TaskNode"),
             ("Resource Task", "simulation.flow.ResourceTaskNode"),
             ("Breakdown", "simulation.flow.BreakdownNode"),
@@ -2014,7 +2013,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             dlg = BufferMenuDialog(self, node, self.model_registry)
         elif kind == "Router":
             dlg = RouterMenuDialog(self, node)
-        elif kind == "FirstTask":
+        elif kind == "PieceGenerator":
             dlg = GeneratorMenuDialog(self, node, self.model_registry, _names(self.shift_registry))
         elif kind == "Breakdown":
             dlg = BreakdownMenuDialog(self, node)
@@ -2184,7 +2183,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 if not get_property_json(node, "mttr", None):
                     problems.append(f"Breakdown '{name}' has no mttr distribution.")
 
-            elif kind == "FirstTask":
+            elif kind == "PieceGenerator":
                 if not get_property_json(node, "models_goals", []):
                     problems.append(f"Piece Generator '{name}' has no model goals.")
                 if not get_output_refs(node, "bufs_out"):
@@ -2308,7 +2307,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "Shutdowns": "simulation.flow.ShutdownsNode",
             "Buffer": "simulation.flow.BufferNode",
             "Router": "simulation.flow.RouterNode",
-            "FirstTask": "simulation.flow.FirstTaskNode",
+            "PieceGenerator": "simulation.flow.PieceGeneratorNode",
             "Task": "simulation.flow.TaskNode",
             "ResourceTask": "simulation.flow.ResourceTaskNode",
             "Breakdown": "simulation.flow.BreakdownNode",
@@ -2323,7 +2322,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     _IMPORT_JSON_PROPS = {
         "Shutdowns": ["intervals"],
         "Buffer": ["valid_models"],
-        "FirstTask": ["models_goals", "shifts"],
+        "PieceGenerator": ["models_goals", "shifts"],
         "Task": ["models_configs", "startup_duration", "loading_duration", "operators",
                  "loading_operators", "startup_operators", "task_shifts", "policies"],
         "ResourceTask": ["non_transformed_resources", "transformed_resources", "resources_out",

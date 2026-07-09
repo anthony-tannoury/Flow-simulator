@@ -63,7 +63,7 @@ as **OR-of-ANDs** `[[{operator,count}], …]` (any one inner group satisfies it,
 {PER_UNIT, PER_BATCH}; `min_carriers`, `max_capacity`, `contiguous_carriers`,
 `independent_carriers`, `timeout`, `priority`.
 
-- **FirstTask** (Piece Generator): `models_goals:[{model,goal}]`, `shifts:[name]`, `outlets:[bufferId]`.
+- **PieceGenerator**: `models_goals:[{model,goal}]`, `shifts:[name]`, `outlets:[bufferId]`.
 - **Buffer**: `valid_models:[modelName]`, `capacity` (number|`"inf"`), `inputs_from`, `outputs_to`.
 - **Router**: `inputs_from`, `buffer_probs:[{buffer:bufferId, probability:<time-fn>}]`
   (per connected buffer; probabilities are validated to sum to 1 at sample time).

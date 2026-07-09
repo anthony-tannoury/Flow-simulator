@@ -239,7 +239,7 @@
   "nodes": [
     {
       "id": "gen",
-      "kind": "FirstTask",
+      "kind": "PieceGenerator",
       "name": "Bodies In",
       "models_goals": [
         {
@@ -665,7 +665,7 @@
   "connections": [
     {
       "from_node": "gen",
-      "from_kind": "FirstTask",
+      "from_kind": "PieceGenerator",
       "from_port": "bufs_out",
       "to_node": "buf_raw",
       "to_kind": "Buffer",
