@@ -4,7 +4,7 @@ import salabim as sim
 
 from .ables import Triggerable
 from .component import Component
-from .distribution import Distribution
+from .sampler import Distribution
 
 
 class Resource(sim.Resource, Triggerable):
