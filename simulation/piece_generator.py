@@ -1,4 +1,3 @@
-import salabim as sim
 import numpy as np
 
 from simulation import env
