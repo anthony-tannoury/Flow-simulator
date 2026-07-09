@@ -6,7 +6,7 @@ from .shift_manager import HasShifts, ShiftManager
 from .interrupters import NonFlexibleShutdowns, FlexibleShutdowns
 from .interval import Interval
 from .operator import Alternative
-from .distribution import Distribution
+from .sampler import Distribution
 from .operator import OperatorGroup
 from .protocols import *
 from .ables import Dispatchable, Donnable
@@ -96,7 +96,11 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
         non_flexible_shutdown_deadline = self.task.non_flexible_shutdowns.get_deadline()
         task_current_shift = self.task.current_or_last_shift()
         task_shift_deadline = task_current_shift.end if task_current_shift is not None else float('inf')
-        earliest_deadline = min(non_flexible_shutdown_deadline, task_shift_deadline)
+        if self.task.config.protocols.task_shift_constraint.decide(task_current_shift, float('inf')) is Action.ABORT:
+            earliest_deadline = min(non_flexible_shutdown_deadline, task_shift_deadline)
+        else:
+            earliest_deadline = non_flexible_shutdown_deadline
+        self.freeze_abort_if(env.now() >= earliest_deadline)
 
         self.wait_for_collector(earliest_deadline)
         self.freeze_abort_if(self.failed())
