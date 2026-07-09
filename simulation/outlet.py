@@ -3,13 +3,12 @@ from __future__ import annotations
 import salabim as sim
 import numpy as np
 
+from simulation import env
 from .piece import Model, PickyPieceTaker
 from .ables import Triggerable
 from .helpers import check_probabilities
-from .distribution import Distribution
-
 from abc import ABC, abstractmethod
-from typing import override
+from typing import override, Callable
 
 
 class Outlet(PickyPieceTaker, ABC):
@@ -32,11 +31,7 @@ class Buffer(sim.Store, Outlet, Triggerable):
 
 
 class Router(Outlet):
-    def __init__(self, outlets_probs: dict[Outlet, Distribution]) -> None:
-        for distr in outlets_probs.values():
-            if distr.distr_type is not sim.Constant:
-                raise ValueError("Randomness is not allowed in outlet probability variations with time")
-
+    def __init__(self, outlets_probs: dict[Outlet, float | Callable[[float], float]]) -> None:
         valid_models_sets = [set(outlet.valid_models) for outlet in outlets_probs.keys()]
         intersection = set.intersection(*valid_models_sets)
 
@@ -49,6 +44,6 @@ class Router(Outlet):
 
     @override
     def get(self) -> Buffer:
-        probs = [distr.sample_now() for distr in self.probs]
+        probs = [p if isinstance(p, (int, float)) else p(env.now()) for p in self.probs]
         check_probabilities(probs=probs)
         return self.outlets[np.random.choice(len(self.outlets), p=probs)].get()
