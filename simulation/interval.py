@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import salabim as sim
-
 from .helpers import check_disjoint_sorted_intervals
 from .component import Component
 
