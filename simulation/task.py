@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import salabim as sim
 
 from simulation import env
@@ -98,11 +96,7 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
         non_flexible_shutdown_deadline = self.task.non_flexible_shutdowns.get_deadline()
         task_current_shift = self.task.current_or_last_shift()
         task_shift_deadline = task_current_shift.end if task_current_shift is not None else float('inf')
-        if self.task.config.protocols.task_shift_constraint.decide(task_current_shift, float('inf')) is Action.ABORT:
-            earliest_deadline = min(non_flexible_shutdown_deadline, task_shift_deadline)
-        else:
-            earliest_deadline = non_flexible_shutdown_deadline
-        self.freeze_abort_if(env.now() >= earliest_deadline)
+        earliest_deadline = min(non_flexible_shutdown_deadline, task_shift_deadline)
 
         self.wait_for_collector(earliest_deadline)
         self.freeze_abort_if(self.failed())
@@ -110,7 +104,6 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
 
         ideal_loading_duration = self.get_ideal_loading_duration()
         ideal_duration = self.get_ideal_duration()
-        self.freeze_abort_if(env.now() > earliest_deadline - (ideal_duration + ideal_loading_duration))
 
         self.request_resources(fail_at=earliest_deadline - (ideal_duration + ideal_loading_duration))
 
@@ -311,7 +304,7 @@ class Task(Component, HasShifts, ABC):
 
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
-            self.wait(new_carrier.loaded)
+            self.wait(new_carrier.done)
 
             if len(self.pending_carriers) >= self.config.min_carriers:
                 dispatched = []
