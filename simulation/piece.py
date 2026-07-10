@@ -15,13 +15,14 @@ if TYPE_CHECKING:
 
 
 class Model:
-    def __init__(self, name: str, parent: Model | None = None) -> None:
+    def __init__(self, name: str) -> None:
         self.name = name
-        self.parent = parent
+        self.parent = None
         self.children: list[Model] = []
 
-        if self.parent is not None:
-            self.parent.children.append(self)
+    def set_parent(self, parent: Model) -> None:
+        self.parent = parent
+        self.parent.children.append(self)
 
 
 class Piece(sim.Component):
@@ -66,7 +67,13 @@ class PickyPieceTaker:
 
 
 class PieceGenerator(Component, PickyPieceTaker, HasShifts):
+    COUNT = 0
+
     def setup(self, models_goals: dict[Model, int], shifts: list[Interval], outlets: list[Outlet]) -> None:
+        if PieceGenerator.COUNT > 0:
+            raise ValueError("Cannot have more than one piece generator")
+        PieceGenerator.COUNT += 1
+        
         self.models = list(models_goals.keys())
         PickyPieceTaker.__init__(self, self.models)
         HasShifts.__init__(self, shifts)
