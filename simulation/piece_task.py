@@ -251,9 +251,9 @@ class PieceCarrier(Carrier):
     def abort(self, *args):
         assert isinstance(self.task, PieceTask)
         outlets = args[0] if args else self.task.inlets
+        place(self.piece_collector.collected_pieces, outlets)
         self.piece_collector.done.set(True)
         self.piece_collector.cancel()
-        place(self.piece_collector.collected_pieces, outlets)
 
         self.loaded.set(True)
         self.done.set(True)
@@ -291,7 +291,7 @@ class PieceCarrier(Carrier):
         model = self.piece_collector.collected_pieces[0].model
         mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else len(self.piece_collector.collected_pieces)
         resources = [(r, q*mult) for r, q in self.task.config.get_model_config(model).resources]
-        self.request(*resources, fail_at=fail_at)
+        self.request(*resources, fail_at=fail_at, cap_now=True)
         self.freeze_abort_if(self.failed())
 
     @override
@@ -327,7 +327,7 @@ class PieceTask(Task, PickyPieceTaker):
 
     @override
     def abort(self, *args):
-        for carrier in list(self.pending_carriers) + list(self.active_carriers):
+        for carrier in reversed(list(self.pending_carriers) + list(self.active_carriers)):
             carrier.abort(*args)
         self.release()
         self.started_up = False

@@ -42,19 +42,3 @@ class Bathtub:
             return a * np.exp(t / tau) + c + (beta / eta) * np.pow(t / eta, beta - 1)
         
         return bathtub
-    
-    @staticmethod
-    def sample_mttr(bathtub_curve: Callable[[float], float], tolerance: float = 60, max_iters: int = 100) -> float:
-        threshold = -np.log(env.random.random())
-        integral = 0.0
-        t = env.now()
-        iters = 0
-
-        while iters < max_iters and integral < threshold:
-            integral += bathtub_curve(t) * tolerance
-            t += tolerance
-            iters += 1
-
-        if integral < threshold:
-            raise ValueError(f"Integral did not cross threshold after {max_iters} iterations")
-        return t

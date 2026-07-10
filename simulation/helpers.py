@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 
-from .piece import PickyPieceTaker, Piece
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .piece import PickyPieceTaker, Piece
     from .interval import Interval
     from .outlet import Outlet
 
@@ -24,6 +24,8 @@ def check_probabilities(probs: list[float]) -> None:
 
 
 def check_outlet_validity(giver: PickyPieceTaker, outlets: list[Outlet]) -> None:
+    from .piece import PickyPieceTaker
+    
     if not outlets:
         raise ValueError("Giver must have at least one outlet")
 

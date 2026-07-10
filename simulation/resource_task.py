@@ -160,9 +160,9 @@ class ResourceCarrier(Carrier):
     @override
     def abort(self, *args) -> None:
         assert isinstance(self.task.config, ResourceTaskConfig)
-        for i, (r, p, s) in enumerate(self.task.config.transformed_resources_salvageable):
+        for i, (r, _, s) in enumerate(self.task.config.transformed_resources_salvageable):
             if s:
-                r.replenish(demander=self, quantity=p*self.resource_collector.requested_quantities[i])
+                r.replenish(demander=self, quantity=self.resource_collector.requested_quantities[i])
 
         self.resource_collector.done.set(True)
         self.resource_collector.cancel()
@@ -182,8 +182,14 @@ class ResourceCarrier(Carrier):
 
     @override
     def wait_for_collector(self, fail_at: float) -> None:
+        self.handle_restock()
+
+        if env.now() >= fail_at:
+            self.freeze_abort_if(True)
+            return
+    
         self.resource_collector.allow_dispatch.set(True)
-        self.wait(self.resource_collector.done, fail_at=fail_at)
+        self.wait(self.resource_collector.done, fail_at=fail_at, cap_now=True)
 
     @override
     def get_ideal_loading_duration(self) -> float:
@@ -199,14 +205,14 @@ class ResourceCarrier(Carrier):
         assert isinstance(self.task.config, ResourceTaskConfig)
         mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else self.resource_collector.requested_quantity
         resources = [(r, q*mult) for r, q in self.task.config.non_transformed_resources]
-        self.request(*resources, fail_at=fail_at)
+        self.request(*resources, fail_at=fail_at, cap_now=True)
         self.freeze_abort_if(self.failed())
 
     @override
     def successfully_end_process(self):
         assert isinstance(self.task.config, ResourceTaskConfig)
         for resource_out, distr in self.task.config.resources_out_distr:
-            resource_out.replenish(demander=self, quantity=distr.sample())
+            resource_out.replenish(demander=self, quantity=distr.sample()*self.resource_collector.requested_quantity)
 
         self.resource_collector.cancel()
         self.done.set(True)

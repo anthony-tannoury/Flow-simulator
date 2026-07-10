@@ -83,7 +83,7 @@ class FlexibleShutdowns(Shutdowns):
 
     def adapt(self, operation_interval: Interval) -> bool:
         for i, interval in enumerate(self.intervals):
-            if not Interval.disjoint(operation_interval, interval) and interval.end > env.now():
+            if not Interval.disjoint(operation_interval, interval) and interval.start <= operation_interval.end:
                 interval.translate(operation_interval.end - interval.start)
                 self.rearrange(i)
                 return True
@@ -115,6 +115,8 @@ class FlexibleShutdowns(Shutdowns):
             self.hold(till=current.end, cap_now=True)
             self.task.is_in_shutdown.set(False)
             self.task.is_frozen.set(False)
+            if current in self.intervals:
+                self.intervals.remove(current)
 
 
 class NonFlexibleShutdowns(Shutdowns):

@@ -34,6 +34,9 @@ class Interval:
     def copy(self) -> Interval:
         return Interval(self.start, self.end)
     
+    def __repr__(self):
+        return f"[{self.start}, {self.end}]"
+    
 
 class IntervalWaiter(Component, ABC):
     def setup(self, intervals: list[Interval]) -> None:

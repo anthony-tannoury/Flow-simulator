@@ -67,8 +67,10 @@ class Alternative:
         else:
             fail_at = float('inf')
 
+        cap_now = kwargs.get("cap_now", False)
+
         if len(self.alternatives) == 1:
-            demander.request(*self.alternatives[0], fail_at=fail_at)
+            demander.request(*self.alternatives[0], fail_at=fail_at, cap_now=cap_now)
             if not demander.failed():
                 return self.alternatives[0]
             return None
@@ -79,7 +81,7 @@ class Alternative:
                 if not demander.failed():
                     return alt
 
-            demander.wait(*self.triggers, fail_at=fail_at)
+            demander.wait(*self.triggers, fail_at=fail_at, cap_now=cap_now)
             if demander.failed():
                 return None
             
