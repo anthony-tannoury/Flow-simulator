@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import salabim as sim
-
 from .helpers import check_disjoint_sorted_intervals
 from .component import Component
 
@@ -35,6 +33,9 @@ class Interval:
     
     def copy(self) -> Interval:
         return Interval(self.start, self.end)
+    
+    def __repr__(self):
+        return f"[{self.start}, {self.end}]"
     
 
 class IntervalWaiter(Component, ABC):

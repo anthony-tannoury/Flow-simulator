@@ -1,3 +1,26 @@
-- Shift generator
-- Function generator
 
+Missing parameters from input excel:
+
+- # of operators needed per task
+- operator scope per task
+- restock timing : order duration and delivery duration 
+
+
+Unused or redundant in excel:
+
+- Timeout columns in 3_BillOfEquipement.timeout_charge_minutes and 4_PolitiqueBatch.timeout_minutes_globale
+- primaire and score_preference in 3_BillOfEquipement
+- obligatoire ??
+- taille_grappe, est_assemblage_grappe, est_eclatement_grappe, unite_scope = par_grappe ??
+
+
+Parameters that cannot be changed in from the excel inputs :
+
+- Models 
+- Operations and order of operations
+- Shifts and opening / closing periods (for operators, tasks and piece generator)
+
+
+
+
+120,127,133, 194, 232

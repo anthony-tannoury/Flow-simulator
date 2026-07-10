@@ -1,0 +1,811 @@
+{
+  "editor": {
+    "name": "Simulation Flow Designer",
+    "version": "0.3.0",
+    "format": "clean-json"
+  },
+  "models": [
+    {
+      "name": "Widget",
+      "parent": null
+    },
+    {
+      "name": "WidgetA",
+      "parent": "Widget"
+    },
+    {
+      "name": "WidgetB",
+      "parent": "Widget"
+    }
+  ],
+  "resources": [
+    {
+      "name": "steel",
+      "restockable": false,
+      "lifespan": "inf",
+      "max_capacity": 500.0,
+      "initial_capacity": 500.0
+    },
+    {
+      "name": "primer",
+      "restockable": true,
+      "lifespan": "inf",
+      "max_capacity": 100.0,
+      "initial_capacity": 100.0,
+      "order_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 2.0
+          }
+        }
+      },
+      "delivery_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 48.0
+          }
+        }
+      },
+      "threshold": 20.0
+    },
+    {
+      "name": "painted_body",
+      "restockable": false,
+      "lifespan": "inf",
+      "max_capacity": 1000.0,
+      "initial_capacity": 0.0
+    }
+  ],
+  "operators": [
+    {
+      "name": "welders",
+      "capacity": 3,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 1.0
+          }
+        }
+      },
+      "shifts": [
+        "day"
+      ]
+    },
+    {
+      "name": "helpers",
+      "capacity": 2,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 1.0
+          }
+        }
+      },
+      "shifts": [
+        "day",
+        "night"
+      ]
+    }
+  ],
+  "shifts": [
+    {
+      "name": "day",
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "08:00",
+              "end": "17:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "08:00",
+              "end": "17:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "08:00",
+              "end": "17:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "08:00",
+              "end": "17:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "08:00",
+              "end": "17:00"
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "days_off": [],
+      "horizon": {
+        "start": "05-01-2026",
+        "end": "02-02-2026"
+      }
+    },
+    {
+      "name": "night",
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        }
+      ],
+      "days_off": [
+        "12-01-2026",
+        "19-01-2026"
+      ],
+      "horizon": {
+        "start": "05-01-2026",
+        "end": "02-02-2026"
+      }
+    },
+    {
+      "name": "audit-window",
+      "mode": "custom",
+      "days": [],
+      "days_off": [
+        "13-01-2026"
+      ],
+      "horizon": {
+        "start": "05-01-2026",
+        "end": "02-02-2026"
+      },
+      "custom_intervals": [
+        {
+          "start": "12-01-2026 00:00",
+          "end": "13-01-2026 23:59"
+        },
+        {
+          "start": "15-01-2026 10:00",
+          "end": "15-01-2026 19:00"
+        }
+      ]
+    }
+  ],
+  "stopping_criterion": {
+    "type": "ByPiecesProduced",
+    "total": 200,
+    "timeout": "inf"
+  },
+  "start_date": "05-01-2026 00:00",
+  "nodes": [
+    {
+      "id": "gen",
+      "kind": "PieceGenerator",
+      "name": "Bodies In",
+      "models_goals": [
+        {
+          "model": "WidgetA",
+          "goal": 120
+        },
+        {
+          "model": "WidgetB",
+          "goal": 80
+        }
+      ],
+      "shifts": [
+        "day"
+      ],
+      "outlets": [
+        "buf_raw"
+      ],
+      "position": [
+        -900.0,
+        0.0
+      ]
+    },
+    {
+      "id": "buf_raw",
+      "kind": "Buffer",
+      "name": "Raw Bodies",
+      "valid_models": [
+        "Widget"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": true,
+        "max_length": true,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": true,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": true
+      },
+      "inputs_from": [
+        "gen"
+      ],
+      "outputs_to": [
+        "weld"
+      ],
+      "position": [
+        -650.0,
+        0.0
+      ]
+    },
+    {
+      "id": "weld",
+      "kind": "Task",
+      "name": "Weld & Assemble",
+      "models_configs": [
+        {
+          "model": "WidgetA",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 4.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "steel",
+              "value": 2.0
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 2
+        },
+        {
+          "model": "WidgetB",
+          "duration": {
+            "dist_type": "Normal",
+            "params": {
+              "mean": {
+                "kind": "linear",
+                "x1": 0,
+                "y1": 6.0,
+                "x2": 20000,
+                "y2": 8.0
+              },
+              "std": {
+                "kind": "constant",
+                "value": 1.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "steel",
+              "value": 3.0
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 15.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 1.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "welders",
+            "count": 1
+          },
+          {
+            "operator": "helpers",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "welders",
+            "count": 2
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "helpers",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "day"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortOrWaitForCarriers",
+          "tolerance_fraction": 0.5
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "WaitForCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "PartiallyConstrainedByShift",
+          "tolerance": 30.0
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 2,
+      "max_capacity": 6.0,
+      "contiguous_carriers": true,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 6,
+      "collector_type": "DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buf_raw"
+      ],
+      "bufs_out": [
+        "router"
+      ],
+      "shutdowns": [
+        "maint"
+      ],
+      "breakdowns": [
+        "jam"
+      ],
+      "position": [
+        -380.0,
+        0.0
+      ]
+    },
+    {
+      "id": "router",
+      "kind": "Router",
+      "name": "QC Router",
+      "inputs_from": [
+        "weld"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buf_ok",
+          "probability": {
+            "kind": "linear",
+            "x1": 0,
+            "y1": 0.95,
+            "x2": 20000,
+            "y2": 0.8
+          }
+        },
+        {
+          "buffer": "buf_scrap",
+          "probability": null
+        }
+      ],
+      "position": [
+        -110.0,
+        0.0
+      ]
+    },
+    {
+      "id": "buf_ok",
+      "kind": "Buffer",
+      "name": "Passed QC",
+      "valid_models": [
+        "WidgetA",
+        "WidgetB"
+      ],
+      "capacity": "inf",
+      "buffer_type": "EXIT",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router"
+      ],
+      "outputs_to": [],
+      "position": [
+        160.0,
+        -110.0
+      ]
+    },
+    {
+      "id": "buf_scrap",
+      "kind": "Buffer",
+      "name": "Scrap",
+      "valid_models": [
+        "WidgetA",
+        "WidgetB"
+      ],
+      "capacity": "inf",
+      "buffer_type": "SCRAP",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router",
+        "jam"
+      ],
+      "outputs_to": [],
+      "position": [
+        160.0,
+        110.0
+      ]
+    },
+    {
+      "id": "paint",
+      "kind": "ResourceTask",
+      "name": "Paint Line",
+      "non_transformed_resources": [
+        {
+          "resource": "steel",
+          "value": 1.0
+        }
+      ],
+      "transformed_resources": [
+        {
+          "resource": "primer",
+          "proportion": 1.0,
+          "salvageable": true
+        }
+      ],
+      "resources_out": [
+        {
+          "resource": "painted_body",
+          "distribution": {
+            "dist_type": "Normal",
+            "params": {
+              "mean": {
+                "kind": "constant",
+                "value": 1.0
+              },
+              "std": {
+                "kind": "constant",
+                "value": 0.0
+              }
+            }
+          },
+          "lowerbound": 0.0,
+          "upperbound": 2.0
+        }
+      ],
+      "duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 3.0
+          }
+        }
+      },
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "helpers",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [],
+      "startup_operators": [],
+      "task_shifts": [
+        "day",
+        "night"
+      ],
+      "policies": {},
+      "resource_scope": "PER_BATCH",
+      "operator_scope": "PER_BATCH",
+      "resource_collector_type": "ALTRUISTIC",
+      "min_carriers": 1,
+      "max_capacity": 4.0,
+      "min_carrier_capacity": 1.0,
+      "max_carrier_capacity": 2.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": 240.0,
+      "priority": 4,
+      "shutdowns": [],
+      "breakdowns": [
+        "spray"
+      ],
+      "position": [
+        -380.0,
+        260.0
+      ]
+    },
+    {
+      "id": "maint",
+      "kind": "Shutdowns",
+      "name": "Scheduled Maint.",
+      "shutdown_type": "FLEXIBLE",
+      "intervals": [
+        {
+          "start": "11-01-2026 23:00",
+          "end": "12-01-2026 00:00"
+        }
+      ],
+      "position": [
+        -640.0,
+        -220.0
+      ]
+    },
+    {
+      "id": "jam",
+      "kind": "Breakdown",
+      "name": "Weld-head Jam",
+      "task": "weld",
+      "mtbf": {
+        "mode": "bathtub",
+        "a": 0.001,
+        "tau": 5000.0,
+        "c": 0.01,
+        "beta": 2.0,
+        "eta": 8000.0,
+        "tolerance": 60.0,
+        "max_iters": 10000
+      },
+      "mttr": {
+        "dist_type": "Exponential",
+        "params": {
+          "mean": {
+            "kind": "constant",
+            "value": 45.0
+          }
+        }
+      },
+      "outlets": [
+        "buf_scrap"
+      ],
+      "position": [
+        -110.0,
+        -220.0
+      ]
+    },
+    {
+      "id": "spray",
+      "kind": "Breakdown",
+      "name": "Sprayer Fault",
+      "task": "paint",
+      "mtbf": {
+        "mode": "distribution",
+        "distribution": {
+          "dist_type": "Exponential",
+          "params": {
+            "mean": {
+              "kind": "constant",
+              "value": 3000.0
+            }
+          }
+        }
+      },
+      "mttr": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 30.0
+          }
+        }
+      },
+      "outlets": [],
+      "position": [
+        -640.0,
+        440.0
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from_node": "gen",
+      "from_kind": "PieceGenerator",
+      "from_port": "bufs_out",
+      "to_node": "buf_raw",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buf_raw",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "weld",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "weld",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buf_ok",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buf_scrap",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "maint",
+      "from_kind": "Shutdowns",
+      "from_port": "shutdowns",
+      "to_node": "weld",
+      "to_kind": "Task",
+      "to_port": "shutdowns"
+    },
+    {
+      "from_node": "jam",
+      "from_kind": "Breakdown",
+      "from_port": "breakdown",
+      "to_node": "weld",
+      "to_kind": "Task",
+      "to_port": "breakdowns"
+    },
+    {
+      "from_node": "jam",
+      "from_kind": "Breakdown",
+      "from_port": "bufs_out",
+      "to_node": "buf_scrap",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "spray",
+      "from_kind": "Breakdown",
+      "from_port": "breakdown",
+      "to_node": "paint",
+      "to_kind": "ResourceTask",
+      "to_port": "breakdowns"
+    }
+  ],
+  "backdrops": []
+}

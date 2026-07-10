@@ -40,6 +40,7 @@ class AbortOrWaitForCarriers:
 
 class ShiftConstraint(Protocol):
     def decide(self, current_shift: Interval | None, duration: float) -> Action: ...
+    def deadline(self, current_shift: Interval | None) -> float: ...
 
 
 class ConstrainedByShift:
@@ -47,11 +48,30 @@ class ConstrainedByShift:
         if current_shift is None:
             return Action.ABORT
         return Action.ABORT if env.now() + duration > current_shift.end else Action.LAUNCH
+    
+    def deadline(self, current_shift: Interval | None) -> float:
+        return current_shift.end if current_shift is not None else float('inf')
 
 
 class NotConstrainedByShift:
     def decide(self, current_shift: Interval | None, duration: float) -> Action:
         return Action.LAUNCH
+    
+    def deadline(self, current_shift: Interval | None) -> float:
+        return float('inf')
+    
+
+class PartiallyConstrainedByShift:
+    def __init__(self, tolerance: float) -> None:
+        self.tolerance = tolerance
+
+    def decide(self, current_shift: Interval | None, duration: float) -> Action:
+        if current_shift is None:
+            return Action.ABORT
+        return Action.ABORT if env.now() + duration > current_shift.end + self.tolerance else Action.LAUNCH
+    
+    def deadline(self, current_shift: Interval | None) -> float:
+        return current_shift.end + self.tolerance if current_shift is not None else float('inf')
 
 
 class SelfConsciousness(Protocol):

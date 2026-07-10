@@ -3,10 +3,10 @@ from __future__ import annotations
 import salabim as sim
 
 from simulation import env
-from .triggerable import Triggerable
+from .ables import Triggerable
 from .interval import Interval
 from .shift_manager import ShiftManager, HasShifts
-from .distribution import Distribution
+from .sampler import Distribution
 
 from typing import override
 
@@ -67,8 +67,10 @@ class Alternative:
         else:
             fail_at = float('inf')
 
+        cap_now = kwargs.get("cap_now", False)
+
         if len(self.alternatives) == 1:
-            demander.request(*self.alternatives[0], fail_at=fail_at)
+            demander.request(*self.alternatives[0], fail_at=fail_at, cap_now=cap_now)
             if not demander.failed():
                 return self.alternatives[0]
             return None
@@ -79,7 +81,7 @@ class Alternative:
                 if not demander.failed():
                     return alt
 
-            demander.wait(*self.triggers, fail_at=fail_at)
+            demander.wait(*self.triggers, fail_at=fail_at, cap_now=cap_now)
             if demander.failed():
                 return None
             

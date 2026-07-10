@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import salabim as sim
 
-from .triggerable import Triggerable
+from .ables import Triggerable
 from .component import Component
-from .distribution import Distribution
+from .sampler import Distribution
 
 
 class Resource(sim.Resource, Triggerable):
@@ -58,7 +58,7 @@ class Delivery(Component):
         self.delivery_duration = delivery_duration
 
     def process(self):
-        missing = self.stock.capacity.value - self.stock.available_quantity()
+        missing = self.stock.capacity() - self.stock.available_quantity()
         self.hold(self.delivery_duration.sample_now())
         self.stock.replenish(demander=self, quantity=missing)
         self.stock.active_order = False

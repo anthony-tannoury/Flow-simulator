@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-import salabim as sim
 
-from simulation import env
-from .piece import PickyPieceTaker, Piece
-
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .piece import PickyPieceTaker, Piece
     from .interval import Interval
     from .outlet import Outlet
-
-
-def sample_distr_or_func(obj: sim.Distribution | Callable[[float], float]) -> float:
-    return obj.sample() if isinstance(obj, sim.Distribution) else obj(env.now())
 
 
 def check_disjoint_sorted_intervals(intervals: list[Interval]) -> None:
@@ -31,6 +24,8 @@ def check_probabilities(probs: list[float]) -> None:
 
 
 def check_outlet_validity(giver: PickyPieceTaker, outlets: list[Outlet]) -> None:
+    from .piece import PickyPieceTaker
+    
     if not outlets:
         raise ValueError("Giver must have at least one outlet")
 

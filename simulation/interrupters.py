@@ -1,28 +1,21 @@
 from __future__ import annotations
 
-import salabim as sim
-
 from simulation import env
 from .component import Component
 from .interval import Interval, IntervalWaiter
+from .protocols import Action
 from abc import ABC
 from typing import override, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .task import Task
-    from .distribution import Distribution
+    from .sampler import Sampler, Distribution
     from .outlet import Outlet
 
 
-class Interruptible:
-    def __init__(self) -> None:
-        self.is_in_breakdown = sim.State(value=False)
-        self.is_in_shutdown = sim.State(value=False)
-
-
 class Breakdown(Component, ABC):
-    def setup(self, task: Task, mtbf: Distribution, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
-        from .resource_task import ResourceTask  # deferred: resource_task.py imports task.py which imports this module
+    def setup(self, task: Task, mtbf: Sampler, mttr: Distribution, outlets: list[Outlet] | None = None) -> None:
+        from .resource_task import ResourceTask
         from .piece_task import PieceTask
 
         if outlets is None:
@@ -30,10 +23,10 @@ class Breakdown(Component, ABC):
 
         if outlets and isinstance(task, ResourceTask):
             raise ValueError("Breakdown on resource task cannot have outlets")
-
+        
         if not outlets and isinstance(task, PieceTask):
-            raise ValueError("Breakdown on piece task must have outlets")
-
+            raise ValueError("Breakdowns on piece tasks must have outlets")
+    
         self.task = task
         self.mtbf = mtbf
         self.mttr = mttr
@@ -67,10 +60,10 @@ class Shutdowns(IntervalWaiter):
     def get_deadline(self) -> float:
         next_shutdown = self.get_next_shutdown()
         return next_shutdown.start if next_shutdown is not None else float('inf')
-
+    
     @override
     def on_enter(self, *args):
-        self.task.abort(getattr(self.task, 'inlets', []))
+        self.task.abort()
         self.task.is_in_shutdown.set(True)
 
     @override
@@ -90,28 +83,40 @@ class FlexibleShutdowns(Shutdowns):
 
     def adapt(self, operation_interval: Interval) -> bool:
         for i, interval in enumerate(self.intervals):
-            if not Interval.disjoint(operation_interval, interval):
+            if not Interval.disjoint(operation_interval, interval) and interval.start <= operation_interval.end:
                 interval.translate(operation_interval.end - interval.start)
                 self.rearrange(i)
                 return True
 
         return False
-
+    
     @override
     def process(self):
         while True:
-            self.wait((self.task.active_carriers.num_carriers, 0))
-
             next_shutdown = self.get_next_shutdown()
             if next_shutdown is None:
                 break
 
-            self.hold(till=next_shutdown.start, cap_now=True)
-            self.task.abort(getattr(self.task, 'inlets', []))
+            if env.now() < next_shutdown.start:
+                self.hold(till=next_shutdown.start)
+                continue
+
+            if self.task.config.protocols.pending_carriers_pre_flexible_shutdowns.decide(self.task.config.min_carriers, len(self.task.pending_carriers)) is Action.WAIT:
+                self.wait((self.task.active_carriers.num_carriers, 0), (self.task.pending_carriers.num_carriers, 0), all=True)
+            else:
+                self.wait((self.task.active_carriers.num_carriers, 0))
+
+            current = self.get_next_shutdown()
+            if current is None or env.now() < current.start:
+                continue
+
+            self.task.abort()
             self.task.is_in_shutdown.set(True)
-            self.hold(till=next_shutdown.end, cap_now=True)
+            self.hold(till=current.end, cap_now=True)
             self.task.is_in_shutdown.set(False)
             self.task.is_frozen.set(False)
+            if current in self.intervals:
+                self.intervals.remove(current)
 
 
 class NonFlexibleShutdowns(Shutdowns):

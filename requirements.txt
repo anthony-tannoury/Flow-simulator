@@ -1,4 +1,0 @@
-salabim
-greenlet
-numpy
-pytest
