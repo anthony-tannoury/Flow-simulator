@@ -62,10 +62,9 @@ PORT_COLORS = {
     "task": (230, 140, 70),
     "shutdown": (180, 100, 200),
     "breakdown": (220, 90, 110),
-    "monitor": (110, 180, 200),
 }
 
-# Statistics offered by a Monitor card.
+# Buffer statistics that can be monitored (toggled in the buffer's Monitor tab).
 MONITOR_STATS = [
     ("avg_length", "avg length", True),
     ("max_length", "max length", True),
@@ -162,11 +161,6 @@ def connected_refs_from_port(node, port_name: str, direction: str):
     return [node_uid(n) for n in connected_nodes_from_port(node, port_name, direction)]
 
 
-def get_input_ref(node, port_name: str):
-    refs = connected_refs_from_port(node, port_name, "input")
-    return refs[0] if refs else None
-
-
 def get_output_refs(node, port_name: str):
     return connected_refs_from_port(node, port_name, "output")
 
@@ -208,14 +202,6 @@ def set_property_json(node: BaseNode, prop_name: str, value):
         node.set_property(prop_name, json.dumps(value, indent=2, ensure_ascii=False))
 
 
-def add_bool_input(node: BaseNode, name: str, label: str, default: bool) -> None:
-    try:
-        node.add_checkbox(name, label="", text=label, state=bool(default))
-    except Exception:
-        if not node.has_property(name):
-            node.create_property(name, bool(default))
-
-
 def add_combo_input(node: BaseNode, name: str, label: str, items: list, default: str) -> None:
     try:
         node.add_combo_menu(name, label=label, items=items)
@@ -223,17 +209,6 @@ def add_combo_input(node: BaseNode, name: str, label: str, items: list, default:
     except Exception:
         if not node.has_property(name):
             node.create_property(name, default)
-
-
-def set_bool_prop(node: BaseNode, name: str, value) -> None:
-    bval = bool(value)
-    if node.has_property(name):
-        try:
-            node.set_property(name, bval)
-        except Exception:
-            pass
-    else:
-        node.create_property(name, bval)
 
 
 # ============================================================
@@ -296,10 +271,10 @@ class BufferNode(SimNode):
         super().__init__()
         self.add_input("from_task", multi_input=True, color=PORT_COLORS["task"])
         self.add_output("to_task", multi_output=True, color=PORT_COLORS["buffer"])
-        self.add_output("monitor", multi_output=True, color=PORT_COLORS["monitor"])
         self.create_property("valid_models", "[]")
         self.create_property("capacity", "inf")
         self.create_property("buffer_type", "PASSAGE")  # PASSAGE | SCRAP | EXIT
+        self.create_property("monitor", "{}")  # {stat: bool}; monitored iff any stat is true
 
     def to_clean_json(self) -> dict:
         return {
@@ -309,6 +284,8 @@ class BufferNode(SimNode):
             "valid_models": get_property_json(self, "valid_models", []),
             "capacity": self.get_property("capacity"),
             "buffer_type": self.get_property("buffer_type") if self.has_property("buffer_type") else "PASSAGE",
+            "monitor": {key: bool(get_property_json(self, "monitor", {}).get(key, False))
+                        for key, _, _ in MONITOR_STATS},
             "inputs_from": connected_refs_from_port(self, "from_task", "input"),
             "outputs_to": connected_refs_from_port(self, "to_task", "output"),
             "position": [self.x_pos(), self.y_pos()],
@@ -527,31 +504,6 @@ class BreakdownNode(SimNode):
         }
 
 
-class MonitorNode(SimNode):
-    NODE_NAME = "Monitor"
-    kind = "Monitor"
-    color = (55, 110, 125)
-
-    def __init__(self):
-        super().__init__()
-        self.add_input("buffer", color=PORT_COLORS["monitor"])
-        for key, label, default in MONITOR_STATS:
-            add_bool_input(self, key, label, default)
-
-    def to_clean_json(self) -> dict:
-        return {
-            "id": node_uid(self),
-            "kind": self.kind,
-            "name": self.name(),
-            "buffer": get_input_ref(self, "buffer"),
-            "stats": {
-                key: bool(self.get_property(key)) if self.has_property(key) else default
-                for key, _, default in MONITOR_STATS
-            },
-            "position": [self.x_pos(), self.y_pos()],
-        }
-
-
 def port_signature(port) -> Tuple[str, str, str]:
     n = port.node()
     ptype = str(port.type_()).lower()
@@ -575,10 +527,6 @@ def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str
     # Buffer feeds task inputs.
     if out_kind == "Buffer" and out_port == "to_task":
         return in_kind == "Task" and in_port == "bufs_in"
-
-    # Buffer taps a Monitor card.
-    if out_kind == "Buffer" and out_port == "monitor":
-        return in_kind == "Monitor" and in_port == "buffer"
 
     # Tasks / piece generators / breakdowns feed buffers (breakdown outlets are lifeboats).
     if out_kind in {"Task", "PieceGenerator", "Breakdown"} and out_port == "bufs_out":
@@ -1354,6 +1302,28 @@ def _leaf_model_names(model_registry):
     return [m["name"] for m in model_registry if m["name"] not in parents]
 
 
+def _model_parents(model_registry):
+    return {m.get("name"): m.get("parent") for m in model_registry if m.get("name")}
+
+
+def _taker_can_take(valid_models: set, model: str, parents: dict) -> bool:
+    """Mirror PickyPieceTaker.can_take: a taker accepts a model if the model or any
+    of its ancestors is in the taker's valid-model set."""
+    seen = set()
+    while model is not None and model not in seen:
+        if model in valid_models:
+            return True
+        seen.add(model)
+        model = parents.get(model)
+    return False
+
+
+def _takers_disjoint(a: set, b: set, parents: dict) -> bool:
+    """Mirror PickyPieceTaker.disjoint (hierarchy-aware)."""
+    return not (any(_taker_can_take(a, m, parents) for m in b)
+                or any(_taker_can_take(b, m, parents) for m in a))
+
+
 class IntervalListWidget(QtWidgets.QWidget):
     """A list of {start, end} intervals with '+ interval'."""
 
@@ -1445,9 +1415,15 @@ class BufferMenuDialog(QtWidgets.QDialog):
         self.node = node
         self.setWindowTitle("Buffer")
         lay = QtWidgets.QVBoxLayout(self)
-        lay.addWidget(QtWidgets.QLabel("valid models (selecting a model selects its children):"))
+        tabs = QtWidgets.QTabWidget()
+        lay.addWidget(tabs)
+
+        # --- Buffer tab: valid models, type, capacity ---
+        buf_tab = QtWidgets.QWidget()
+        bl = QtWidgets.QVBoxLayout(buf_tab)
+        bl.addWidget(QtWidgets.QLabel("valid models (selecting a model selects its children):"))
         self.models = ModelTreeWidget(model_registry, checked=get_property_json(node, "valid_models", []))
-        lay.addWidget(self.models)
+        bl.addWidget(self.models)
         form = QtWidgets.QFormLayout()
         self.buffer_type = QtWidgets.QComboBox()
         for t in BUFFER_TYPES:
@@ -1458,7 +1434,23 @@ class BufferMenuDialog(QtWidgets.QDialog):
         form.addRow("type", self.buffer_type)
         self.capacity = InfFloatWidget(node.get_property("capacity") if node.has_property("capacity") else "inf")
         form.addRow("capacity", self.capacity)
-        lay.addLayout(form)
+        bl.addLayout(form)
+        tabs.addTab(buf_tab, "Buffer")
+
+        # --- Monitor tab: which statistics to track on this buffer ---
+        mon_tab = QtWidgets.QWidget()
+        ml = QtWidgets.QVBoxLayout(mon_tab)
+        ml.addWidget(QtWidgets.QLabel("statistics to monitor (unchecked everywhere = buffer not monitored):"))
+        current = get_property_json(node, "monitor", {})
+        self._monitor = {}
+        for key, label, _default in MONITOR_STATS:
+            cb = QtWidgets.QCheckBox(label)
+            cb.setChecked(bool(current.get(key, False)))
+            ml.addWidget(cb)
+            self._monitor[key] = cb
+        ml.addStretch(1)
+        tabs.addTab(mon_tab, "Monitor")
+
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
 
@@ -1466,6 +1458,7 @@ class BufferMenuDialog(QtWidgets.QDialog):
         set_property_json(self.node, "valid_models", self.models.checked_models())
         self.node.set_property("capacity", self.capacity.get_value())
         self.node.set_property("buffer_type", self.buffer_type.currentData())
+        set_property_json(self.node, "monitor", {k: cb.isChecked() for k, cb in self._monitor.items()})
 
 
 class RouterMenuDialog(QtWidgets.QDialog):
@@ -1910,9 +1903,13 @@ class _OutputsWidget(QtWidgets.QWidget):
         if entry.get("resource") in self._names:
             combo.setCurrentText(entry["resource"])
         bl.addRow("resource", combo)
-        dist = SamplerWidget(entry.get("distribution")); bl.addRow("amount (≥0)", dist)
+        dist = SamplerWidget(entry.get("distribution")); bl.addRow("amount", dist)
+        lb = QtWidgets.QLineEdit(str(entry.get("lowerbound", 0.0))); lb.setMaximumWidth(90)
+        ub = QtWidgets.QLineEdit(str(entry.get("upperbound", 1.0))); ub.setMaximumWidth(90)
+        bl.addRow("lowerbound (≥ 0)", lb)
+        bl.addRow("upperbound (finite)", ub)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24); bl.addRow(rm)
-        rec = (box, combo, dist); rm.clicked.connect(lambda: self._remove(rec))
+        rec = (box, combo, dist, lb, ub); rm.clicked.connect(lambda: self._remove(rec))
         self._rows.append(rec); self._vl.addWidget(box)
 
     def _remove(self, rec):
@@ -1920,8 +1917,9 @@ class _OutputsWidget(QtWidgets.QWidget):
             self._rows.remove(rec); rec[0].setParent(None); rec[0].deleteLater()
 
     def value(self):
-        return [{"resource": c.currentText(), "distribution": d.get_value(), "lowerbound": 0.0, "upperbound": "inf"}
-                for _, c, d in self._rows if c.currentText()]
+        return [{"resource": c.currentText(), "distribution": d.get_value(),
+                 "lowerbound": as_float(lb.text()), "upperbound": as_float(ub.text(), 1.0)}
+                for _, c, d, lb, ub in self._rows if c.currentText()]
 
 
 class FlowEditorWindow(QtWidgets.QMainWindow):
@@ -1962,7 +1960,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             TaskNode,
             ResourceTaskNode,
             BreakdownNode,
-            MonitorNode,
         ])
 
         self.setCentralWidget(self.graph.widget)
@@ -2015,7 +2012,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             ("Piece Task", "simulation.flow.TaskNode"),
             ("Resource Task", "simulation.flow.ResourceTaskNode"),
             ("Breakdown", "simulation.flow.BreakdownNode"),
-            ("Monitor", "simulation.flow.MonitorNode"),
         ]:
             action = create_menu.addAction(label)
             action.triggered.connect(lambda checked=False, t=cls_name: self.create_node(t))
@@ -2283,6 +2279,49 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         else:
             qmessage(self, "Validation problems", "\n".join(problems[:50]), QtWidgets.QMessageBox.Warning)
 
+    def _outlet_valid_models(self, node):
+        """Effective valid-model set an outlet accepts, or None if it can't be resolved
+        statically (unconfigured buffer, or a router that isn't fed only by buffers)."""
+        kind = node_kind(node)
+        if kind == "Buffer":
+            vm = get_property_json(node, "valid_models", [])
+            return set(vm) if vm else None
+        if kind == "Router":
+            sets = []
+            for b in connected_nodes_from_port(node, "to_buffers", "output"):
+                if node_kind(b) != "Buffer":
+                    return None
+                vm = get_property_json(b, "valid_models", [])
+                if not vm:
+                    return None
+                sets.append(set(vm))
+            return set.intersection(*sets) if sets else None
+        return None
+
+    def _check_flushability(self, node, giver_models, out_port, label, problems):
+        """Mirror check_outlet_validity: a generator/piece-task's outlets must be pairwise
+        disjoint and together cover every model the giver emits. Skips silently when the
+        wiring is incomplete (other checks flag empties)."""
+        outlets = connected_nodes_from_port(node, out_port, "output")
+        if not outlets or not giver_models:
+            return
+        resolved = []
+        for o in outlets:
+            vm = self._outlet_valid_models(o)
+            if vm is None:
+                return
+            resolved.append((o, vm))
+        parents = _model_parents(self.model_registry)
+        for i in range(len(resolved)):
+            for j in range(i + 1, len(resolved)):
+                if not _takers_disjoint(resolved[i][1], resolved[j][1], parents):
+                    problems.append(f"{label} '{node.name()}': outlets '{resolved[i][0].name()}' and "
+                                    f"'{resolved[j][0].name()}' accept overlapping models (outlets must be disjoint).")
+        union = set().union(*[vm for _, vm in resolved])
+        for m in giver_models:
+            if not _taker_can_take(union, m, parents):
+                problems.append(f"{label} '{node.name()}': model '{m}' has no outlet that can accept it.")
+
     def validate_graph(self) -> List[str]:
         problems = []
         for c in self.connections_clean():
@@ -2299,6 +2338,20 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                         and pol.get("pending_carrier_pre_task_shift_end", {}).get("type") == "WaitForCarriers"):
                     problems.append(f"'{name}': ConstrainedByShift cannot be combined with "
                                     f"WaitForCarriers on pending_carrier_pre_task_shift_end.")
+                # priority must be in [0, 10]
+                if node.has_property("priority") and str(node.get_property("priority")) != "":
+                    if not 0 <= as_int(node.get_property("priority")) <= 10:
+                        problems.append(f"'{name}': task priority must be in [0, 10].")
+                # operators in one AND-alternative must share the same productivity
+                prod = {o.get("name"): json.dumps(o.get("productivity"), sort_keys=True)
+                        for o in self.operator_registry}
+                for field in ("operators", "loading_operators", "startup_operators"):
+                    for group in get_property_json(node, field, []):
+                        seen = {prod.get(g.get("operator")) for g in group if g.get("operator") in prod}
+                        if len(seen) > 1:
+                            problems.append(f"'{name}': operators in one alternative of '{field}' "
+                                            f"must share the same productivity.")
+                            break
             if kind == "Task":
                 if not connected_refs_from_port(node, "bufs_in", "input"):
                     problems.append(f"Piece Task '{name}' has no input buffers.")
@@ -2311,38 +2364,95 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     for m in mc:
                         if not m.get("duration"):
                             problems.append(f"Piece Task '{name}' model '{m.get('model')}' has no duration.")
+                    # non-discriminating collectors need uniform duration / carrier-capacity across models
+                    ct = str(node.get_property("collector_type") if node.has_property("collector_type") else "")
+                    if ct.startswith("NON_DISCRIMINATING"):
+                        for f, lbl in [("duration", "duration"),
+                                       ("min_carrier_capacity", "min_carrier_capacity"),
+                                       ("max_carrier_capacity", "max_carrier_capacity")]:
+                            if len({json.dumps(m.get(f), sort_keys=True) for m in mc}) > 1:
+                                problems.append(f"Piece Task '{name}': a non-discriminating collector requires "
+                                                f"all models to share the same {lbl}.")
+                    self._check_flushability(node, [m.get("model") for m in mc if m.get("model")],
+                                             "bufs_out", "Piece Task", problems)
 
             elif kind == "ResourceTask":
                 if not get_property_json(node, "duration", None):
                     problems.append(f"Resource Task '{name}' has no duration.")
-                if not get_property_json(node, "resources_out", []):
+                outs = get_property_json(node, "resources_out", [])
+                if not outs:
                     problems.append(f"Resource Task '{name}' has no output resources.")
+                for out in outs:
+                    if as_float(out.get("lowerbound", 0.0)) < 0:
+                        problems.append(f"Resource Task '{name}': output '{out.get('resource')}' "
+                                        f"lowerbound must be ≥ 0.")
+                    ub = out.get("upperbound", 1.0)
+                    if ub in ("inf", "Infinity") or as_float(ub, 1.0) == float("inf"):
+                        problems.append(f"Resource Task '{name}': output '{out.get('resource')}' "
+                                        f"upperbound must be finite.")
+                # transformed-resource proportions are treated as probabilities: in [0,1] and sum to 1
+                tr = get_property_json(node, "transformed_resources", [])
+                props = [as_float(t.get("proportion", 0.0)) for t in tr]
+                if not tr:
+                    problems.append(f"Resource Task '{name}': needs transformed resources whose proportions "
+                                    f"sum to 1 (the simulation rejects an empty set).")
+                elif any(p < 0 or p > 1 for p in props):
+                    problems.append(f"Resource Task '{name}': transformed-resource proportions must be in [0, 1].")
+                elif abs(sum(props) - 1.0) > 1e-6:
+                    problems.append(f"Resource Task '{name}': transformed-resource proportions must sum to 1 "
+                                    f"(currently {sum(props):g}).")
 
             elif kind == "Breakdown":
-                if not get_output_refs(node, "breakdown"):
+                tasks = connected_nodes_from_port(node, "breakdown", "output")
+                if not tasks:
                     problems.append(f"Breakdown '{name}' is not attached to a task.")
                 if not (get_property_json(node, "mtbf", {}) or {}):
                     problems.append(f"Breakdown '{name}' has no mtbf set.")
                 if not get_property_json(node, "mttr", None):
                     problems.append(f"Breakdown '{name}' has no mttr distribution.")
+                has_outlets = bool(get_output_refs(node, "bufs_out"))
+                for t in tasks:
+                    if node_kind(t) == "Task" and not has_outlets:
+                        problems.append(f"Breakdown '{name}' on piece task '{t.name()}' must have "
+                                        f"lifeboat outlets for in-progress pieces.")
+                    elif node_kind(t) == "ResourceTask" and has_outlets:
+                        problems.append(f"Breakdown '{name}' on resource task '{t.name()}' cannot have outlets.")
 
             elif kind == "PieceGenerator":
-                if not get_property_json(node, "models_goals", []):
+                goals = get_property_json(node, "models_goals", [])
+                if not goals:
                     problems.append(f"Piece Generator '{name}' has no model goals.")
                 if not get_output_refs(node, "bufs_out"):
                     problems.append(f"Piece Generator '{name}' has no outlets.")
+                self._check_flushability(node, [g.get("model") for g in goals if g.get("model")],
+                                         "bufs_out", "Piece Generator", problems)
 
             elif kind == "Buffer":
                 if not get_property_json(node, "valid_models", []):
                     problems.append(f"Buffer '{name}' has no valid models.")
 
             elif kind == "Router":
-                if not connected_refs_from_port(node, "to_buffers", "output"):
+                out_bufs = connected_nodes_from_port(node, "to_buffers", "output")
+                if not out_bufs:
                     problems.append(f"Router '{name}' has no output buffers.")
+                else:
+                    vmsets = [set(get_property_json(b, "valid_models", []))
+                              for b in out_bufs if node_kind(b) == "Buffer"]
+                    if vmsets and all(vmsets) and not set.intersection(*vmsets):
+                        problems.append(f"Router '{name}': its buffers share no common valid model "
+                                        f"(router outlets must overlap).")
 
-            elif kind == "Monitor":
-                if not get_input_ref(node, "buffer"):
-                    problems.append(f"Monitor '{name}' is not attached to a buffer.")
+            elif kind == "Shutdowns":
+                ivs = get_property_json(node, "intervals", [])
+                if any(as_float(iv.get("end")) < as_float(iv.get("start")) for iv in ivs):
+                    problems.append(f"Shutdowns '{name}': an interval has end before start.")
+                sv = sorted(ivs, key=lambda x: as_float(x.get("start")))
+                for a, b in zip(sv, sv[1:]):
+                    if not (min(as_float(a.get("end")), as_float(b.get("end")))
+                            < max(as_float(a.get("start")), as_float(b.get("start")))):
+                        problems.append(f"Shutdowns '{name}': intervals overlap or touch "
+                                        f"(they must be pairwise disjoint).")
+                        break
 
         # Aggregate (whole-graph) checks.
         buffer_types = [node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
@@ -2473,7 +2583,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "Task": "simulation.flow.TaskNode",
             "ResourceTask": "simulation.flow.ResourceTaskNode",
             "Breakdown": "simulation.flow.BreakdownNode",
-            "Monitor": "simulation.flow.MonitorNode",
         }
         if kind not in mapping:
             raise ValueError(f"Unknown node kind in JSON: {kind}")
@@ -2483,7 +2592,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     # from the same-named keys. Structured (JSON) properties vs plain scalars:
     _IMPORT_JSON_PROPS = {
         "Shutdowns": ["intervals"],
-        "Buffer": ["valid_models"],
+        "Buffer": ["valid_models", "monitor"],
         "PieceGenerator": ["models_goals", "shifts"],
         "Task": ["models_configs", "startup_duration", "loading_duration", "operators",
                  "loading_operators", "startup_operators", "task_shifts", "policies"],
@@ -2528,11 +2637,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 if bid:
                     prob_map[bid] = item.get("probability", {"kind": "constant", "value": 0.0})
             self.set_json_property_safe(node, "buffer_probs", prob_map)
-
-        elif kind == "Monitor":
-            stats = node_data.get("stats", {}) or {}
-            for key, _label, default in MONITOR_STATS:
-                set_bool_prop(node, key, bool(stats.get(key, default)))
 
     def import_clean_json_dialog(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Import clean JSON", "", "JSON (*.json)")

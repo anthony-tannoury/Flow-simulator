@@ -85,7 +85,7 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.8
+            "value": 1.0
           }
         }
       },
@@ -276,6 +276,16 @@
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": true,
+        "max_length": true,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": true,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": true
+      },
       "inputs_from": [
         "gen"
       ],
@@ -471,6 +481,16 @@
       ],
       "capacity": "inf",
       "buffer_type": "EXIT",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
       "inputs_from": [
         "router"
       ],
@@ -485,10 +505,21 @@
       "kind": "Buffer",
       "name": "Scrap",
       "valid_models": [
-        "Widget"
+        "WidgetA",
+        "WidgetB"
       ],
       "capacity": "inf",
       "buffer_type": "SCRAP",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
       "inputs_from": [
         "router",
         "jam"
@@ -512,7 +543,7 @@
       "transformed_resources": [
         {
           "resource": "primer",
-          "proportion": 0.8,
+          "proportion": 1.0,
           "salvageable": true
         }
       ],
@@ -533,7 +564,7 @@
             }
           },
           "lowerbound": 0.0,
-          "upperbound": "inf"
+          "upperbound": 2.0
         }
       ],
       "duration": {
@@ -643,26 +674,6 @@
         -110.0,
         -220.0
       ]
-    },
-    {
-      "id": "mon",
-      "kind": "Monitor",
-      "name": "Raw-buffer Stats",
-      "buffer": "buf_raw",
-      "stats": {
-        "avg_length": true,
-        "max_length": true,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": true,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": true
-      },
-      "position": [
-        -650.0,
-        200.0
-      ]
     }
   ],
   "connections": [
@@ -681,14 +692,6 @@
       "to_node": "weld",
       "to_kind": "Task",
       "to_port": "bufs_in"
-    },
-    {
-      "from_node": "buf_raw",
-      "from_kind": "Buffer",
-      "from_port": "monitor",
-      "to_node": "mon",
-      "to_kind": "Monitor",
-      "to_port": "buffer"
     },
     {
       "from_node": "weld",
