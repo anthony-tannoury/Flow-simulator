@@ -268,7 +268,6 @@
   ],
   "stopping_criterion": {
     "type": "ByPiecesProduced",
-    "total": 200,
     "timeout": "inf"
   },
   "start_date": "05-01-2026 00:00",
