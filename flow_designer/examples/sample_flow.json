@@ -103,8 +103,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 480,
-              "end": 1020
+              "start": "08:00",
+              "end": "17:00"
             }
           ]
         },
@@ -112,8 +112,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 480,
-              "end": 1020
+              "start": "08:00",
+              "end": "17:00"
             }
           ]
         },
@@ -121,8 +121,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 480,
-              "end": 1020
+              "start": "08:00",
+              "end": "17:00"
             }
           ]
         },
@@ -130,8 +130,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 480,
-              "end": 1020
+              "start": "08:00",
+              "end": "17:00"
             }
           ]
         },
@@ -139,8 +139,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 480,
-              "end": 1020
+              "start": "08:00",
+              "end": "17:00"
             }
           ]
         },
@@ -166,8 +166,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 1200,
-              "end": 1440
+              "start": "20:00",
+              "end": "24:00"
             }
           ]
         },
@@ -175,8 +175,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 1200,
-              "end": 1440
+              "start": "20:00",
+              "end": "24:00"
             }
           ]
         },
@@ -184,8 +184,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 1200,
-              "end": 1440
+              "start": "20:00",
+              "end": "24:00"
             }
           ]
         },
@@ -193,8 +193,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 1200,
-              "end": 1440
+              "start": "20:00",
+              "end": "24:00"
             }
           ]
         },
@@ -202,8 +202,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 1200,
-              "end": 1440
+              "start": "20:00",
+              "end": "24:00"
             }
           ]
         },
@@ -211,8 +211,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 1200,
-              "end": 1440
+              "start": "20:00",
+              "end": "24:00"
             }
           ]
         },
@@ -220,8 +220,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 1200,
-              "end": 1440
+              "start": "20:00",
+              "end": "24:00"
             }
           ]
         }
@@ -446,7 +446,7 @@
       "max_capacity": 6.0,
       "contiguous_carriers": true,
       "independent_carriers": false,
-      "timeout": 1000000000.0,
+      "timeout": "inf",
       "priority": 6,
       "collector_type": "DISCRIMINATING_GREEDY",
       "bufs_in": [
@@ -641,10 +641,12 @@
       "max_carrier_capacity": 2.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 1000000000.0,
+      "timeout": 240.0,
       "priority": 4,
       "shutdowns": [],
-      "breakdowns": [],
+      "breakdowns": [
+        "spray"
+      ],
       "position": [
         -380.0,
         260.0
@@ -696,6 +698,38 @@
       "position": [
         -110.0,
         -220.0
+      ]
+    },
+    {
+      "id": "spray",
+      "kind": "Breakdown",
+      "name": "Sprayer Fault",
+      "task": "paint",
+      "mtbf": {
+        "mode": "distribution",
+        "distribution": {
+          "dist_type": "Exponential",
+          "params": {
+            "mean": {
+              "kind": "constant",
+              "value": 3000.0
+            }
+          }
+        }
+      },
+      "mttr": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 30.0
+          }
+        }
+      },
+      "outlets": [],
+      "position": [
+        -640.0,
+        440.0
       ]
     }
   ],
@@ -763,6 +797,14 @@
       "to_node": "buf_scrap",
       "to_kind": "Buffer",
       "to_port": "from_task"
+    },
+    {
+      "from_node": "spray",
+      "from_kind": "Breakdown",
+      "from_port": "breakdown",
+      "to_node": "paint",
+      "to_kind": "ResourceTask",
+      "to_port": "breakdowns"
     }
   ],
   "backdrops": []

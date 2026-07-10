@@ -771,15 +771,12 @@ class InfFloatWidget(QtWidgets.QWidget):
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
-def _fmt_num(x: float) -> str:
-    return str(int(x)) if float(x) == int(x) else str(x)
-
-
 class HourMinuteWidget(QtWidgets.QWidget):
-    """A time of day entered as hours + minutes; the stored value is raw minutes,
-    matching the simulation's Time(h, m) = 60*h + m."""
+    """A time of day entered as hours + minutes; the stored/returned value is an
+    "hh:mm" string (e.g. "08:30"). Raw minutes are still accepted on load, so
+    older files keep working."""
 
-    def __init__(self, value=0.0, parent=None):
+    def __init__(self, value="00:00", parent=None):
         super().__init__(parent)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -791,15 +788,18 @@ class HourMinuteWidget(QtWidgets.QWidget):
         self.set_value(value)
 
     def set_value(self, value):
-        minutes = as_float(value)
-        if minutes in (float("inf"), float("-inf")) or minutes != minutes:
-            minutes = 0.0
-        hours = int(minutes // 60)
-        self.h.setText(str(hours))
-        self.m.setText(_fmt_num(minutes - 60 * hours))
+        if isinstance(value, str) and ":" in value:
+            hh, _, mm = value.partition(":")
+            h, m = as_int(hh), as_int(mm)
+        else:  # legacy: raw minutes from midnight
+            minutes = as_float(value)
+            if minutes != minutes or minutes in (float("inf"), float("-inf")):
+                minutes = 0.0
+            h, m = int(minutes // 60), int(minutes % 60)
+        self.h.setText(str(h)); self.m.setText(str(m))
 
     def get_value(self):
-        return 60 * as_float(self.h.text()) + as_float(self.m.text())
+        return f"{as_int(self.h.text()):02d}:{as_int(self.m.text()):02d}"
 
 
 # Absolute calendar formats. Date+time is used by the simulation start date, custom
@@ -899,7 +899,7 @@ class DateListWidget(QtWidgets.QWidget):
 
 
 class _IntervalRow(QtWidgets.QWidget):
-    def __init__(self, start=480.0, end=1020.0, on_remove=None, parent=None):
+    def __init__(self, start="08:00", end="17:00", on_remove=None, parent=None):
         super().__init__(parent)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -936,11 +936,11 @@ class _DayRow(QtWidgets.QWidget):
         outer.addWidget(self._box, 1)
         self.chk.toggled.connect(self._box.setEnabled)
         for iv in (intervals or []):
-            self._add(iv.get("start", 480.0), iv.get("end", 1020.0))
+            self._add(iv.get("start", "08:00"), iv.get("end", "17:00"))
         self.chk.setChecked(working)
         self._box.setEnabled(working)
 
-    def _add(self, start=480.0, end=1020.0):
+    def _add(self, start="08:00", end="17:00"):
         row = _IntervalRow(start, end, on_remove=self._remove)
         self._rows.append(row)
         self._vl.insertWidget(self._vl.count() - 1, row)  # keep the add button last
