@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import sys
 import uuid
@@ -1538,6 +1539,76 @@ def _takers_disjoint(a: set, b: set, parents: dict) -> bool:
                 or any(_taker_can_take(b, m, parents) for m in a))
 
 
+# ------------------------------------------------------------------
+# Registry ids. Internally the designer references models/resources/operators/
+# shifts by name (unique per registry); the exported JSON references them by a
+# stable id instead, so a rename or a duplicate name can never break a link.
+# Names <-> ids are translated only at the export/import boundary.
+# ------------------------------------------------------------------
+
+def ensure_ids(entries: list, prefix: str, old_by_name: dict | None = None) -> list:
+    """Give every registry entry a stable id, reusing an existing one (matched by
+    name against old_by_name) so ids survive edits, else minting a fresh one."""
+    old_by_name = old_by_name or {}
+    for e in entries:
+        if not e.get("id"):
+            e["id"] = old_by_name.get(e.get("name")) or new_uid(prefix)
+    return entries
+
+
+def _shift_export_shape(s: dict) -> dict:
+    """Only the fields a shift's mode actually uses: weekly keeps days/horizon,
+    custom keeps custom_intervals; both keep days_off. mode is always present."""
+    mode = s.get("mode", "weekly")
+    out = {"id": s.get("id"), "name": s.get("name"), "mode": mode,
+           "days_off": s.get("days_off", [])}
+    if mode == "custom":
+        out["custom_intervals"] = s.get("custom_intervals", [])
+    else:
+        out["days"] = s.get("days", [])
+        out["horizon"] = s.get("horizon", {})
+    return out
+
+
+def _apply_ref_map(nodes, models, resources, operators, resolve) -> None:
+    """Translate every registry reference (model/resource/operator/shift) in place,
+    via resolve(kind, value) -> value. Node-to-node wires (node uids) are untouched."""
+    for m in models:
+        if m.get("parent"):
+            m["parent"] = resolve("model", m["parent"])
+    for o in operators:
+        if o.get("shifts"):
+            o["shifts"] = [resolve("shift", s) for s in o["shifts"]]
+    for n in nodes:
+        k = n.get("kind")
+        if k == "Buffer":
+            n["valid_models"] = [resolve("model", x) for x in n.get("valid_models", [])]
+        elif k == "PieceGenerator":
+            for g in n.get("models_goals", []):
+                if "model" in g:
+                    g["model"] = resolve("model", g["model"])
+            n["shifts"] = [resolve("shift", s) for s in n.get("shifts", [])]
+        elif k in ("Task", "ResourceTask"):
+            if k == "Task":
+                for mc in n.get("models_configs", []):
+                    if "model" in mc:
+                        mc["model"] = resolve("model", mc["model"])
+                    for r in mc.get("resources", []):
+                        if "resource" in r:
+                            r["resource"] = resolve("resource", r["resource"])
+            else:
+                for fld in ("non_transformed_resources", "transformed_resources", "resources_out"):
+                    for r in n.get(fld, []):
+                        if "resource" in r:
+                            r["resource"] = resolve("resource", r["resource"])
+            for fld in ("operators", "loading_operators", "startup_operators"):
+                for alt in n.get(fld, []):
+                    for mem in alt:
+                        if "operator" in mem:
+                            mem["operator"] = resolve("operator", mem["operator"])
+            n["task_shifts"] = [resolve("shift", s) for s in n.get("task_shifts", [])]
+
+
 def _check_date_intervals(label, intervals, start_dt, problems):
     """Shared checks for a list of absolute {start, end} date intervals (shutdowns,
     custom shifts): dates parse, each ends after it starts, pairwise disjoint, and
@@ -2333,11 +2404,15 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.stopping_criterion = {}
         self.start_date = "01-01-2026 00:00"
 
+    @staticmethod
+    def _ids_by_name(entries):
+        return {e.get("name"): e.get("id") for e in entries if e.get("id")}
+
     def edit_models(self):
         dlg = ModelRegistryDialog(self, self.model_registry)
         if dlg.exec():
             try:
-                self.model_registry = dlg.models()
+                self.model_registry = ensure_ids(dlg.models(), "model", self._ids_by_name(self.model_registry))
                 self.statusBar().showMessage(f"{len(self.model_registry)} models defined.")
             except Exception as e:
                 qmessage(self, "Invalid models", str(e), QtWidgets.QMessageBox.Warning)
@@ -2345,20 +2420,20 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def edit_resources(self):
         dlg = ResourceRegistryDialog(self, self.resource_registry)
         if dlg.exec():
-            self.resource_registry = dlg.entries()
+            self.resource_registry = ensure_ids(dlg.entries(), "resource", self._ids_by_name(self.resource_registry))
             self.statusBar().showMessage(f"{len(self.resource_registry)} resources defined.")
 
     def edit_operators(self):
         shift_names = [s.get("name", "") for s in self.shift_registry if s.get("name")]
         dlg = OperatorRegistryDialog(self, self.operator_registry, shift_names=shift_names)
         if dlg.exec():
-            self.operator_registry = dlg.entries()
+            self.operator_registry = ensure_ids(dlg.entries(), "operator", self._ids_by_name(self.operator_registry))
             self.statusBar().showMessage(f"{len(self.operator_registry)} operator groups defined.")
 
     def edit_shifts(self):
         dlg = ShiftRegistryDialog(self, self.shift_registry)
         if dlg.exec():
-            self.shift_registry = dlg.entries()
+            self.shift_registry = ensure_ids(dlg.entries(), "shift", self._ids_by_name(self.shift_registry))
             self.statusBar().showMessage(f"{len(self.shift_registry)} shift definitions.")
 
     def edit_simulation_settings(self):
@@ -2481,12 +2556,31 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 node_data = node.to_clean_json()
                 if node_data and node_data.get("kind"):
                     nodes.append(node_data)
+
+        # Registries carry a stable id; references in nodes/registries are emitted as
+        # those ids, not names. Work on copies so the live (name-based) state is untouched.
+        ensure_ids(self.model_registry, "model")
+        ensure_ids(self.resource_registry, "resource")
+        ensure_ids(self.operator_registry, "operator")
+        ensure_ids(self.shift_registry, "shift")
+        models = copy.deepcopy(self.model_registry)
+        resources = copy.deepcopy(self.resource_registry)
+        operators = copy.deepcopy(self.operator_registry)
+        shifts = [_shift_export_shape(copy.deepcopy(s)) for s in self.shift_registry]
+        name_to_id = {
+            "model": {m["name"]: m["id"] for m in models if m.get("name") and m.get("id")},
+            "resource": {r["name"]: r["id"] for r in resources if r.get("name") and r.get("id")},
+            "operator": {o["name"]: o["id"] for o in operators if o.get("name") and o.get("id")},
+            "shift": {s["name"]: s["id"] for s in shifts if s.get("name") and s.get("id")},
+        }
+        _apply_ref_map(nodes, models, resources, operators,
+                       lambda kind, v: name_to_id[kind].get(v, v))
         return {
             "editor": {"name": APP_NAME, "version": EDITOR_VERSION, "format": "clean-json"},
-            "models": self.model_registry,
-            "resources": self.resource_registry,
-            "operators": self.operator_registry,
-            "shifts": self.shift_registry,
+            "models": models,
+            "resources": resources,
+            "operators": operators,
+            "shifts": shifts,
             "stopping_criterion": self.stopping_criterion,
             "start_date": self.start_date,
             "nodes": nodes,
@@ -2954,6 +3048,20 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     item["position"] = [pos[0] + dx, pos[1] + dy]
         return data
 
+    def _resolve_ref_ids_to_names(self, data: dict) -> dict:
+        """Inverse of the export's name->id mapping: rewrite id references in the
+        imported nodes/registries back to names, so the internal (name-based) model
+        keeps working. Old files that already reference by name are left untouched
+        (their registries carry no ids, so the maps are empty)."""
+        data = json.loads(json.dumps(data))  # never mutate the caller's dict
+        regs = {"model": data.get("models", []), "resource": data.get("resources", []),
+                "operator": data.get("operators", []), "shift": data.get("shifts", [])}
+        id_to_name = {k: {e["id"]: e["name"] for e in v if e.get("id") and e.get("name")}
+                      for k, v in regs.items()}
+        _apply_ref_map(data.get("nodes", []), regs["model"], regs["resource"], regs["operator"],
+                       lambda kind, v: id_to_name[kind].get(v, v))
+        return data
+
     def _merge_models(self, imported_models: list) -> None:
         if not hasattr(self, "model_registry") or self.model_registry is None:
             self.model_registry = []
@@ -2967,7 +3075,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 if (existing[name].get("parent") or None) != (model.get("parent") or None):
                     conflicts.append(name)
                 continue
-            entry = {"name": name, "parent": model.get("parent") or None}
+            entry = {"name": name, "parent": model.get("parent") or None, "id": model.get("id")}
             self.model_registry.append(entry)
             existing[name] = entry
         if conflicts:
@@ -2988,12 +3096,17 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         setattr(self, attr, reg)
 
     def import_clean_json(self, data: dict):
+        data = self._resolve_ref_ids_to_names(data)
         data = self._remap_ids(data)
         data = self._offset_imported_positions(data)
         self._merge_models(data.get("models", []))
         self._merge_named_registry("resource_registry", data.get("resources", []))
         self._merge_named_registry("operator_registry", data.get("operators", []))
         self._merge_named_registry("shift_registry", data.get("shifts", []))
+        ensure_ids(self.model_registry, "model")
+        ensure_ids(self.resource_registry, "resource")
+        ensure_ids(self.operator_registry, "operator")
+        ensure_ids(self.shift_registry, "shift")
         if not self.stopping_criterion and data.get("stopping_criterion"):
             self.stopping_criterion = data["stopping_criterion"]
         if data.get("start_date"):

@@ -6,20 +6,24 @@
   },
   "models": [
     {
+      "id": "m_widget",
       "name": "Widget",
       "parent": null
     },
     {
+      "id": "m_widgetA",
       "name": "WidgetA",
-      "parent": "Widget"
+      "parent": "m_widget"
     },
     {
+      "id": "m_widgetB",
       "name": "WidgetB",
-      "parent": "Widget"
+      "parent": "m_widget"
     }
   ],
   "resources": [
     {
+      "id": "r_steel",
       "name": "steel",
       "restockable": false,
       "lifespan": "inf",
@@ -27,6 +31,7 @@
       "initial_capacity": 500.0
     },
     {
+      "id": "r_primer",
       "name": "primer",
       "restockable": true,
       "lifespan": "inf",
@@ -53,6 +58,7 @@
       "threshold": 20.0
     },
     {
+      "id": "r_painted",
       "name": "painted_body",
       "restockable": false,
       "lifespan": "inf",
@@ -62,6 +68,7 @@
   ],
   "operators": [
     {
+      "id": "o_welders",
       "name": "welders",
       "capacity": 3,
       "productivity": {
@@ -74,10 +81,11 @@
         }
       },
       "shifts": [
-        "day"
+        "s_day"
       ]
     },
     {
+      "id": "o_helpers",
       "name": "helpers",
       "capacity": 2,
       "productivity": {
@@ -90,14 +98,17 @@
         }
       },
       "shifts": [
-        "day",
-        "night"
+        "s_day",
+        "s_night"
       ]
     }
   ],
   "shifts": [
     {
+      "id": "s_day",
       "name": "day",
+      "mode": "weekly",
+      "days_off": [],
       "days": [
         {
           "working": true,
@@ -153,99 +164,96 @@
           "intervals": []
         }
       ],
-      "days_off": [],
       "horizon": {
         "start": "05-01-2026",
         "end": "02-02-2026"
       }
     },
     {
+      "id": "s_night",
       "name": "night",
-      "days": [
-        {
-          "working": true,
-          "intervals": [
-            {
-              "start": "20:00",
-              "end": "24:00"
-            }
-          ]
-        },
-        {
-          "working": true,
-          "intervals": [
-            {
-              "start": "20:00",
-              "end": "24:00"
-            }
-          ]
-        },
-        {
-          "working": true,
-          "intervals": [
-            {
-              "start": "20:00",
-              "end": "24:00"
-            }
-          ]
-        },
-        {
-          "working": true,
-          "intervals": [
-            {
-              "start": "20:00",
-              "end": "24:00"
-            }
-          ]
-        },
-        {
-          "working": true,
-          "intervals": [
-            {
-              "start": "20:00",
-              "end": "24:00"
-            }
-          ]
-        },
-        {
-          "working": true,
-          "intervals": [
-            {
-              "start": "20:00",
-              "end": "24:00"
-            }
-          ]
-        },
-        {
-          "working": true,
-          "intervals": [
-            {
-              "start": "20:00",
-              "end": "24:00"
-            }
-          ]
-        }
-      ],
+      "mode": "weekly",
       "days_off": [
         "12-01-2026",
         "19-01-2026"
       ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "20:00",
+              "end": "24:00"
+            }
+          ]
+        }
+      ],
       "horizon": {
         "start": "05-01-2026",
         "end": "02-02-2026"
       }
     },
     {
+      "id": "s_audit",
       "name": "audit-window",
       "mode": "custom",
-      "days": [],
       "days_off": [
         "13-01-2026"
       ],
-      "horizon": {
-        "start": "05-01-2026",
-        "end": "02-02-2026"
-      },
       "custom_intervals": [
         {
           "start": "12-01-2026 00:00",
@@ -271,16 +279,16 @@
       "name": "Bodies In",
       "models_goals": [
         {
-          "model": "WidgetA",
+          "model": "m_widgetA",
           "goal": 120
         },
         {
-          "model": "WidgetB",
+          "model": "m_widgetB",
           "goal": 80
         }
       ],
       "shifts": [
-        "day"
+        "s_day"
       ],
       "outlets": [
         "buf_raw"
@@ -295,7 +303,7 @@
       "kind": "Buffer",
       "name": "Raw Bodies",
       "valid_models": [
-        "Widget"
+        "m_widget"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -326,7 +334,7 @@
       "name": "Weld & Assemble",
       "models_configs": [
         {
-          "model": "WidgetA",
+          "model": "m_widgetA",
           "duration": {
             "dist_type": "Constant",
             "params": {
@@ -338,7 +346,7 @@
           },
           "resources": [
             {
-              "resource": "steel",
+              "resource": "r_steel",
               "value": 2.0
             }
           ],
@@ -346,7 +354,7 @@
           "max_carrier_capacity": 2
         },
         {
-          "model": "WidgetB",
+          "model": "m_widgetB",
           "duration": {
             "dist_type": "Normal",
             "params": {
@@ -365,7 +373,7 @@
           },
           "resources": [
             {
-              "resource": "steel",
+              "resource": "r_steel",
               "value": 3.0
             }
           ],
@@ -394,17 +402,17 @@
       "operators": [
         [
           {
-            "operator": "welders",
+            "operator": "o_welders",
             "count": 1
           },
           {
-            "operator": "helpers",
+            "operator": "o_helpers",
             "count": 1
           }
         ],
         [
           {
-            "operator": "welders",
+            "operator": "o_welders",
             "count": 2
           }
         ]
@@ -412,14 +420,14 @@
       "loading_operators": [
         [
           {
-            "operator": "helpers",
+            "operator": "o_helpers",
             "count": 1
           }
         ]
       ],
       "startup_operators": [],
       "task_shifts": [
-        "day"
+        "s_day"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -499,8 +507,8 @@
       "kind": "Buffer",
       "name": "Passed QC",
       "valid_models": [
-        "WidgetA",
-        "WidgetB"
+        "m_widgetA",
+        "m_widgetB"
       ],
       "capacity": "inf",
       "buffer_type": "EXIT",
@@ -528,8 +536,8 @@
       "kind": "Buffer",
       "name": "Scrap",
       "valid_models": [
-        "WidgetA",
-        "WidgetB"
+        "m_widgetA",
+        "m_widgetB"
       ],
       "capacity": "inf",
       "buffer_type": "SCRAP",
@@ -559,20 +567,20 @@
       "name": "Paint Line",
       "non_transformed_resources": [
         {
-          "resource": "steel",
+          "resource": "r_steel",
           "value": 1.0
         }
       ],
       "transformed_resources": [
         {
-          "resource": "primer",
+          "resource": "r_primer",
           "proportion": 1.0,
           "salvageable": true
         }
       ],
       "resources_out": [
         {
-          "resource": "painted_body",
+          "resource": "r_painted",
           "distribution": {
             "dist_type": "Normal",
             "params": {
@@ -620,7 +628,7 @@
       "operators": [
         [
           {
-            "operator": "helpers",
+            "operator": "o_helpers",
             "count": 1
           }
         ]
@@ -628,8 +636,8 @@
       "loading_operators": [],
       "startup_operators": [],
       "task_shifts": [
-        "day",
-        "night"
+        "s_day",
+        "s_night"
       ],
       "policies": {},
       "resource_scope": "PER_BATCH",
