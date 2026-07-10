@@ -776,58 +776,53 @@ def _fmt_num(x: float) -> str:
 
 
 class HourMinuteWidget(QtWidgets.QWidget):
-    """A point in time entered as hours + minutes; the stored value is raw minutes,
-    matching the simulation's Time(h, m) = 60*h + m. With allow_inf, an 'infinite'
-    checkbox makes get_value() return the string \"inf\" (like InfFloatWidget)."""
+    """A time of day entered as hours + minutes; the stored value is raw minutes,
+    matching the simulation's Time(h, m) = 60*h + m."""
 
-    def __init__(self, value=0.0, allow_inf=False, parent=None):
+    def __init__(self, value=0.0, parent=None):
         super().__init__(parent)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        self.chk = None
-        if allow_inf:
-            self.chk = QtWidgets.QCheckBox("infinite")
-            lay.addWidget(self.chk)
         self.h = QtWidgets.QLineEdit(); self.h.setMaximumWidth(48)
         self.m = QtWidgets.QLineEdit(); self.m.setMaximumWidth(48)
         lay.addWidget(self.h); lay.addWidget(QtWidgets.QLabel("h"))
         lay.addWidget(self.m); lay.addWidget(QtWidgets.QLabel("m"))
         lay.addStretch(1)
-        if self.chk is not None:
-            self.chk.toggled.connect(self.h.setDisabled)
-            self.chk.toggled.connect(self.m.setDisabled)
         self.set_value(value)
 
     def set_value(self, value):
-        infinite = (value in ("inf", "Infinity") or (isinstance(value, float) and value == float("inf")))
-        if self.chk is not None:
-            self.chk.setChecked(infinite)
-        if infinite:
-            self.h.setText(""); self.m.setText("")
-            self.h.setDisabled(True); self.m.setDisabled(True)
-            return
         minutes = as_float(value)
+        if minutes in (float("inf"), float("-inf")) or minutes != minutes:
+            minutes = 0.0
         hours = int(minutes // 60)
         self.h.setText(str(hours))
         self.m.setText(_fmt_num(minutes - 60 * hours))
-        self.h.setDisabled(False); self.m.setDisabled(False)
 
     def get_value(self):
-        if self.chk is not None and self.chk.isChecked():
-            return "inf"
         return 60 * as_float(self.h.text()) + as_float(self.m.text())
 
 
-# Absolute date+time format used by custom shift intervals and the simulation start
-# date. Qt syntax below; the Python strptime equivalent is "%d-%m-%Y %H:%M".
+# Absolute calendar formats. Date+time is used by the simulation start date, custom
+# shift intervals, shutdown intervals and the ByTime stopping date; date-only is used
+# by days off and shift horizons. Qt syntax below; Python strptime equivalents follow.
 DATE_TIME_FORMAT = "dd-MM-yyyy HH:mm"
 PY_DATE_TIME_FORMAT = "%d-%m-%Y %H:%M"
+DATE_FORMAT = "dd-MM-yyyy"
+PY_DATE_FORMAT = "%d-%m-%Y"
 
 
 def parse_date_time(text):
     """dd-mm-yyyy hh:mm -> datetime, or None if malformed."""
     try:
         return datetime.strptime(str(text).strip(), PY_DATE_TIME_FORMAT)
+    except Exception:
+        return None
+
+
+def parse_date(text):
+    """dd-mm-yyyy -> datetime (midnight), or None if malformed."""
+    try:
+        return datetime.strptime(str(text).strip(), PY_DATE_FORMAT)
     except Exception:
         return None
 
@@ -851,6 +846,56 @@ class DateTimeWidget(QtWidgets.QDateTimeEdit):
 
     def get_value(self):
         return self.dateTime().toString(DATE_TIME_FORMAT)
+
+
+class DateWidget(QtWidgets.QDateEdit):
+    """Calendar-popup picker for a date-only 'dd-mm-yyyy' (days off, horizons)."""
+
+    def __init__(self, value="", parent=None):
+        super().__init__(parent)
+        self.setCalendarPopup(True)
+        self.setDisplayFormat(DATE_FORMAT)
+        self.set_value(value)
+
+    def set_value(self, value):
+        d = QtCore.QDate.fromString(str(value or ""), DATE_FORMAT)
+        if not d.isValid():
+            d = QtCore.QDate(2026, 1, 1)
+        self.setDate(d)
+
+    def get_value(self):
+        return self.date().toString(DATE_FORMAT)
+
+
+class DateListWidget(QtWidgets.QWidget):
+    """A vertical list of date-only pickers with an add button (e.g. days off)."""
+
+    def __init__(self, dates=None, add_label="+ date", parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton(add_label); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        self._rows = []
+        for d in (dates or []):
+            self._add(d)
+
+    def _add(self, value=None):
+        row = QtWidgets.QWidget()
+        rl = QtWidgets.QHBoxLayout(row); rl.setContentsMargins(0, 0, 0, 0)
+        picker = DateWidget(value or "01-01-2026")
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
+        rl.addWidget(picker); rl.addWidget(rm); rl.addStretch(1)
+        rec = (row, picker)
+        rm.clicked.connect(lambda: self._remove(rec))
+        self._rows.append(rec); self._vl.addWidget(row)
+
+    def _remove(self, rec):
+        if rec in self._rows:
+            self._rows.remove(rec); rec[0].setParent(None); rec[0].deleteLater()
+
+    def value(self):
+        return [picker.get_value() for _, picker in self._rows]
 
 
 class _IntervalRow(QtWidgets.QWidget):
@@ -986,16 +1031,16 @@ class ShiftEditorDialog(QtWidgets.QDialog):
             self.day_rows.append(row)
             wl.addWidget(row)
         form2 = QtWidgets.QFormLayout()
-        self.days_off = QtWidgets.QLineEdit(",".join(str(d) for d in entry.get("days_off", [])))
-        form2.addRow("days off (integer day numbers from t=0, comma-separated)", self.days_off)
-        hz = entry.get("horizon", {"start": 0, "end": 7})
+        self.days_off = DateListWidget(entry.get("days_off", []), add_label="+ day off")
+        form2.addRow("days off (whole days)", self.days_off)
+        hz = entry.get("horizon", {})
         hbox = QtWidgets.QHBoxLayout()
-        self.h_start = QtWidgets.QLineEdit(str(hz.get("start", 0))); self.h_start.setMaximumWidth(70)
-        self.h_end = QtWidgets.QLineEdit(str(hz.get("end", 7))); self.h_end.setMaximumWidth(70)
-        hbox.addWidget(QtWidgets.QLabel("start day:")); hbox.addWidget(self.h_start)
-        hbox.addWidget(QtWidgets.QLabel("end day:")); hbox.addWidget(self.h_end); hbox.addStretch(1)
+        self.h_start = DateWidget(hz.get("start"))
+        self.h_end = DateWidget(hz.get("end"))
+        hbox.addWidget(QtWidgets.QLabel("from day:")); hbox.addWidget(self.h_start)
+        hbox.addWidget(QtWidgets.QLabel("to day:")); hbox.addWidget(self.h_end); hbox.addStretch(1)
         hw = QtWidgets.QWidget(); hw.setLayout(hbox)
-        form2.addRow("horizon (in days)", hw)
+        form2.addRow("horizon", hw)
         wl.addLayout(form2)
         self.tabs.addTab(weekly, "Weekly")
 
@@ -1016,13 +1061,12 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         lay.addWidget(bb)
 
     def data(self):
-        days_off = [as_int(x) for x in self.days_off.text().split(",") if x.strip() != ""]
         return {
             "name": self.name.text().strip(),
             "mode": "custom" if self.tabs.currentIndex() == 1 else "weekly",
             "days": [r.data() for r in self.day_rows],
-            "days_off": days_off,
-            "horizon": {"start": as_int(self.h_start.text()), "end": as_int(self.h_end.text())},
+            "days_off": self.days_off.value(),
+            "horizon": {"start": self.h_start.get_value(), "end": self.h_end.get_value()},
             "custom_intervals": self.custom.value(),
         }
 
@@ -1479,29 +1523,29 @@ def _takers_disjoint(a: set, b: set, parents: dict) -> bool:
                 or any(_taker_can_take(b, m, parents) for m in a))
 
 
-class IntervalListWidget(QtWidgets.QWidget):
-    """A list of {start, end} intervals with '+ interval'."""
-
-    def __init__(self, intervals=None, parent=None):
-        super().__init__(parent)
-        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
-        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self._host)
-        add = QtWidgets.QPushButton("+ interval"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
-        self._rows = []
-        for iv in (intervals or []):
-            self._add(iv.get("start", 0.0), iv.get("end", 1.0))
-
-    def _add(self, start=0.0, end=1.0):
-        row = _IntervalRow(start, end, on_remove=self._remove)
-        self._rows.append(row); self._vl.addWidget(row)
-
-    def _remove(self, row):
-        if row in self._rows:
-            self._rows.remove(row); row.setParent(None); row.deleteLater()
-
-    def value(self):
-        return [r.data() for r in self._rows]
+def _check_date_intervals(label, intervals, start_dt, problems):
+    """Shared checks for a list of absolute {start, end} date intervals (shutdowns,
+    custom shifts): dates parse, each ends after it starts, pairwise disjoint, and
+    none begins before the simulation start date."""
+    parsed = []
+    for iv in intervals:
+        d0 = parse_date_time(iv.get("start"))
+        d1 = parse_date_time(iv.get("end"))
+        if d0 is None or d1 is None:
+            problems.append(f"{label}: dates must be 'dd-mm-yyyy hh:mm'.")
+        elif d1 < d0:
+            problems.append(f"{label}: an interval ends before it starts.")
+        else:
+            parsed.append((d0, d1))
+    parsed.sort()
+    for (a0, a1), (b0, b1) in zip(parsed, parsed[1:]):
+        if not (min(a1, b1) < max(a0, b0)):
+            problems.append(f"{label}: intervals overlap or touch (they must be pairwise disjoint).")
+            break
+    if start_dt is not None and parsed and parsed[0][0] < start_dt:
+        problems.append(f"{label}: an interval begins before the simulation start date "
+                        f"(would convert to negative minutes).")
+    return parsed
 
 
 class NameValuePicker(QtWidgets.QWidget):
@@ -1553,8 +1597,8 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         self.type.setCurrentText(node.get_property("shutdown_type") if node.has_property("shutdown_type") else "NON_FLEXIBLE")
         form.addRow("type", self.type)
         lay.addLayout(form)
-        lay.addWidget(QtWidgets.QLabel("intervals (simulation times as hours + minutes):"))
-        self.intervals = IntervalListWidget(get_property_json(node, "intervals", []))
+        lay.addWidget(QtWidgets.QLabel("intervals (absolute dates, dd-mm-yyyy hh:mm):"))
+        self.intervals = CustomIntervalListWidget(get_property_json(node, "intervals", []))
         lay.addWidget(self.intervals)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
@@ -1688,25 +1732,21 @@ class GeneratorMenuDialog(QtWidgets.QDialog):
 
 
 class SimulationSettingsDialog(QtWidgets.QDialog):
-    """Simulation settings: the start date (the calendar anchor that custom shift
-    dates are converted against) and the stopping criterion. Criterion parameter
-    slots appear dynamically per type: Time -> one time slot; Pieces produced ->
-    total + timeout (the exit buffer is deduced by the parser from the single
-    EXIT buffer, so it is not selected here)."""
+    """Simulation settings: the start date (the calendar anchor every absolute date
+    is converted against — always set) and the stopping criterion. Criterion
+    parameter slots appear dynamically per type: Time -> an absolute stop date;
+    Pieces produced -> total + timeout in minutes (the exit buffer is deduced by
+    the parser from the single EXIT buffer, so it is not selected here)."""
 
     def __init__(self, parent, start_date, criterion):
         super().__init__(parent)
         self.setWindowTitle("Simulation settings")
         lay = QtWidgets.QVBoxLayout(self)
 
-        start_box = QtWidgets.QGroupBox("start date")
+        start_box = QtWidgets.QGroupBox("start date (calendar anchor of t=0)")
         sl = QtWidgets.QHBoxLayout(start_box)
-        self.has_start = QtWidgets.QCheckBox("set:")
         self.start_date = DateTimeWidget(start_date or "01-01-2026 00:00")
-        self.has_start.toggled.connect(self.start_date.setEnabled)
-        self.has_start.setChecked(bool(start_date))
-        self.start_date.setEnabled(bool(start_date))
-        sl.addWidget(self.has_start); sl.addWidget(self.start_date); sl.addStretch(1)
+        sl.addWidget(self.start_date); sl.addStretch(1)
         lay.addWidget(start_box)
 
         crit_box = QtWidgets.QGroupBox("stopping criterion")
@@ -1736,7 +1776,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self._load(criterion)
 
     def start_value(self):
-        return self.start_date.get_value() if self.has_start.isChecked() else ""
+        return self.start_date.get_value()
 
     def _rebuild(self, *_):
         while self._form.rowCount():
@@ -1744,22 +1784,22 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self._widgets = {}
         canonical = self.type.currentData()
         if canonical == "ByTime":
-            e = HourMinuteWidget(0.0)
+            e = DateTimeWidget("")  # an absolute stop date, not a duration
             self._widgets["time"] = e
-            self._form.addRow("time", e)
+            self._form.addRow("stop at", e)
         elif canonical == "ByPiecesProduced":
             total = QtWidgets.QLineEdit("0")
             self._widgets["total"] = total
             self._form.addRow("total pieces", total)
-            timeout = HourMinuteWidget("inf", allow_inf=True)
+            timeout = InfFloatWidget("inf")  # a duration, in raw minutes
             self._widgets["timeout"] = timeout
-            self._form.addRow("timeout", timeout)
+            self._form.addRow("timeout (minutes)", timeout)
 
     def _load(self, criterion):
         if criterion.get("type") != self.type.currentData():
             return
         if "time" in self._widgets:
-            self._widgets["time"].set_value(criterion.get("time", 0))
+            self._widgets["time"].set_value(criterion.get("time", ""))
         if "total" in self._widgets:
             self._widgets["total"].setText(str(criterion.get("total", 0)))
         if "timeout" in self._widgets:
@@ -1768,10 +1808,10 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
     def value(self):
         canonical = self.type.currentData()
         if canonical == "ByTime":
-            return {"type": "ByTime", "time": self._widgets["time"].get_value()}
+            return {"type": "ByTime", "time": self._widgets["time"].get_value()}  # "dd-mm-yyyy hh:mm"
         return {"type": "ByPiecesProduced",
                 "total": as_int(self._widgets["total"].text()),
-                "timeout": self._widgets["timeout"].get_value()}
+                "timeout": self._widgets["timeout"].get_value()}  # minutes | "inf"
 
 
 class BreakdownMenuDialog(QtWidgets.QDialog):
@@ -2125,7 +2165,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.operator_registry = []
         self.shift_registry = []
         self.stopping_criterion = {}  # {} | {"type": "ByTime"|"ByPiecesProduced", ...}
-        self.start_date = ""  # "" (unset) | "dd-mm-yyyy hh:mm"; anchors custom shift dates
+        self.start_date = "01-01-2026 00:00"  # always set; the calendar anchor of t=0
 
         self.graph.register_nodes([
             ShutdownsNode,
@@ -2273,7 +2313,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.graph.clear_session()
         self.model_registry = []
         self.stopping_criterion = {}
-        self.start_date = ""
+        self.start_date = "01-01-2026 00:00"
 
     def edit_models(self):
         dlg = ModelRegistryDialog(self, self.model_registry)
@@ -2503,6 +2543,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
     def validate_graph(self) -> List[str]:
         problems = []
+        start_dt = parse_date_time(self.start_date)
         for c in self.connections_clean():
             if not is_valid_connection(c["from_kind"], c["from_port"], c["to_kind"], c["to_port"]):
                 problems.append(f"Invalid connection: {c['from_kind']}.{c['from_port']} -> {c['to_kind']}.{c['to_port']}")
@@ -2622,16 +2663,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                                         f"(router outlets must overlap).")
 
             elif kind == "Shutdowns":
-                ivs = get_property_json(node, "intervals", [])
-                if any(as_float(iv.get("end")) < as_float(iv.get("start")) for iv in ivs):
-                    problems.append(f"Shutdowns '{name}': an interval has end before start.")
-                sv = sorted(ivs, key=lambda x: as_float(x.get("start")))
-                for a, b in zip(sv, sv[1:]):
-                    if not (min(as_float(a.get("end")), as_float(b.get("end")))
-                            < max(as_float(a.get("start")), as_float(b.get("start")))):
-                        problems.append(f"Shutdowns '{name}': intervals overlap or touch "
-                                        f"(they must be pairwise disjoint).")
-                        break
+                _check_date_intervals(f"Shutdowns '{name}'",
+                                      get_property_json(node, "intervals", []),
+                                      start_dt, problems)
 
         # Aggregate (whole-graph) checks.
         buffer_types = [node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
@@ -2644,46 +2678,47 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         if "SCRAP" in buffer_types and not any(node_kind(n) == "PieceGenerator" for n in self.all_nodes()):
             problems.append("A SCRAP buffer needs a Piece Generator to return its scrapped pieces to.")
 
+        # The start date is mandatory: every absolute date converts against it.
+        if start_dt is None:
+            problems.append("Simulation start date missing or not 'dd-mm-yyyy hh:mm' "
+                            "(Simulation > Settings...).")
+
         crit = self.stopping_criterion or {}
         if not crit:
             problems.append("No stopping criterion set (Simulation > Settings...); "
                             "the simulation may never terminate.")
         elif crit.get("type") == "ByPiecesProduced" and exit_count != 1:
             problems.append("Stopping criterion 'Pieces produced' needs exactly one EXIT buffer to count.")
+        elif crit.get("type") == "ByTime":
+            stop_dt = parse_date_time(crit.get("time"))
+            if stop_dt is None:
+                problems.append("Stopping date must be 'dd-mm-yyyy hh:mm' (Simulation > Settings...).")
+            elif start_dt is not None and stop_dt <= start_dt:
+                problems.append("Stopping date must be after the simulation start date.")
 
-        # Custom shifts: parseable dates, end after start, pairwise disjoint, anchored
-        # to a simulation start date they don't precede.
-        start_dt = parse_date_time(self.start_date) if self.start_date else None
-        if self.start_date and start_dt is None:
-            problems.append("Simulation start date must be 'dd-mm-yyyy hh:mm' (Simulation > Settings...).")
-        custom_shifts = [s for s in self.shift_registry if s.get("mode") == "custom"]
-        if custom_shifts and not self.start_date:
-            problems.append("Custom shifts need a simulation start date to be converted "
-                            "to minutes (Simulation > Settings...).")
-        for s in custom_shifts:
+        # Shifts: custom mode = absolute date intervals; weekly mode = date horizon + days off.
+        for s in self.shift_registry:
             sname = s.get("name", "?")
-            ivs = s.get("custom_intervals", [])
-            if not ivs:
-                problems.append(f"Custom shift '{sname}' has no intervals.")
-            parsed = []
-            for iv in ivs:
-                d0 = parse_date_time(iv.get("start"))
-                d1 = parse_date_time(iv.get("end"))
-                if d0 is None or d1 is None:
-                    problems.append(f"Custom shift '{sname}': dates must be 'dd-mm-yyyy hh:mm'.")
-                elif d1 < d0:
-                    problems.append(f"Custom shift '{sname}': an interval ends before it starts.")
-                else:
-                    parsed.append((d0, d1))
-            parsed.sort()
-            for (a0, a1), (b0, b1) in zip(parsed, parsed[1:]):
-                if not (min(a1, b1) < max(a0, b0)):
-                    problems.append(f"Custom shift '{sname}': intervals overlap or touch "
-                                    f"(they must be pairwise disjoint).")
-                    break
-            if start_dt is not None and parsed and parsed[0][0] < start_dt:
-                problems.append(f"Custom shift '{sname}' begins before the simulation start date "
-                                f"(would convert to negative minutes).")
+            if s.get("mode") == "custom":
+                ivs = s.get("custom_intervals", [])
+                if not ivs:
+                    problems.append(f"Custom shift '{sname}' has no intervals.")
+                _check_date_intervals(f"Custom shift '{sname}'", ivs, start_dt, problems)
+            else:
+                hz = s.get("horizon", {})
+                h0 = parse_date(hz.get("start"))
+                h1 = parse_date(hz.get("end"))
+                if h0 is None or h1 is None:
+                    problems.append(f"Shift '{sname}': horizon dates must be 'dd-mm-yyyy'.")
+                elif h1 < h0:
+                    problems.append(f"Shift '{sname}': horizon ends before it starts.")
+                elif start_dt is not None and h0.date() < start_dt.date():
+                    problems.append(f"Shift '{sname}': horizon begins before the simulation start date.")
+                offs = [parse_date(x) for x in s.get("days_off", [])]
+                if any(o is None for o in offs):
+                    problems.append(f"Shift '{sname}': days off must be 'dd-mm-yyyy'.")
+                elif h0 is not None and h1 is not None and any(not (h0 <= o <= h1) for o in offs):
+                    problems.append(f"Shift '{sname}': a day off lies outside the horizon.")
 
         return problems
 
@@ -2941,7 +2976,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self._merge_named_registry("shift_registry", data.get("shifts", []))
         if not self.stopping_criterion and data.get("stopping_criterion"):
             self.stopping_criterion = data["stopping_criterion"]
-        if not self.start_date and data.get("start_date"):
+        if data.get("start_date"):
+            # the imported file's dates were authored against its own anchor: adopt it
             self.start_date = data["start_date"]
 
         id_to_node = {}

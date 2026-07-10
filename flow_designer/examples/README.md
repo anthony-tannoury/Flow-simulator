@@ -20,7 +20,7 @@ monitored raw buffer, and a `ByPiecesProduced` stopping criterion.
   "operators": [ <operator> ],
   "shifts":    [ <shift> ],
   "stopping_criterion": <criterion>,          # when the run ends (may be {} if unset)
-  "start_date": "dd-mm-yyyy hh:mm",           # calendar anchor of t=0 ("" if unset)
+  "start_date": "dd-mm-yyyy hh:mm",           # calendar anchor of t=0 (always set)
   "nodes":     [ <node> ],
   "connections": [ {from_node, from_kind, from_port, to_node, to_kind, to_port} ],
   "backdrops": [ {id, title, nodes, position, width, height} ] }
@@ -55,19 +55,27 @@ operator: {name, capacity (int), productivity:<dist>, shifts:[shift_name]}
 shift:    {name, mode: "weekly"|"custom",                            # absent mode = weekly
            # weekly (recurring) definition:
            days:[7 × {working:bool, intervals:[{start,end}]}]        # Mon..Sun, minutes from midnight
-           days_off:[int day numbers], horizon:{start,end},          # in days
+           days_off:["dd-mm-yyyy"], horizon:{start:"dd-mm-yyyy", end:"dd-mm-yyyy"},
            # custom definition — explicit absolute intervals:
            custom_intervals:[{start:"dd-mm-yyyy hh:mm", end:"dd-mm-yyyy hh:mm"}]}
 ```
 
-All times in the JSON are raw minutes (the simulation's `Time(h, m) = 60*h + m` unit); the
-designer edits them as hours + minutes (shift intervals, shutdown intervals, stopping times).
+### Time conventions
 
-Exception: `custom_intervals` and the top-level `start_date` carry **absolute dates** as
-`dd-mm-yyyy hh:mm` strings. The loader converts each custom interval to raw minutes relative
-to `start_date` (which must therefore be set whenever a custom shift exists — validated).
-A custom shift's interval list maps 1:1 to a `HasShifts` interval list; its weekly fields
-are kept but ignored.
+Three kinds of time appear in the JSON — the loader converts the calendar kind
+against `start_date`, everything else is already in simulation units:
+
+| kind | unit / format | where |
+|---|---|---|
+| time of day | raw minutes from midnight (`Time(h, m) = 60*h + m`; edited as h + m) | weekday shift `intervals` |
+| duration | raw minutes (plain numbers) | all distributions, task `timeout`, policy tolerances, stopping `timeout` |
+| absolute calendar point | `"dd-mm-yyyy hh:mm"` (date-only fields drop the time) | `start_date`, `custom_intervals`, shutdown `intervals`, ByTime stop, `days_off`, `horizon` |
+
+`start_date` is **always set** — it is the calendar anchor `t = 0`; the loader turns every
+absolute date into raw minutes as `date − start_date`. A custom shift's interval list maps
+1:1 to a `HasShifts` interval list; its weekly fields are kept but ignored. The validator
+checks that dates parse, intervals are ordered and pairwise disjoint, nothing precedes
+`start_date`, days off fall inside the horizon, and the ByTime stop is after the start.
 
 ## Nodes (by `kind`)
 
@@ -110,8 +118,10 @@ A **non-discriminating** piece-task `collector_type` requires every model in
   **finite** `upperbound`), `duration:<dist>`, `resource_collector_type` ∈ {GREEDY,
   ALTRUISTIC}, `min_carrier_capacity`, `max_carrier_capacity`, plus the shared fields,
   `shutdowns`, `breakdowns`.
-- **Shutdowns**: `shutdown_type` ∈ {NON_FLEXIBLE, FLEXIBLE}, `intervals:[{start,end}]`
-  (each `start ≤ end`; intervals must be pairwise disjoint and non-touching).
+- **Shutdowns**: `shutdown_type` ∈ {NON_FLEXIBLE, FLEXIBLE},
+  `intervals:[{start:"dd-mm-yyyy hh:mm", end:"dd-mm-yyyy hh:mm"}]` — absolute dates,
+  converted by the loader relative to `start_date` (each end after its start; intervals
+  pairwise disjoint and non-touching; none before `start_date`).
 - **Breakdown**: `task:<taskId>`, `mttr:<dist>`, `outlets:[bufferId]`, and `mtbf` either
   `{"mode":"distribution","distribution":<dist>}` or
   `{"mode":"bathtub", a, tau, c, beta, eta, tolerance, max_iters}`.
@@ -141,10 +151,11 @@ overrun the shift end by at most that many time units.
 Top-level `stopping_criterion` says when the run ends. `{}` means unset. One of:
 
 ```
-{"type": "ByTime",           "time": t}                     # stop at simulation time t
+{"type": "ByTime",           "time": "dd-mm-yyyy hh:mm"}    # stop at that absolute date
+                                                            # (loader: minutes = date - start_date)
 {"type": "ByPiecesProduced", "total": n, "timeout": T}      # stop after n pieces reach the EXIT buffer,
-                                                            # or at time T (number|"inf") — whichever first
+                                                            # or after T MINUTES (number|"inf") - a duration
 ```
 
 `ByPiecesProduced` does not name the exit buffer: the loader uses the graph's single
-`EXIT` buffer (see **Buffer** above).
+`EXIT` buffer (see **Buffer** above). The ByTime stop date must lie after `start_date`.

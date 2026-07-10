@@ -155,8 +155,8 @@
       ],
       "days_off": [],
       "horizon": {
-        "start": 0,
-        "end": 28
+        "start": "05-01-2026",
+        "end": "02-02-2026"
       }
     },
     {
@@ -227,12 +227,12 @@
         }
       ],
       "days_off": [
-        7,
-        14
+        "12-01-2026",
+        "19-01-2026"
       ],
       "horizon": {
-        "start": 0,
-        "end": 28
+        "start": "05-01-2026",
+        "end": "02-02-2026"
       }
     },
     {
@@ -241,8 +241,8 @@
       "days": [],
       "days_off": [],
       "horizon": {
-        "start": 0,
-        "end": 28
+        "start": "05-01-2026",
+        "end": "02-02-2026"
       },
       "custom_intervals": [
         {
@@ -655,8 +655,8 @@
       "shutdown_type": "FLEXIBLE",
       "intervals": [
         {
-          "start": 10020,
-          "end": 10080
+          "start": "11-01-2026 23:00",
+          "end": "12-01-2026 00:00"
         }
       ],
       "position": [
