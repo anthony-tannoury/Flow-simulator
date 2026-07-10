@@ -1547,12 +1547,18 @@ def _takers_disjoint(a: set, b: set, parents: dict) -> bool:
 # ------------------------------------------------------------------
 
 def ensure_ids(entries: list, prefix: str, old_by_name: dict | None = None) -> list:
-    """Give every registry entry a stable id, reusing an existing one (matched by
-    name against old_by_name) so ids survive edits, else minting a fresh one."""
+    """Give every registry entry a unique id. An entry without one reuses its prior
+    id (matched by name against old_by_name) so ids survive edits, unless that id is
+    already taken by a sibling — then it mints a fresh one. The id, never the name, is
+    the identity, so two entries that happen to share a name still get distinct ids."""
     old_by_name = old_by_name or {}
+    used = {e["id"] for e in entries if e.get("id")}
     for e in entries:
-        if not e.get("id"):
-            e["id"] = old_by_name.get(e.get("name")) or new_uid(prefix)
+        if e.get("id"):
+            continue
+        candidate = old_by_name.get(e.get("name"))
+        e["id"] = candidate if (candidate and candidate not in used) else new_uid(prefix)
+        used.add(e["id"])
     return entries
 
 
@@ -2780,6 +2786,17 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                                       start_dt, problems)
 
         # Aggregate (whole-graph) checks.
+        # Registry entries are picked by name in the card menus, so two entries that
+        # share a name are indistinguishable there (even though each still exports a
+        # unique id). Flag it so the ambiguity never reaches the export silently.
+        for label, reg in (("model", self.model_registry), ("resource", self.resource_registry),
+                           ("operator", self.operator_registry), ("shift", self.shift_registry)):
+            names = [e.get("name") for e in reg if e.get("name")]
+            dupes = sorted({n for n in names if names.count(n) > 1})
+            for n in dupes:
+                problems.append(f"Two or more {label} registry entries are named '{n}'; "
+                                f"names must be unique so cards can reference them.")
+
         buffer_types = [node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
                         for node in self.all_nodes() if node_kind(node) == "Buffer"]
         exit_count = buffer_types.count("EXIT")
