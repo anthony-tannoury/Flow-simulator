@@ -770,13 +770,60 @@ class InfFloatWidget(QtWidgets.QWidget):
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
+def _fmt_num(x: float) -> str:
+    return str(int(x)) if float(x) == int(x) else str(x)
+
+
+class HourMinuteWidget(QtWidgets.QWidget):
+    """A point in time entered as hours + minutes; the stored value is raw minutes,
+    matching the simulation's Time(h, m) = 60*h + m. With allow_inf, an 'infinite'
+    checkbox makes get_value() return the string \"inf\" (like InfFloatWidget)."""
+
+    def __init__(self, value=0.0, allow_inf=False, parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.chk = None
+        if allow_inf:
+            self.chk = QtWidgets.QCheckBox("infinite")
+            lay.addWidget(self.chk)
+        self.h = QtWidgets.QLineEdit(); self.h.setMaximumWidth(48)
+        self.m = QtWidgets.QLineEdit(); self.m.setMaximumWidth(48)
+        lay.addWidget(self.h); lay.addWidget(QtWidgets.QLabel("h"))
+        lay.addWidget(self.m); lay.addWidget(QtWidgets.QLabel("m"))
+        lay.addStretch(1)
+        if self.chk is not None:
+            self.chk.toggled.connect(self.h.setDisabled)
+            self.chk.toggled.connect(self.m.setDisabled)
+        self.set_value(value)
+
+    def set_value(self, value):
+        infinite = (value in ("inf", "Infinity") or (isinstance(value, float) and value == float("inf")))
+        if self.chk is not None:
+            self.chk.setChecked(infinite)
+        if infinite:
+            self.h.setText(""); self.m.setText("")
+            self.h.setDisabled(True); self.m.setDisabled(True)
+            return
+        minutes = as_float(value)
+        hours = int(minutes // 60)
+        self.h.setText(str(hours))
+        self.m.setText(_fmt_num(minutes - 60 * hours))
+        self.h.setDisabled(False); self.m.setDisabled(False)
+
+    def get_value(self):
+        if self.chk is not None and self.chk.isChecked():
+            return "inf"
+        return 60 * as_float(self.h.text()) + as_float(self.m.text())
+
+
 class _IntervalRow(QtWidgets.QWidget):
     def __init__(self, start=480.0, end=1020.0, on_remove=None, parent=None):
         super().__init__(parent)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        self.start = QtWidgets.QLineEdit(str(start)); self.start.setMaximumWidth(70)
-        self.end = QtWidgets.QLineEdit(str(end)); self.end.setMaximumWidth(70)
+        self.start = HourMinuteWidget(start)
+        self.end = HourMinuteWidget(end)
         lay.addWidget(QtWidgets.QLabel("start:")); lay.addWidget(self.start)
         lay.addWidget(QtWidgets.QLabel("end:")); lay.addWidget(self.end)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
@@ -785,11 +832,11 @@ class _IntervalRow(QtWidgets.QWidget):
         lay.addWidget(rm); lay.addStretch(1)
 
     def data(self):
-        return {"start": as_float(self.start.text()), "end": as_float(self.end.text())}
+        return {"start": self.start.get_value(), "end": self.end.get_value()}
 
 
 class _DayRow(QtWidgets.QWidget):
-    """One weekday: a working toggle + a list of shift intervals (minutes 0..1440)."""
+    """One weekday: a working toggle + a list of shift intervals (edited as h/m of day)."""
 
     def __init__(self, label, working=False, intervals=None, parent=None):
         super().__init__(parent)
@@ -838,7 +885,7 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.name = QtWidgets.QLineEdit(entry.get("name", ""))
         form.addRow("name", self.name)
         lay.addLayout(form)
-        lay.addWidget(QtWidgets.QLabel("Shifts per weekday (times in minutes from midnight, 0–1440):"))
+        lay.addWidget(QtWidgets.QLabel("Shifts per weekday (times of day as hours + minutes):"))
         days = entry.get("days", [])
         self.day_rows = []
         for i, label in enumerate(WEEKDAYS):
@@ -1398,7 +1445,7 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         self.type.setCurrentText(node.get_property("shutdown_type") if node.has_property("shutdown_type") else "NON_FLEXIBLE")
         form.addRow("type", self.type)
         lay.addLayout(form)
-        lay.addWidget(QtWidgets.QLabel("intervals:"))
+        lay.addWidget(QtWidgets.QLabel("intervals (simulation times as hours + minutes):"))
         self.intervals = IntervalListWidget(get_property_json(node, "intervals", []))
         lay.addWidget(self.intervals)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -1570,14 +1617,14 @@ class StoppingCriterionDialog(QtWidgets.QDialog):
         self._widgets = {}
         canonical = self.type.currentData()
         if canonical == "ByTime":
-            e = QtWidgets.QLineEdit("0")
+            e = HourMinuteWidget(0.0)
             self._widgets["time"] = e
             self._form.addRow("time", e)
         elif canonical == "ByPiecesProduced":
             total = QtWidgets.QLineEdit("0")
             self._widgets["total"] = total
             self._form.addRow("total pieces", total)
-            timeout = InfFloatWidget("inf")
+            timeout = HourMinuteWidget("inf", allow_inf=True)
             self._widgets["timeout"] = timeout
             self._form.addRow("timeout", timeout)
 
@@ -1585,7 +1632,7 @@ class StoppingCriterionDialog(QtWidgets.QDialog):
         if criterion.get("type") != self.type.currentData():
             return
         if "time" in self._widgets:
-            self._widgets["time"].setText(str(criterion.get("time", 0)))
+            self._widgets["time"].set_value(criterion.get("time", 0))
         if "total" in self._widgets:
             self._widgets["total"].setText(str(criterion.get("total", 0)))
         if "timeout" in self._widgets:
@@ -1594,7 +1641,7 @@ class StoppingCriterionDialog(QtWidgets.QDialog):
     def value(self):
         canonical = self.type.currentData()
         if canonical == "ByTime":
-            return {"type": "ByTime", "time": as_float(self._widgets["time"].text())}
+            return {"type": "ByTime", "time": self._widgets["time"].get_value()}
         return {"type": "ByPiecesProduced",
                 "total": as_int(self._widgets["total"].text()),
                 "timeout": self._widgets["timeout"].get_value()}

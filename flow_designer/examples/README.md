@@ -55,6 +55,9 @@ shift:    {name, days:[7 × {working:bool, intervals:[{start,end}]}]  # Mon..Sun
            days_off:[int day numbers], horizon:{start,end}}          # in days
 ```
 
+All times in the JSON are raw minutes (the simulation's `Time(h, m) = 60*h + m` unit); the
+designer edits them as hours + minutes (shift intervals, shutdown intervals, stopping times).
+
 ## Nodes (by `kind`)
 
 Shared task fields (both `Task` and `ResourceTask`): `startup_duration`,
