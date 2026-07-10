@@ -1004,9 +1004,11 @@ class CustomIntervalListWidget(QtWidgets.QWidget):
 
 class ShiftEditorDialog(QtWidgets.QDialog):
     """A shift definition is either 'weekly' (the recurring weekday creator) or
-    'custom' (an explicit list of absolute date intervals). The selected tab at
-    OK time decides the mode; both configurations are kept in the entry. Days
-    off are shared: one list of whole days, applied in either mode."""
+    'custom' (an explicit list of absolute date intervals). A type dropdown picks
+    the mode and the matching parameters appear below it; both configurations are
+    kept in the entry. Days off are shared: one list of whole days, either mode."""
+
+    SHIFT_MODES = [("Weekly", "weekly"), ("Custom", "custom")]
 
     def __init__(self, parent=None, entry=None):
         super().__init__(parent)
@@ -1016,11 +1018,15 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         form = QtWidgets.QFormLayout()
         self.name = QtWidgets.QLineEdit(entry.get("name", ""))
         form.addRow("name", self.name)
+        self.mode = QtWidgets.QComboBox()
+        for label, canonical in self.SHIFT_MODES:
+            self.mode.addItem(label, canonical)
+        form.addRow("type", self.mode)
         lay.addLayout(form)
-        self.tabs = QtWidgets.QTabWidget()
-        lay.addWidget(self.tabs)
+        self._stack = QtWidgets.QStackedWidget()
+        lay.addWidget(self._stack)
 
-        # --- Weekly tab: the existing recurring creator ---
+        # --- Weekly page: the recurring weekday creator ---
         weekly = QtWidgets.QWidget()
         wl = QtWidgets.QVBoxLayout(weekly)
         wl.addWidget(QtWidgets.QLabel("Shifts per weekday (times of day as hours + minutes):"))
@@ -1041,9 +1047,9 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         hw = QtWidgets.QWidget(); hw.setLayout(hbox)
         form2.addRow("horizon", hw)
         wl.addLayout(form2)
-        self.tabs.addTab(weekly, "Weekly")
+        self._stack.addWidget(weekly)
 
-        # --- Custom tab: absolute date intervals (the loader converts them to raw
+        # --- Custom page: absolute date intervals (the loader converts them to raw
         #     minutes relative to the simulation start date) ---
         custom = QtWidgets.QWidget()
         cl = QtWidgets.QVBoxLayout(custom)
@@ -1052,9 +1058,12 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.custom = CustomIntervalListWidget(entry.get("custom_intervals", []))
         cl.addWidget(self.custom)
         cl.addStretch(1)
-        self.tabs.addTab(custom, "Custom")
+        self._stack.addWidget(custom)
 
-        self.tabs.setCurrentIndex(1 if entry.get("mode", "weekly") == "custom" else 0)
+        self.mode.currentIndexChanged.connect(self._stack.setCurrentIndex)
+        mi = self.mode.findData(entry.get("mode", "weekly"))
+        self.mode.setCurrentIndex(mi if mi >= 0 else 0)
+        self._stack.setCurrentIndex(self.mode.currentIndex())
 
         # --- Days off: shared by both modes (whole days, date-only) ---
         lay.addWidget(QtWidgets.QLabel("days off (whole days; applies in either mode):"))
@@ -1068,7 +1077,7 @@ class ShiftEditorDialog(QtWidgets.QDialog):
     def data(self):
         return {
             "name": self.name.text().strip(),
-            "mode": "custom" if self.tabs.currentIndex() == 1 else "weekly",
+            "mode": self.mode.currentData(),
             "days": [r.data() for r in self.day_rows],
             "days_off": self.days_off.value(),
             "horizon": {"start": self.h_start.get_value(), "end": self.h_end.get_value()},
