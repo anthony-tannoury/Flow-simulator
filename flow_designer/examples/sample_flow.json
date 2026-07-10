@@ -234,6 +234,26 @@
         "start": 0,
         "end": 28
       }
+    },
+    {
+      "name": "audit-window",
+      "mode": "custom",
+      "days": [],
+      "days_off": [],
+      "horizon": {
+        "start": 0,
+        "end": 28
+      },
+      "custom_intervals": [
+        {
+          "start": "12-01-2026 00:00",
+          "end": "13-01-2026 23:59"
+        },
+        {
+          "start": "15-01-2026 10:00",
+          "end": "15-01-2026 19:00"
+        }
+      ]
     }
   ],
   "stopping_criterion": {
@@ -241,6 +261,7 @@
     "total": 200,
     "timeout": "inf"
   },
+  "start_date": "05-01-2026 00:00",
   "nodes": [
     {
       "id": "gen",

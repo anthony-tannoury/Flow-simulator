@@ -20,6 +20,7 @@ monitored raw buffer, and a `ByPiecesProduced` stopping criterion.
   "operators": [ <operator> ],
   "shifts":    [ <shift> ],
   "stopping_criterion": <criterion>,          # when the run ends (may be {} if unset)
+  "start_date": "dd-mm-yyyy hh:mm",           # calendar anchor of t=0 ("" if unset)
   "nodes":     [ <node> ],
   "connections": [ {from_node, from_kind, from_port, to_node, to_kind, to_port} ],
   "backdrops": [ {id, title, nodes, position, width, height} ] }
@@ -51,12 +52,22 @@ resource: {name, restockable, lifespan (number|"inf"), max_capacity, initial_cap
            # only when restockable:
            order_duration:<dist>, delivery_duration:<dist>, threshold}
 operator: {name, capacity (int), productivity:<dist>, shifts:[shift_name]}
-shift:    {name, days:[7 × {working:bool, intervals:[{start,end}]}]  # Mon..Sun, minutes from midnight
-           days_off:[int day numbers], horizon:{start,end}}          # in days
+shift:    {name, mode: "weekly"|"custom",                            # absent mode = weekly
+           # weekly (recurring) definition:
+           days:[7 × {working:bool, intervals:[{start,end}]}]        # Mon..Sun, minutes from midnight
+           days_off:[int day numbers], horizon:{start,end},          # in days
+           # custom definition — explicit absolute intervals:
+           custom_intervals:[{start:"dd-mm-yyyy hh:mm", end:"dd-mm-yyyy hh:mm"}]}
 ```
 
 All times in the JSON are raw minutes (the simulation's `Time(h, m) = 60*h + m` unit); the
 designer edits them as hours + minutes (shift intervals, shutdown intervals, stopping times).
+
+Exception: `custom_intervals` and the top-level `start_date` carry **absolute dates** as
+`dd-mm-yyyy hh:mm` strings. The loader converts each custom interval to raw minutes relative
+to `start_date` (which must therefore be set whenever a custom shift exists — validated).
+A custom shift's interval list maps 1:1 to a `HasShifts` interval list; its weekly fields
+are kept but ignored.
 
 ## Nodes (by `kind`)
 

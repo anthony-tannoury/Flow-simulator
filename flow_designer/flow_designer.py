@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import uuid
+from datetime import datetime
 from typing import Any, List, Tuple
 
 from Qt import QtCore, QtWidgets
@@ -817,6 +818,41 @@ class HourMinuteWidget(QtWidgets.QWidget):
         return 60 * as_float(self.h.text()) + as_float(self.m.text())
 
 
+# Absolute date+time format used by custom shift intervals and the simulation start
+# date. Qt syntax below; the Python strptime equivalent is "%d-%m-%Y %H:%M".
+DATE_TIME_FORMAT = "dd-MM-yyyy HH:mm"
+PY_DATE_TIME_FORMAT = "%d-%m-%Y %H:%M"
+
+
+def parse_date_time(text):
+    """dd-mm-yyyy hh:mm -> datetime, or None if malformed."""
+    try:
+        return datetime.strptime(str(text).strip(), PY_DATE_TIME_FORMAT)
+    except Exception:
+        return None
+
+
+class DateTimeWidget(QtWidgets.QDateTimeEdit):
+    """Calendar-popup picker for an absolute 'dd-mm-yyyy hh:mm'. The value travels
+    as that string; converting it to raw simulation minutes (relative to the
+    simulation start date) is the loader's job."""
+
+    def __init__(self, value="", parent=None):
+        super().__init__(parent)
+        self.setCalendarPopup(True)
+        self.setDisplayFormat(DATE_TIME_FORMAT)
+        self.set_value(value)
+
+    def set_value(self, value):
+        dt = QtCore.QDateTime.fromString(str(value or ""), DATE_TIME_FORMAT)
+        if not dt.isValid():
+            dt = QtCore.QDateTime(QtCore.QDate(2026, 1, 1), QtCore.QTime(0, 0))
+        self.setDateTime(dt)
+
+    def get_value(self):
+        return self.dateTime().toString(DATE_TIME_FORMAT)
+
+
 class _IntervalRow(QtWidgets.QWidget):
     def __init__(self, start=480.0, end=1020.0, on_remove=None, parent=None):
         super().__init__(parent)
@@ -875,7 +911,57 @@ class _DayRow(QtWidgets.QWidget):
                 "intervals": [r.data() for r in self._rows]}
 
 
+class _CustomIntervalRow(QtWidgets.QWidget):
+    """One absolute interval: start date+time -> end date+time (dd-mm-yyyy hh:mm)."""
+
+    def __init__(self, start="01-01-2026 08:00", end="01-01-2026 17:00", on_remove=None, parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.start = DateTimeWidget(start)
+        self.end = DateTimeWidget(end)
+        lay.addWidget(QtWidgets.QLabel("from:")); lay.addWidget(self.start)
+        lay.addWidget(QtWidgets.QLabel("to:")); lay.addWidget(self.end)
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
+        if on_remove:
+            rm.clicked.connect(lambda: on_remove(self))
+        lay.addWidget(rm); lay.addStretch(1)
+
+    def data(self):
+        return {"start": self.start.get_value(), "end": self.end.get_value()}
+
+
+class CustomIntervalListWidget(QtWidgets.QWidget):
+    """A list of absolute {start, end} date intervals with '+ interval'."""
+
+    def __init__(self, intervals=None, parent=None):
+        super().__init__(parent)
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton("+ interval"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        self._rows = []
+        for iv in (intervals or []):
+            self._add(iv.get("start"), iv.get("end"))
+
+    def _add(self, start=None, end=None):
+        row = _CustomIntervalRow(start or "01-01-2026 08:00", end or "01-01-2026 17:00",
+                                 on_remove=self._remove)
+        self._rows.append(row); self._vl.addWidget(row)
+
+    def _remove(self, row):
+        if row in self._rows:
+            self._rows.remove(row); row.setParent(None); row.deleteLater()
+
+    def value(self):
+        return [r.data() for r in self._rows]
+
+
 class ShiftEditorDialog(QtWidgets.QDialog):
+    """A shift definition is either 'weekly' (the recurring weekday creator) or
+    'custom' (an explicit list of absolute date intervals). The selected tab at
+    OK time decides the mode; both configurations are kept in the entry."""
+
     def __init__(self, parent=None, entry=None):
         super().__init__(parent)
         self.setWindowTitle("Shift definition")
@@ -885,14 +971,20 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.name = QtWidgets.QLineEdit(entry.get("name", ""))
         form.addRow("name", self.name)
         lay.addLayout(form)
-        lay.addWidget(QtWidgets.QLabel("Shifts per weekday (times of day as hours + minutes):"))
+        self.tabs = QtWidgets.QTabWidget()
+        lay.addWidget(self.tabs)
+
+        # --- Weekly tab: the existing recurring creator ---
+        weekly = QtWidgets.QWidget()
+        wl = QtWidgets.QVBoxLayout(weekly)
+        wl.addWidget(QtWidgets.QLabel("Shifts per weekday (times of day as hours + minutes):"))
         days = entry.get("days", [])
         self.day_rows = []
         for i, label in enumerate(WEEKDAYS):
             d = days[i] if i < len(days) else {}
             row = _DayRow(label, d.get("working", False), d.get("intervals"))
             self.day_rows.append(row)
-            lay.addWidget(row)
+            wl.addWidget(row)
         form2 = QtWidgets.QFormLayout()
         self.days_off = QtWidgets.QLineEdit(",".join(str(d) for d in entry.get("days_off", [])))
         form2.addRow("days off (integer day numbers from t=0, comma-separated)", self.days_off)
@@ -904,7 +996,21 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         hbox.addWidget(QtWidgets.QLabel("end day:")); hbox.addWidget(self.h_end); hbox.addStretch(1)
         hw = QtWidgets.QWidget(); hw.setLayout(hbox)
         form2.addRow("horizon (in days)", hw)
-        lay.addLayout(form2)
+        wl.addLayout(form2)
+        self.tabs.addTab(weekly, "Weekly")
+
+        # --- Custom tab: absolute date intervals (the loader converts them to raw
+        #     minutes relative to the simulation start date) ---
+        custom = QtWidgets.QWidget()
+        cl = QtWidgets.QVBoxLayout(custom)
+        cl.addWidget(QtWidgets.QLabel("Absolute intervals (dd-mm-yyyy hh:mm). They are converted to\n"
+                                      "minutes relative to the simulation start date (Simulation > Settings...)."))
+        self.custom = CustomIntervalListWidget(entry.get("custom_intervals", []))
+        cl.addWidget(self.custom)
+        cl.addStretch(1)
+        self.tabs.addTab(custom, "Custom")
+
+        self.tabs.setCurrentIndex(1 if entry.get("mode", "weekly") == "custom" else 0)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
         lay.addWidget(bb)
@@ -913,9 +1019,11 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         days_off = [as_int(x) for x in self.days_off.text().split(",") if x.strip() != ""]
         return {
             "name": self.name.text().strip(),
+            "mode": "custom" if self.tabs.currentIndex() == 1 else "weekly",
             "days": [r.data() for r in self.day_rows],
             "days_off": days_off,
             "horizon": {"start": as_int(self.h_start.text()), "end": as_int(self.h_end.text())},
+            "custom_intervals": self.custom.value(),
         }
 
 
@@ -1579,25 +1687,41 @@ class GeneratorMenuDialog(QtWidgets.QDialog):
         set_property_json(self.node, "shifts", self.shifts.chosen())
 
 
-class StoppingCriterionDialog(QtWidgets.QDialog):
-    """Pick when the simulation ends. Parameter slots appear dynamically per type:
-    Time -> one time slot; Pieces produced -> total + timeout (the exit buffer is
-    deduced by the parser from the single EXIT buffer, so it is not selected here)."""
+class SimulationSettingsDialog(QtWidgets.QDialog):
+    """Simulation settings: the start date (the calendar anchor that custom shift
+    dates are converted against) and the stopping criterion. Criterion parameter
+    slots appear dynamically per type: Time -> one time slot; Pieces produced ->
+    total + timeout (the exit buffer is deduced by the parser from the single
+    EXIT buffer, so it is not selected here)."""
 
-    def __init__(self, parent, criterion):
+    def __init__(self, parent, start_date, criterion):
         super().__init__(parent)
-        self.setWindowTitle("Stopping criterion")
+        self.setWindowTitle("Simulation settings")
         lay = QtWidgets.QVBoxLayout(self)
+
+        start_box = QtWidgets.QGroupBox("start date")
+        sl = QtWidgets.QHBoxLayout(start_box)
+        self.has_start = QtWidgets.QCheckBox("set:")
+        self.start_date = DateTimeWidget(start_date or "01-01-2026 00:00")
+        self.has_start.toggled.connect(self.start_date.setEnabled)
+        self.has_start.setChecked(bool(start_date))
+        self.start_date.setEnabled(bool(start_date))
+        sl.addWidget(self.has_start); sl.addWidget(self.start_date); sl.addStretch(1)
+        lay.addWidget(start_box)
+
+        crit_box = QtWidgets.QGroupBox("stopping criterion")
+        cl = QtWidgets.QVBoxLayout(crit_box)
         top = QtWidgets.QFormLayout()
         self.type = QtWidgets.QComboBox()
         for label, canonical in STOPPING_CRITERION_TYPES:
             self.type.addItem(label, canonical)
         top.addRow("stop on", self.type)
-        lay.addLayout(top)
+        cl.addLayout(top)
         self._host = QtWidgets.QWidget()
         self._form = QtWidgets.QFormLayout(self._host)
         self._form.setContentsMargins(12, 4, 0, 0)
-        lay.addWidget(self._host)
+        cl.addWidget(self._host)
+        lay.addWidget(crit_box)
         self._widgets = {}
         self.type.currentIndexChanged.connect(self._rebuild)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -1610,6 +1734,9 @@ class StoppingCriterionDialog(QtWidgets.QDialog):
         self.type.blockSignals(blocked)
         self._rebuild()
         self._load(criterion)
+
+    def start_value(self):
+        return self.start_date.get_value() if self.has_start.isChecked() else ""
 
     def _rebuild(self, *_):
         while self._form.rowCount():
@@ -1998,6 +2125,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.operator_registry = []
         self.shift_registry = []
         self.stopping_criterion = {}  # {} | {"type": "ByTime"|"ByPiecesProduced", ...}
+        self.start_date = ""  # "" (unset) | "dd-mm-yyyy hh:mm"; anchors custom shift dates
 
         self.graph.register_nodes([
             ShutdownsNode,
@@ -2036,7 +2164,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         registries_menu.addAction("Edit shifts...").triggered.connect(self.edit_shifts)
 
         simulation_menu = self.menuBar().addMenu("Simulation")
-        simulation_menu.addAction("Stopping criterion...").triggered.connect(self.edit_stopping_criterion)
+        simulation_menu.addAction("Settings...").triggered.connect(self.edit_simulation_settings)
 
         edit_menu = self.menuBar().addMenu("Edit")
         delete_action = edit_menu.addAction("Delete selected")
@@ -2145,6 +2273,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.graph.clear_session()
         self.model_registry = []
         self.stopping_criterion = {}
+        self.start_date = ""
 
     def edit_models(self):
         dlg = ModelRegistryDialog(self, self.model_registry)
@@ -2174,13 +2303,15 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             self.shift_registry = dlg.entries()
             self.statusBar().showMessage(f"{len(self.shift_registry)} shift definitions.")
 
-    def edit_stopping_criterion(self):
-        dlg = StoppingCriterionDialog(self, self.stopping_criterion)
+    def edit_simulation_settings(self):
+        dlg = SimulationSettingsDialog(self, self.start_date, self.stopping_criterion)
         if dlg.exec():
+            self.start_date = dlg.start_value()
             self.stopping_criterion = dlg.value()
             label = next((lbl for lbl, canon in STOPPING_CRITERION_TYPES
                           if canon == self.stopping_criterion.get("type")), "?")
-            self.statusBar().showMessage(f"Stopping criterion: {label}.")
+            start = self.start_date or "not set"
+            self.statusBar().showMessage(f"Simulation: start {start}; stops on {label}.")
 
     def on_node_double_clicked(self, node):
         kind = node_kind(node)
@@ -2299,6 +2430,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "operators": self.operator_registry,
             "shifts": self.shift_registry,
             "stopping_criterion": self.stopping_criterion,
+            "start_date": self.start_date,
             "nodes": nodes,
             "connections": self.connections_clean(),
             "backdrops": backdrops,
@@ -2514,10 +2646,44 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
         crit = self.stopping_criterion or {}
         if not crit:
-            problems.append("No stopping criterion set (Simulation > Stopping criterion...); "
+            problems.append("No stopping criterion set (Simulation > Settings...); "
                             "the simulation may never terminate.")
         elif crit.get("type") == "ByPiecesProduced" and exit_count != 1:
             problems.append("Stopping criterion 'Pieces produced' needs exactly one EXIT buffer to count.")
+
+        # Custom shifts: parseable dates, end after start, pairwise disjoint, anchored
+        # to a simulation start date they don't precede.
+        start_dt = parse_date_time(self.start_date) if self.start_date else None
+        if self.start_date and start_dt is None:
+            problems.append("Simulation start date must be 'dd-mm-yyyy hh:mm' (Simulation > Settings...).")
+        custom_shifts = [s for s in self.shift_registry if s.get("mode") == "custom"]
+        if custom_shifts and not self.start_date:
+            problems.append("Custom shifts need a simulation start date to be converted "
+                            "to minutes (Simulation > Settings...).")
+        for s in custom_shifts:
+            sname = s.get("name", "?")
+            ivs = s.get("custom_intervals", [])
+            if not ivs:
+                problems.append(f"Custom shift '{sname}' has no intervals.")
+            parsed = []
+            for iv in ivs:
+                d0 = parse_date_time(iv.get("start"))
+                d1 = parse_date_time(iv.get("end"))
+                if d0 is None or d1 is None:
+                    problems.append(f"Custom shift '{sname}': dates must be 'dd-mm-yyyy hh:mm'.")
+                elif d1 < d0:
+                    problems.append(f"Custom shift '{sname}': an interval ends before it starts.")
+                else:
+                    parsed.append((d0, d1))
+            parsed.sort()
+            for (a0, a1), (b0, b1) in zip(parsed, parsed[1:]):
+                if not (min(a1, b1) < max(a0, b0)):
+                    problems.append(f"Custom shift '{sname}': intervals overlap or touch "
+                                    f"(they must be pairwise disjoint).")
+                    break
+            if start_dt is not None and parsed and parsed[0][0] < start_dt:
+                problems.append(f"Custom shift '{sname}' begins before the simulation start date "
+                                f"(would convert to negative minutes).")
 
         return problems
 
@@ -2775,6 +2941,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self._merge_named_registry("shift_registry", data.get("shifts", []))
         if not self.stopping_criterion and data.get("stopping_criterion"):
             self.stopping_criterion = data["stopping_criterion"]
+        if not self.start_date and data.get("start_date"):
+            self.start_date = data["start_date"]
 
         id_to_node = {}
         for card in data.get("nodes", []):
