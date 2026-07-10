@@ -1005,7 +1005,8 @@ class CustomIntervalListWidget(QtWidgets.QWidget):
 class ShiftEditorDialog(QtWidgets.QDialog):
     """A shift definition is either 'weekly' (the recurring weekday creator) or
     'custom' (an explicit list of absolute date intervals). The selected tab at
-    OK time decides the mode; both configurations are kept in the entry."""
+    OK time decides the mode; both configurations are kept in the entry. Days
+    off are shared: one list of whole days, applied in either mode."""
 
     def __init__(self, parent=None, entry=None):
         super().__init__(parent)
@@ -1031,8 +1032,6 @@ class ShiftEditorDialog(QtWidgets.QDialog):
             self.day_rows.append(row)
             wl.addWidget(row)
         form2 = QtWidgets.QFormLayout()
-        self.days_off = DateListWidget(entry.get("days_off", []), add_label="+ day off")
-        form2.addRow("days off (whole days)", self.days_off)
         hz = entry.get("horizon", {})
         hbox = QtWidgets.QHBoxLayout()
         self.h_start = DateWidget(hz.get("start"))
@@ -1056,6 +1055,12 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.tabs.addTab(custom, "Custom")
 
         self.tabs.setCurrentIndex(1 if entry.get("mode", "weekly") == "custom" else 0)
+
+        # --- Days off: shared by both modes (whole days, date-only) ---
+        lay.addWidget(QtWidgets.QLabel("days off (whole days; applies in either mode):"))
+        self.days_off = DateListWidget(entry.get("days_off", []), add_label="+ day off")
+        lay.addWidget(self.days_off)
+
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
         lay.addWidget(bb)
@@ -2696,9 +2701,13 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             elif start_dt is not None and stop_dt <= start_dt:
                 problems.append("Stopping date must be after the simulation start date.")
 
-        # Shifts: custom mode = absolute date intervals; weekly mode = date horizon + days off.
+        # Shifts: days off (shared by both modes) must be dates; custom mode = absolute
+        # date intervals; weekly mode = date horizon containing the days off.
         for s in self.shift_registry:
             sname = s.get("name", "?")
+            offs = [parse_date(x) for x in s.get("days_off", [])]
+            if any(o is None for o in offs):
+                problems.append(f"Shift '{sname}': days off must be 'dd-mm-yyyy'.")
             if s.get("mode") == "custom":
                 ivs = s.get("custom_intervals", [])
                 if not ivs:
@@ -2714,10 +2723,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     problems.append(f"Shift '{sname}': horizon ends before it starts.")
                 elif start_dt is not None and h0.date() < start_dt.date():
                     problems.append(f"Shift '{sname}': horizon begins before the simulation start date.")
-                offs = [parse_date(x) for x in s.get("days_off", [])]
-                if any(o is None for o in offs):
-                    problems.append(f"Shift '{sname}': days off must be 'dd-mm-yyyy'.")
-                elif h0 is not None and h1 is not None and any(not (h0 <= o <= h1) for o in offs):
+                if (h0 is not None and h1 is not None
+                        and any(o is not None and not (h0 <= o <= h1) for o in offs)):
                     problems.append(f"Shift '{sname}': a day off lies outside the horizon.")
 
         return problems

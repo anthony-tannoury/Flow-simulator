@@ -53,9 +53,10 @@ resource: {name, restockable, lifespan (number|"inf"), max_capacity, initial_cap
            order_duration:<dist>, delivery_duration:<dist>, threshold}
 operator: {name, capacity (int), productivity:<dist>, shifts:[shift_name]}
 shift:    {name, mode: "weekly"|"custom",                            # absent mode = weekly
+           days_off:["dd-mm-yyyy"],                                  # whole days off — either mode
            # weekly (recurring) definition:
            days:[7 × {working:bool, intervals:[{start,end}]}]        # Mon..Sun, minutes from midnight
-           days_off:["dd-mm-yyyy"], horizon:{start:"dd-mm-yyyy", end:"dd-mm-yyyy"},
+           horizon:{start:"dd-mm-yyyy", end:"dd-mm-yyyy"},
            # custom definition — explicit absolute intervals:
            custom_intervals:[{start:"dd-mm-yyyy hh:mm", end:"dd-mm-yyyy hh:mm"}]}
 ```
@@ -72,10 +73,12 @@ against `start_date`, everything else is already in simulation units:
 | absolute calendar point | `"dd-mm-yyyy hh:mm"` (date-only fields drop the time) | `start_date`, `custom_intervals`, shutdown `intervals`, ByTime stop, `days_off`, `horizon` |
 
 `start_date` is **always set** — it is the calendar anchor `t = 0`; the loader turns every
-absolute date into raw minutes as `date − start_date`. A custom shift's interval list maps
-1:1 to a `HasShifts` interval list; its weekly fields are kept but ignored. The validator
-checks that dates parse, intervals are ordered and pairwise disjoint, nothing precedes
-`start_date`, days off fall inside the horizon, and the ByTime stop is after the start.
+absolute date into raw minutes as `date − start_date`. `days_off` applies in **either
+mode**: whole days the loader removes when generating the shift's intervals. A custom
+shift's interval list (minus days off) maps to a `HasShifts` interval list; its weekly
+fields are kept but ignored. The validator checks that dates parse, intervals are ordered
+and pairwise disjoint, nothing precedes `start_date`, weekly days off fall inside the
+horizon, and the ByTime stop is after the start.
 
 ## Nodes (by `kind`)
 

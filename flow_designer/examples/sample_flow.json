@@ -239,7 +239,9 @@
       "name": "audit-window",
       "mode": "custom",
       "days": [],
-      "days_off": [],
+      "days_off": [
+        "13-01-2026"
+      ],
       "horizon": {
         "start": "05-01-2026",
         "end": "02-02-2026"
