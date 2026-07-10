@@ -69,7 +69,7 @@ against `start_date`, everything else is already in simulation units:
 | kind | unit / format | where |
 |---|---|---|
 | time of day | raw minutes from midnight (`Time(h, m) = 60*h + m`; edited as h + m) | weekday shift `intervals` |
-| duration | raw minutes (plain numbers) | all distributions, task `timeout`, policy tolerances, stopping `timeout` |
+| duration | raw minutes (plain numbers; `"inf"` where a timeout can be disabled) | all distributions, task `timeout` (number\|`"inf"`), policy tolerances, stopping `timeout` |
 | absolute calendar point | `"dd-mm-yyyy hh:mm"` (date-only fields drop the time) | `start_date`, `custom_intervals`, shutdown `intervals`, ByTime stop, `days_off`, `horizon` |
 
 `start_date` is **always set** — it is the calendar anchor `t = 0`; the loader turns every
@@ -89,7 +89,8 @@ as **OR-of-ANDs** `[[{operator,count}], …]` (any one inner group satisfies it,
 share the same productivity); `task_shifts:[name]`; `policies`
 (five entries below); `operator_scope` ∈ {PER_BATCH, PER_TASK}; `resource_scope` ∈
 {PER_UNIT, PER_BATCH}; `min_carriers`, `max_capacity`, `contiguous_carriers`,
-`independent_carriers`, `timeout`, `priority` (integer in `[0,10]`).
+`independent_carriers`, `timeout` (minutes, or `"inf"` for no carrier timeout),
+`priority` (integer in `[0,10]`).
 
 A **non-discriminating** piece-task `collector_type` requires every model in
 `models_configs` to share the same `duration`, `min_carrier_capacity`, and

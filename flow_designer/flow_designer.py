@@ -398,7 +398,7 @@ class TaskNode(SimNode):
             "max_capacity": as_float(self.get_property("max_capacity"), 1.0),
             "contiguous_carriers": bool(self.get_property("contiguous_carriers")),
             "independent_carriers": bool(self.get_property("independent_carriers")),
-            "timeout": as_float(self.get_property("timeout"), 1e9),
+            "timeout": self.get_property("timeout"),  # number of minutes | "inf"
             "priority": as_int(self.get_property("priority"), 5),
             "collector_type": self.get_property("collector_type"),
             "bufs_in": connected_refs_from_port(self, "bufs_in", "input"),
@@ -469,7 +469,7 @@ class ResourceTaskNode(SimNode):
             "max_carrier_capacity": as_float(self.get_property("max_carrier_capacity"), 1.0),
             "contiguous_carriers": bool(self.get_property("contiguous_carriers")),
             "independent_carriers": bool(self.get_property("independent_carriers")),
-            "timeout": as_float(self.get_property("timeout"), 1e9),
+            "timeout": self.get_property("timeout"),  # number of minutes | "inf"
             "priority": as_int(self.get_property("priority"), 5),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),
             "breakdowns": connected_refs_from_port(self, "breakdowns", "input"),
@@ -1381,7 +1381,8 @@ class ResourcePickerWidget(QtWidgets.QWidget):
         combo = QtWidgets.QComboBox(); combo.addItems(self._names)
         if resource in self._names:
             combo.setCurrentText(resource)
-        edit = QtWidgets.QLineEdit(str(value)); edit.setMaximumWidth(70)
+        text = str(as_int(value)) if self._int else str(value)  # counts show as 1, not 1.0
+        edit = QtWidgets.QLineEdit(text); edit.setMaximumWidth(70)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
         h.addWidget(combo); h.addWidget(QtWidgets.QLabel(self._label + ":")); h.addWidget(edit); h.addWidget(rm); h.addStretch(1)
         entry = (row, combo, edit)
@@ -1952,8 +1953,11 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
 
     # carriers
     t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
-    for key, default in (("min_carriers", 1), ("max_capacity", 1.0), ("timeout", 1e9), ("priority", 5)):
-        acc[key] = QtWidgets.QLineEdit(str(node.get_property(key))); f.addRow(key, acc[key])
+    acc["min_carriers"] = QtWidgets.QLineEdit(str(node.get_property("min_carriers"))); f.addRow("min_carriers", acc["min_carriers"])
+    acc["max_capacity"] = QtWidgets.QLineEdit(str(node.get_property("max_capacity"))); f.addRow("max_capacity", acc["max_capacity"])
+    acc["timeout"] = InfFloatWidget(node.get_property("timeout") if node.has_property("timeout") else "inf")
+    f.addRow("timeout", acc["timeout"])
+    acc["priority"] = QtWidgets.QLineEdit(str(node.get_property("priority"))); f.addRow("priority", acc["priority"])
     acc["contiguous_carriers"] = QtWidgets.QCheckBox(); acc["contiguous_carriers"].setChecked(bool(node.get_property("contiguous_carriers"))); f.addRow("contiguous carriers", acc["contiguous_carriers"])
     acc["independent_carriers"] = QtWidgets.QCheckBox(); acc["independent_carriers"].setChecked(bool(node.get_property("independent_carriers"))); f.addRow("independent carriers", acc["independent_carriers"])
     for label, wdg in extra.get("carriers", []):
@@ -2001,7 +2005,7 @@ def _apply_carrier_common(node, acc):
         node.set_property("collector_type", acc["collector_type"].currentText())
     node.set_property("min_carriers", as_int(acc["min_carriers"].text(), 1))
     node.set_property("max_capacity", as_float(acc["max_capacity"].text(), 1.0))
-    node.set_property("timeout", as_float(acc["timeout"].text(), 1e9))
+    node.set_property("timeout", acc["timeout"].get_value())  # number of minutes | "inf"
     node.set_property("priority", as_int(acc["priority"].text(), 5))
     node.set_property("contiguous_carriers", acc["contiguous_carriers"].isChecked())
     node.set_property("independent_carriers", acc["independent_carriers"].isChecked())
