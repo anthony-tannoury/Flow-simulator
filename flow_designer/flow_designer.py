@@ -1827,9 +1827,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
     """Simulation settings: the start date (the calendar anchor every absolute date
     is converted against — always set) and the stopping criterion. Criterion
     parameter slots appear dynamically per type: Time -> an absolute stop date;
-    Pieces produced -> a timeout in minutes only (the loader deduces the exit
-    buffer from the single EXIT buffer and the total from the single piece
-    generator's goals, so neither is selected here)."""
+    Pieces produced -> a timeout in minutes only."""
 
     def __init__(self, parent, start_date, criterion):
         super().__init__(parent)
@@ -1881,13 +1879,9 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
             self._widgets["time"] = e
             self._form.addRow("stop at", e)
         elif canonical == "ByPiecesProduced":
-            # no total field: the loader deduces it from the piece generator's goals
             timeout = InfFloatWidget("inf")  # a duration, in raw minutes
             self._widgets["timeout"] = timeout
             self._form.addRow("timeout (minutes)", timeout)
-            note = QtWidgets.QLabel("(total pieces = the piece generator's goals)")
-            note.setStyleSheet("color: gray;")
-            self._form.addRow("", note)
 
     def _load(self, criterion):
         if criterion.get("type") != self.type.currentData():
@@ -2580,16 +2574,13 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         }
         _apply_ref_map(nodes, models, resources, operators,
                        lambda kind, v: name_to_id[kind].get(v, v))
-        criterion = dict(self.stopping_criterion or {})
-        if criterion.get("type") == "ByPiecesProduced":
-            criterion.pop("total", None)  # deduced by the loader from the generator's goals
         return {
             "editor": {"name": APP_NAME, "version": EDITOR_VERSION, "format": "clean-json"},
             "models": models,
             "resources": resources,
             "operators": operators,
             "shifts": shifts,
-            "stopping_criterion": criterion,
+            "stopping_criterion": self.stopping_criterion,
             "start_date": self.start_date,
             "nodes": nodes,
             "connections": self.connections_clean(),
@@ -2807,8 +2798,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         elif exit_count > 1:
             problems.append(f"{exit_count} EXIT buffers: the simulation allows at most one.")
 
-        # The simulation allows exactly one piece generator (it also feeds SCRAP returns
-        # and the ByPiecesProduced total, which the loader deduces from its goals).
+        # Mirror the simulation's guard: exactly one piece generator.
         gen_count = sum(1 for n in self.all_nodes() if node_kind(n) == "PieceGenerator")
         if gen_count == 0:
             problems.append("No Piece Generator: the simulation requires exactly one.")
