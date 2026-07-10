@@ -51,6 +51,12 @@ RESOURCE_COLLECTOR_TYPES = ["GREEDY", "ALTRUISTIC"]
 
 SHUTDOWN_TYPES = ["NON_FLEXIBLE", "FLEXIBLE"]
 
+# BufferType (outlet.py): where a piece lands.
+BUFFER_TYPES = ["PASSAGE", "SCRAP", "EXIT"]
+
+# Simulation stopping criteria (judgement_day.py). Friendly label -> canonical class name.
+STOPPING_CRITERION_TYPES = [("Time", "ByTime"), ("Pieces produced", "ByPiecesProduced")]
+
 PORT_COLORS = {
     "buffer": (80, 180, 120),
     "task": (230, 140, 70),
@@ -293,6 +299,7 @@ class BufferNode(SimNode):
         self.add_output("monitor", multi_output=True, color=PORT_COLORS["monitor"])
         self.create_property("valid_models", "[]")
         self.create_property("capacity", "inf")
+        self.create_property("buffer_type", "PASSAGE")  # PASSAGE | SCRAP | EXIT
 
     def to_clean_json(self) -> dict:
         return {
@@ -301,6 +308,7 @@ class BufferNode(SimNode):
             "name": self.name(),
             "valid_models": get_property_json(self, "valid_models", []),
             "capacity": self.get_property("capacity"),
+            "buffer_type": self.get_property("buffer_type") if self.has_property("buffer_type") else "PASSAGE",
             "inputs_from": connected_refs_from_port(self, "from_task", "input"),
             "outputs_to": connected_refs_from_port(self, "to_task", "output"),
             "position": [self.x_pos(), self.y_pos()],
@@ -316,7 +324,7 @@ class RouterNode(SimNode):
         super().__init__()
         self.add_input("from_task", multi_input=True, color=PORT_COLORS["task"])
         self.add_output("to_buffers", multi_output=True, color=PORT_COLORS["buffer"])
-        self.create_property("buffer_probs", "{}")  # {buffer_id: <time-function>}
+        self.create_property("buffer_probs", "{}")  # {buffer_id: <time-function> | null}; null == freeloader (prob = 1 - others)
 
     def to_clean_json(self) -> dict:
         connected_buffers = connected_refs_from_port(self, "to_buffers", "output")
@@ -1441,6 +1449,13 @@ class BufferMenuDialog(QtWidgets.QDialog):
         self.models = ModelTreeWidget(model_registry, checked=get_property_json(node, "valid_models", []))
         lay.addWidget(self.models)
         form = QtWidgets.QFormLayout()
+        self.buffer_type = QtWidgets.QComboBox()
+        for t in BUFFER_TYPES:
+            self.buffer_type.addItem(t.capitalize(), t)
+        cur_type = node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
+        i = self.buffer_type.findData(cur_type)
+        self.buffer_type.setCurrentIndex(i if i >= 0 else 0)
+        form.addRow("type", self.buffer_type)
         self.capacity = InfFloatWidget(node.get_property("capacity") if node.has_property("capacity") else "inf")
         form.addRow("capacity", self.capacity)
         lay.addLayout(form)
@@ -1450,6 +1465,7 @@ class BufferMenuDialog(QtWidgets.QDialog):
     def apply(self):
         set_property_json(self.node, "valid_models", self.models.checked_models())
         self.node.set_property("capacity", self.capacity.get_value())
+        self.node.set_property("buffer_type", self.buffer_type.currentData())
 
 
 class RouterMenuDialog(QtWidgets.QDialog):
@@ -1463,19 +1479,41 @@ class RouterMenuDialog(QtWidgets.QDialog):
         self._widgets = {}
         if not self._buffers:
             lay.addWidget(QtWidgets.QLabel("Wire this router's 'to_buffers' output into buffers first."))
+        # At most one freeloader: its probability is 1 - sum(others), so its slot is greyed out.
+        self.freeloader = QtWidgets.QComboBox()
+        self.freeloader.addItem("(none)", None)
+        for b in self._buffers:
+            self.freeloader.addItem(b.name(), node_uid(b))
+        free_bid = next((bid for bid, v in current.items() if v is None), None)
+        fi = self.freeloader.findData(free_bid) if free_bid else 0
+        self.freeloader.setCurrentIndex(fi if fi >= 0 else 0)
+        if self._buffers:
+            ff = QtWidgets.QFormLayout()
+            ff.addRow("freeloader", self.freeloader)
+            lay.addLayout(ff)
         form = QtWidgets.QFormLayout()
         for b in self._buffers:
             bid = node_uid(b)
-            tf = TimeFunctionWidget(current.get(bid, {"kind": "constant", "value": 0.0}))
+            tf = TimeFunctionWidget(current.get(bid) or {"kind": "constant", "value": 0.0})
             self._widgets[bid] = tf
             form.addRow(b.name(), tf)
         lay.addLayout(form)
         lay.addWidget(QtWidgets.QLabel("(probabilities are checked to sum to 1 when sampled)"))
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+        self.freeloader.currentIndexChanged.connect(self._sync_freeloader)
+        self._sync_freeloader()
+
+    def _sync_freeloader(self, *_):
+        free_bid = self.freeloader.currentData()
+        for bid, w in self._widgets.items():
+            w.setDisabled(bid == free_bid)
 
     def apply(self):
-        set_property_json(self.node, "buffer_probs", {bid: w.get_value() for bid, w in self._widgets.items()})
+        free_bid = self.freeloader.currentData()
+        set_property_json(self.node, "buffer_probs",
+                          {bid: (None if bid == free_bid else w.get_value())
+                           for bid, w in self._widgets.items()})
 
 
 class GeneratorMenuDialog(QtWidgets.QDialog):
@@ -1499,6 +1537,74 @@ class GeneratorMenuDialog(QtWidgets.QDialog):
         set_property_json(self.node, "models_goals",
                           [{"model": e["model"], "goal": e["value"]} for e in self.goals.value()])
         set_property_json(self.node, "shifts", self.shifts.chosen())
+
+
+class StoppingCriterionDialog(QtWidgets.QDialog):
+    """Pick when the simulation ends. Parameter slots appear dynamically per type:
+    Time -> one time slot; Pieces produced -> total + timeout (the exit buffer is
+    deduced by the parser from the single EXIT buffer, so it is not selected here)."""
+
+    def __init__(self, parent, criterion):
+        super().__init__(parent)
+        self.setWindowTitle("Stopping criterion")
+        lay = QtWidgets.QVBoxLayout(self)
+        top = QtWidgets.QFormLayout()
+        self.type = QtWidgets.QComboBox()
+        for label, canonical in STOPPING_CRITERION_TYPES:
+            self.type.addItem(label, canonical)
+        top.addRow("stop on", self.type)
+        lay.addLayout(top)
+        self._host = QtWidgets.QWidget()
+        self._form = QtWidgets.QFormLayout(self._host)
+        self._form.setContentsMargins(12, 4, 0, 0)
+        lay.addWidget(self._host)
+        self._widgets = {}
+        self.type.currentIndexChanged.connect(self._rebuild)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+
+        criterion = criterion or {}
+        ci = self.type.findData(criterion.get("type", "ByTime"))
+        blocked = self.type.blockSignals(True)
+        self.type.setCurrentIndex(ci if ci >= 0 else 0)
+        self.type.blockSignals(blocked)
+        self._rebuild()
+        self._load(criterion)
+
+    def _rebuild(self, *_):
+        while self._form.rowCount():
+            self._form.removeRow(0)
+        self._widgets = {}
+        canonical = self.type.currentData()
+        if canonical == "ByTime":
+            e = QtWidgets.QLineEdit("0")
+            self._widgets["time"] = e
+            self._form.addRow("time", e)
+        elif canonical == "ByPiecesProduced":
+            total = QtWidgets.QLineEdit("0")
+            self._widgets["total"] = total
+            self._form.addRow("total pieces", total)
+            timeout = InfFloatWidget("inf")
+            self._widgets["timeout"] = timeout
+            self._form.addRow("timeout", timeout)
+
+    def _load(self, criterion):
+        if criterion.get("type") != self.type.currentData():
+            return
+        if "time" in self._widgets:
+            self._widgets["time"].setText(str(criterion.get("time", 0)))
+        if "total" in self._widgets:
+            self._widgets["total"].setText(str(criterion.get("total", 0)))
+        if "timeout" in self._widgets:
+            self._widgets["timeout"].set_value(criterion.get("timeout", "inf"))
+
+    def value(self):
+        canonical = self.type.currentData()
+        if canonical == "ByTime":
+            return {"type": "ByTime", "time": as_float(self._widgets["time"].text())}
+        return {"type": "ByPiecesProduced",
+                "total": as_int(self._widgets["total"].text()),
+                "timeout": self._widgets["timeout"].get_value()}
 
 
 class BreakdownMenuDialog(QtWidgets.QDialog):
@@ -1846,6 +1952,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.resource_registry = []
         self.operator_registry = []
         self.shift_registry = []
+        self.stopping_criterion = {}  # {} | {"type": "ByTime"|"ByPiecesProduced", ...}
 
         self.graph.register_nodes([
             ShutdownsNode,
@@ -1878,13 +1985,14 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         act_import.triggered.connect(self.import_clean_json_dialog)
         act_export.triggered.connect(self.export_clean_json_dialog)
 
-        model_menu = self.menuBar().addMenu("Models")
-        model_menu.addAction("Edit models...").triggered.connect(self.edit_models)
-
         registries_menu = self.menuBar().addMenu("Registries")
+        registries_menu.addAction("Edit models...").triggered.connect(self.edit_models)
         registries_menu.addAction("Edit resources...").triggered.connect(self.edit_resources)
         registries_menu.addAction("Edit operators...").triggered.connect(self.edit_operators)
         registries_menu.addAction("Edit shifts...").triggered.connect(self.edit_shifts)
+
+        simulation_menu = self.menuBar().addMenu("Simulation")
+        simulation_menu.addAction("Stopping criterion...").triggered.connect(self.edit_stopping_criterion)
 
         edit_menu = self.menuBar().addMenu("Edit")
         delete_action = edit_menu.addAction("Delete selected")
@@ -1993,6 +2101,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def new_graph(self):
         self.graph.clear_session()
         self.model_registry = []
+        self.stopping_criterion = {}
 
     def edit_models(self):
         dlg = ModelRegistryDialog(self, self.model_registry)
@@ -2021,6 +2130,14 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         if dlg.exec():
             self.shift_registry = dlg.entries()
             self.statusBar().showMessage(f"{len(self.shift_registry)} shift definitions.")
+
+    def edit_stopping_criterion(self):
+        dlg = StoppingCriterionDialog(self, self.stopping_criterion)
+        if dlg.exec():
+            self.stopping_criterion = dlg.value()
+            label = next((lbl for lbl, canon in STOPPING_CRITERION_TYPES
+                          if canon == self.stopping_criterion.get("type")), "?")
+            self.statusBar().showMessage(f"Stopping criterion: {label}.")
 
     def on_node_double_clicked(self, node):
         kind = node_kind(node)
@@ -2138,6 +2255,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "resources": self.resource_registry,
             "operators": self.operator_registry,
             "shifts": self.shift_registry,
+            "stopping_criterion": self.stopping_criterion,
             "nodes": nodes,
             "connections": self.connections_clean(),
             "backdrops": backdrops,
@@ -2225,6 +2343,25 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             elif kind == "Monitor":
                 if not get_input_ref(node, "buffer"):
                     problems.append(f"Monitor '{name}' is not attached to a buffer.")
+
+        # Aggregate (whole-graph) checks.
+        buffer_types = [node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
+                        for node in self.all_nodes() if node_kind(node) == "Buffer"]
+        exit_count = buffer_types.count("EXIT")
+        if exit_count == 0:
+            problems.append("No EXIT buffer: the parser expects exactly one to define the simulation's exit.")
+        elif exit_count > 1:
+            problems.append(f"{exit_count} EXIT buffers: the simulation allows at most one.")
+        if "SCRAP" in buffer_types and not any(node_kind(n) == "PieceGenerator" for n in self.all_nodes()):
+            problems.append("A SCRAP buffer needs a Piece Generator to return its scrapped pieces to.")
+
+        crit = self.stopping_criterion or {}
+        if not crit:
+            problems.append("No stopping criterion set (Simulation > Stopping criterion...); "
+                            "the simulation may never terminate.")
+        elif crit.get("type") == "ByPiecesProduced" and exit_count != 1:
+            problems.append("Stopping criterion 'Pieces produced' needs exactly one EXIT buffer to count.")
+
         return problems
 
     def delete_selected_nodes(self):
@@ -2357,7 +2494,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     }
     _IMPORT_SCALAR_PROPS = {
         "Shutdowns": ["shutdown_type"],
-        "Buffer": ["capacity"],
+        "Buffer": ["capacity", "buffer_type"],
         "Task": ["operator_scope", "resource_scope", "min_carriers", "max_capacity",
                  "contiguous_carriers", "independent_carriers", "timeout", "priority", "collector_type"],
         "ResourceTask": ["resource_scope", "operator_scope", "resource_collector_type",
@@ -2485,6 +2622,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self._merge_named_registry("resource_registry", data.get("resources", []))
         self._merge_named_registry("operator_registry", data.get("operators", []))
         self._merge_named_registry("shift_registry", data.get("shifts", []))
+        if not self.stopping_criterion and data.get("stopping_criterion"):
+            self.stopping_criterion = data["stopping_criterion"]
 
         id_to_node = {}
         for card in data.get("nodes", []):

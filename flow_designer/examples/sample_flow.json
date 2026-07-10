@@ -236,6 +236,11 @@
       }
     }
   ],
+  "stopping_criterion": {
+    "type": "ByPiecesProduced",
+    "total": 200,
+    "timeout": "inf"
+  },
   "nodes": [
     {
       "id": "gen",
@@ -270,6 +275,7 @@
         "Widget"
       ],
       "capacity": "inf",
+      "buffer_type": "PASSAGE",
       "inputs_from": [
         "gen"
       ],
@@ -447,13 +453,7 @@
         },
         {
           "buffer": "buf_scrap",
-          "probability": {
-            "kind": "linear",
-            "x1": 0,
-            "y1": 0.05,
-            "x2": 20000,
-            "y2": 0.2
-          }
+          "probability": null
         }
       ],
       "position": [
@@ -470,6 +470,7 @@
         "WidgetB"
       ],
       "capacity": "inf",
+      "buffer_type": "EXIT",
       "inputs_from": [
         "router"
       ],
@@ -487,6 +488,7 @@
         "Widget"
       ],
       "capacity": "inf",
+      "buffer_type": "SCRAP",
       "inputs_from": [
         "router",
         "jam"
