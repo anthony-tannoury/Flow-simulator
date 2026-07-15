@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(salabimpp VERSION 1.0.0 LANGUAGES CXX)
 
-# salabim++ is a single header: this interface target is all you need.
 add_library(salabimpp INTERFACE)
 add_library(salabimpp::salabimpp ALIAS salabimpp)
 target_include_directories(salabimpp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
