@@ -537,14 +537,21 @@ class ShiftManager : public IntervalWaiter {
         auto before = [](const DateTime& a, const DateTime& b) {
             return minutes_between(b, a) < 0;  // a < b
         };
+        // each day off is subtracted from the pieces the previous days off left
         std::vector<std::pair<DateTime, DateTime>> ranges;
         for (const auto& [start, end] : shifts) {
+            std::vector<std::pair<DateTime, DateTime>> pieces{{start, end}};
             for (long long day_off : days_off) {
                 DateTime d_start{days_t(std::chrono::days(day_off)), 0, 0};
                 DateTime d_end{days_t(std::chrono::days(day_off + 1)), 0, 0};
-                if (before(start, d_start)) ranges.push_back({start, before(end, d_start) ? end : d_start});
-                if (before(d_end, end)) ranges.push_back({before(d_end, start) ? start : d_end, end});
+                std::vector<std::pair<DateTime, DateTime>> new_pieces;
+                for (const auto& [s, e] : pieces) {
+                    if (before(s, d_start)) new_pieces.push_back({s, before(e, d_start) ? e : d_start});
+                    if (before(d_end, e)) new_pieces.push_back({before(s, d_end) ? d_end : s, e});
+                }
+                pieces = std::move(new_pieces);
             }
+            ranges.insert(ranges.end(), pieces.begin(), pieces.end());
         }
         Intervals out;
         for (const auto& [s, e] : ranges)
