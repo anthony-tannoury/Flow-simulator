@@ -667,7 +667,9 @@
       "independent_carriers": false,
       "timeout": 240.0,
       "priority": 4,
-      "shutdowns": [],
+      "shutdowns": [
+        "clean"
+      ],
       "breakdowns": [
         "spray"
       ],
@@ -681,6 +683,7 @@
       "kind": "Shutdowns",
       "name": "Scheduled Maint.",
       "shutdown_type": "FLEXIBLE",
+      "mode": "custom",
       "intervals": [
         {
           "start": "11-01-2026 23:00",
@@ -754,6 +757,23 @@
       "position": [
         -640.0,
         440.0
+      ]
+    },
+    {
+      "id": "clean",
+      "kind": "Shutdowns",
+      "name": "Periodic Cleaning",
+      "shutdown_type": "NON_FLEXIBLE",
+      "mode": "generator",
+      "generator": {
+        "in_between": 480.0,
+        "duration": 20.0,
+        "start": "05-01-2026 00:00",
+        "end": "02-02-2026 00:00"
+      },
+      "position": [
+        -560.0,
+        420.0
       ]
     }
   ],
@@ -829,6 +849,14 @@
       "to_node": "paint",
       "to_kind": "ResourceTask",
       "to_port": "breakdowns"
+    },
+    {
+      "from_node": "clean",
+      "from_kind": "Shutdowns",
+      "from_port": "shutdowns",
+      "to_node": "paint",
+      "to_kind": "ResourceTask",
+      "to_port": "shutdowns"
     }
   ],
   "backdrops": []

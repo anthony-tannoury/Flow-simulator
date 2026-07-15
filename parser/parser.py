@@ -14,7 +14,7 @@ from simulation.interval import Interval
 from simulation.shift_manager import ShiftManager
 from simulation.resource import Resource, RestockableResource
 from simulation.operator import Alternative, OperatorGroup
-from simulation.interrupters import Breakdown, FlexibleShutdowns, NonFlexibleShutdowns
+from simulation.interrupters import Breakdown, Shutdowns, FlexibleShutdowns, NonFlexibleShutdowns
 from simulation.protocols import (AbortPendingCarriers, WaitForCarriers, AbortOrWaitForCarriers,
                                   ConstrainedByShift, NotConstrainedByShift, PartiallyConstrainedByShift,
                                   Conscious, Unconscious)
@@ -437,7 +437,22 @@ class Parser:
             task = self.tasks[task_node['id']]
             for id_ in task_node['shutdowns']:
                 shutdowns_node = self.by_id[id_]
-                intervals = [self.to_interval(i) for i in shutdowns_node['intervals']]
+
+                match shutdowns_node.get('mode', 'custom'):
+                    case 'custom':
+                        intervals = [self.to_interval(i) for i in shutdowns_node['intervals']]
+                    case 'generator':
+                        generator = shutdowns_node['generator']
+                        intervals = Shutdowns.generate_periodic_shutdown(
+                            task=task,
+                            in_between=generator['in_between'],
+                            shutdown_duration=generator['duration'],
+                            sim_start=self.sim_start,
+                            start=to_datetime(generator['start']),
+                            end=to_datetime(generator['end'])
+                        )
+                    case _:
+                        raise NotImplementedError()
 
                 match shutdowns_node['shutdown_type']:
                     case 'FLEXIBLE':
