@@ -3,25 +3,32 @@ import salabim as sim
 
 from datetime import date, time, datetime
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType
-from simulation.resource_task import ResourceTask, ResourceTaskConfig
+from simulation.resource_task import ResourceTask, ResourceTaskConfig, ResourceCollectorType
 from simulation.piece import Model, PieceGenerator
-from simulation.task import Scope, Protocols
-from simulation.sampler import Distribution
-from simulation.function_generator import Linear, Exponential
+from simulation.task import Task, Scope, Protocols
+from simulation.sampler import Sampler, Distribution, FailureRate
+from simulation.function_generator import Linear, Exponential, Bathtub
 from simulation.outlet import Outlet, Buffer, Router, BufferType
-from simulation.judgement_day import ByTime, ByPiecesProduced
+from simulation.judgement_day import ByTime, ByPiecesProduced, SimulationStopper
 from simulation.interval import Interval
 from simulation.shift_manager import ShiftManager
 from simulation.resource import Resource, RestockableResource
 from simulation.operator import Alternative, OperatorGroup
+from simulation.interrupters import Breakdown, FlexibleShutdowns, NonFlexibleShutdowns
+from simulation.protocols import (AbortPendingCarriers, WaitForCarriers, AbortOrWaitForCarriers,
+                                  ConstrainedByShift, NotConstrainedByShift, PartiallyConstrainedByShift,
+                                  Conscious, Unconscious)
 from typing import Callable
 
 
 def to_date(date_str: str) -> date:
     return datetime.strptime(date_str, '%d-%m-%Y').date()
 
-def to_time(time_str: str) -> time:
-    return datetime.strptime(time_str, '%H:%M').time()
+def to_minutes(time_str: str | float) -> float:
+    if isinstance(time_str, (int, float)):   # legacy exports carry raw minutes
+        return float(time_str)
+    hour, minute = time_str.split(':')
+    return 60 * int(hour) + int(minute)
 
 def to_datetime(datetime_str: str) -> datetime:
     return datetime.strptime(datetime_str, '%d-%m-%Y %H:%M')
@@ -48,23 +55,75 @@ def make_callable(c: dict) -> float | Callable[[float], float]:
 
 def make_distribution(distribution: dict) -> Distribution:
         params = []
-        for param in distribution['params']:
+        for param in distribution['params'].values():
             params.append(make_callable(param))
-        
+
         if distribution['dist_type'] not in DISTR_TYPE_TO_CLASS:
             raise NotImplementedError()
 
         return Distribution(DISTR_TYPE_TO_CLASS[distribution['dist_type']], *params)
 
 
-def make_protocols(protocols: dict) -> Protocols:
-    pass
+def make_salabim_distribution(distribution: dict) -> sim.Distribution:
+    params = [make_callable(p) for p in distribution['params'].values()]
+
+    if not all(isinstance(p, (int, float)) for p in params):
+        raise NotImplementedError('output-resource distributions must have constant parameters')
+    if distribution['dist_type'] not in DISTR_TYPE_TO_CLASS:
+        raise NotImplementedError()
+
+    return DISTR_TYPE_TO_CLASS[distribution['dist_type']](*params)
+
+
+def make_mtbf(mtbf: dict) -> Sampler:
+    match mtbf['mode']:
+        case 'distribution':
+            return make_distribution(mtbf['distribution'])
+        case 'bathtub':
+            return FailureRate(
+                failure_rate=Bathtub.generate(mtbf['a'], mtbf['tau'], mtbf['c'], mtbf['beta'], mtbf['eta']),
+                tolerance=mtbf['tolerance'],
+                max_iters=mtbf['max_iters']
+            )
+        case _:
+            raise NotImplementedError()
+
+
+def make_protocol(policy: dict):
+    match policy['type']:
+        case 'AbortPendingCarriers':
+            return AbortPendingCarriers()
+        case 'WaitForCarriers':
+            return WaitForCarriers()
+        case 'AbortOrWaitForCarriers':
+            return AbortOrWaitForCarriers(tolerance_fraction=policy['tolerance_fraction'])
+        case 'ConstrainedByShift':
+            return ConstrainedByShift()
+        case 'NotConstrainedByShift':
+            return NotConstrainedByShift()
+        case 'PartiallyConstrainedByShift':
+            return PartiallyConstrainedByShift(tolerance=policy['tolerance'])
+        case 'Conscious':
+            return Conscious()
+        case 'Unconscious':
+            return Unconscious()
+        case _:
+            raise NotImplementedError()
+
+
+def make_protocols(policies: dict) -> Protocols:
+    return Protocols(**{
+        field: make_protocol(policies.get(field, default))
+        for field, default in DEFAULT_POLICIES.items()
+    })
 
 
 DISTR_TYPE_TO_CLASS = {
     'Constant': sim.Constant,
+    'Uniform': sim.Uniform,
     'Normal': sim.Normal,
-    'Exponential': sim.Exponential
+    'Exponential': sim.Exponential,
+    'Triangular': sim.Triangular
 }
 
 STR_TO_BUFFER_TYPE = {
@@ -80,10 +139,23 @@ STR_TO_PIECE_COLLECTOR_TYPE = {
     'NON_DISCRIMINATING_ALTRUISTIC': PieceCollectorType.NON_DISCRIMINATING_ALTRUISTIC,
 }
 
+STR_TO_RESOURCE_COLLECTOR_TYPE = {
+    'GREEDY': ResourceCollectorType.GREEDY,
+    'ALTRUISTIC': ResourceCollectorType.ALTRUISTIC
+}
+
 STR_TO_SCOPE = {
     'PER_UNIT': Scope.PER_UNIT,
     'PER_BATCH': Scope.PER_BATCH,
     'PER_TASK': Scope.PER_TASK
+}
+
+DEFAULT_POLICIES = {
+    'pending_carriers_pre_flexible_shutdowns': {'type': 'AbortPendingCarriers'},
+    'pending_carrier_pre_task_shift_end': {'type': 'AbortPendingCarriers'},
+    'operator_shift_constraint': {'type': 'ConstrainedByShift'},
+    'task_shift_constraint': {'type': 'ConstrainedByShift'},
+    'operators_self_conscious': {'type': 'Conscious'}
 }
 
 
@@ -95,13 +167,40 @@ class Parser:
         self.discriminate()
         self.by_id = {n['id']: n for n in self.data['nodes']}
 
+    def load_all(self) -> None:
+        self.load_models()
+        self.load_closing_days()
+        self.load_shifts()
+        self.load_resources()
+        self.load_operators()
+        self.load_non_scrap_buffers()
+        self.load_routers(with_scrap=False)
+        self.load_piece_generator()
+        self.load_scrap_buffers()
+        self.load_routers(with_scrap=True)
+        self.load_piece_tasks()
+        self.load_resource_tasks()
+        self.load_shutdowns()
+        self.load_breakdowns()
+        self.load_stopping_criterion()
+
+    def to_interval(self, interval: dict) -> Interval:
+        return Interval(
+            ShiftManager.minutes_between(self.sim_start, to_datetime(interval['start'])),
+            ShiftManager.minutes_between(self.sim_start, to_datetime(interval['end']))
+        )
+
     def make_models_configs(self, json_models_configs: dict) -> dict[Model, ModelConfig]:
         models_configs: dict[Model, ModelConfig] = {}
+        durations: dict[str, Distribution] = {}
 
         for model_config in json_models_configs:
             model = self.models[model_config['model']]
-            duration = make_distribution(model_config['duration'])
-            resources = [(r['resource'], r['value']) for r in model_config['resources']]
+            key = json.dumps(model_config['duration'], sort_keys=True)
+            if key not in durations:
+                durations[key] = make_distribution(model_config['duration'])
+            duration = durations[key]
+            resources = [(self.resources[r['resource']], r['value']) for r in model_config['resources']]
             models_configs[model] = ModelConfig(
                 duration=duration,
                 resources=resources,
@@ -110,14 +209,20 @@ class Parser:
             )
 
         return models_configs
-    
-    def make_alternative(self, operators: dict) -> Alternative:
-        Alternative(*[[(self.operator_groups[og['id']], og['count']) for og in alt] for alt in operators])
+
+    def make_alternative(self, alternatives: list) -> Alternative:
+        return Alternative(*[[(self.operator_groups[m['operator']], m['count']) for m in alt]
+                             for alt in alternatives])
 
     def touches_scrap(self, router: dict) -> bool:
-        return any(self.by_id[e['buffer']]['buffer_type'] == 'SCRAP'
-               for e in router['buffer_probs'])
-     
+        for entry in router['buffer_probs']:
+            target = self.by_id[entry['buffer']]
+            if target['kind'] == 'Router':
+                raise NotImplementedError('router-to-router chains are not supported')
+            if target['buffer_type'] == 'SCRAP':
+                return True
+        return False
+
     def discriminate(self) -> None:
         self.per_kind: dict[str, list[dict]] = {}
 
@@ -125,7 +230,7 @@ class Parser:
             if node['kind'] not in self.per_kind:
                 self.per_kind[node['kind']] = []
             self.per_kind[node['kind']].append(node)
-        
+
     def load_models(self) -> None:
         self.models: dict[str, Model] = {}
 
@@ -138,7 +243,7 @@ class Parser:
 
     def load_closing_days(self) -> None:
         self.closing_days: dict[str, date] = {}
-        
+
         for closing_day in self.data['closing_days']:
             self.closing_days[closing_day['id']] = to_date(closing_day['date'])
 
@@ -151,7 +256,7 @@ class Parser:
             match shift['mode']:
                 case 'weekly':
                     working_days = [d['working'] for d in shift['days']]
-                    shifts_per_day = [[(to_time(s['start']), to_time(s['end'])) for s in d['intervals']] for d in shift['days']]
+                    shifts_per_day = [[(to_minutes(s['start']), to_minutes(s['end'])) for s in d['intervals']] for d in shift['days']]
                     start = to_date(shift['horizon']['start'])
                     end = to_date(shift['horizon']['end'])
                     self.shifts[shift['id']] = ShiftManager.generate_weekly_shifts(
@@ -163,7 +268,7 @@ class Parser:
                         end=end
                     )
                 case 'custom':
-                    intervals = [(to_datetime(i['start']), to_datetime(i['end'])) for i in shift['intervals']]
+                    intervals = [(to_datetime(i['start']), to_datetime(i['end'])) for i in shift['custom_intervals']]
                     self.shifts[shift['id']] = ShiftManager.generate_custom_shifts(
                         sim_start=self.sim_start,
                         shifts=intervals,
@@ -193,17 +298,21 @@ class Parser:
 
     def load_operators(self) -> None:
         self.operator_groups: dict[str, OperatorGroup] = {}
+        productivities: dict[str, Distribution] = {}
 
         for operator in self.data['operators']:
+            key = json.dumps(operator['productivity'], sort_keys=True)
+            if key not in productivities:
+                productivities[key] = make_distribution(operator['productivity'])
+
             self.operator_groups[operator['id']] = OperatorGroup(
                 name=operator['name'],
                 capacity=operator['capacity'],
                 shifts=join_shifts([self.shifts[id_] for id_ in operator['shifts']]),
-                productivity=make_distribution(operator['productivity'])
+                productivity=productivities[key]
             )
 
     def load_non_scrap_buffers(self) -> None:
-        # First step in loading the flow so we initialize self.outlets here
         self.outlets: dict[str, Outlet] = {}
         self.scrap_buffers_ids = []
 
@@ -230,11 +339,15 @@ class Parser:
         assert len(self.per_kind['PieceGenerator']) == 1
         piece_generator_node = self.per_kind['PieceGenerator'][0]
 
+        for id_ in piece_generator_node['outlets']:
+            if id_ not in self.outlets:
+                raise ValueError(f"piece generator outlet {id_} is (or routes into) a scrap buffer")
+
         models_goals = {
-            mg['model']: mg['goal']
+            self.models[mg['model']]: mg['goal']
             for mg in piece_generator_node['models_goals']
         }
-        shifts = join_shifts([self.shifts[shift['id']] for shift in piece_generator_node['shifts']])
+        shifts = join_shifts([self.shifts[id_] for id_ in piece_generator_node['shifts']])
         outlets = [self.outlets[id_] for id_ in piece_generator_node['outlets']]
         self.piece_generator = PieceGenerator(
             name=piece_generator_node['name'],
@@ -246,7 +359,7 @@ class Parser:
     def load_scrap_buffers(self) -> None:
         for id_ in self.scrap_buffers_ids:
             buffer = self.by_id[id_]
-            self.buffers[buffer['id']] = Buffer(
+            self.outlets[buffer['id']] = Buffer(
                 capacity=float(buffer['capacity']),
                 valid_models=[self.models[m] for m in buffer['valid_models']],
                 buffer_type=BufferType.SCRAP,
@@ -254,9 +367,9 @@ class Parser:
             )
 
     def load_piece_tasks(self) -> None:
-        self.piece_tasks: dict[str, PieceTask] = {}
+        self.tasks: dict[str, Task] = {}
 
-        for pt in self.per_kind['Task']:
+        for pt in self.per_kind.get('Task', []):
             piece_task_config = PieceTaskConfig(
                 task_shifts=join_shifts([self.shifts[id_] for id_ in pt['task_shifts']]),
                 startup_duration=make_distribution(pt['startup_duration']),
@@ -276,3 +389,91 @@ class Parser:
                 models_configs=self.make_models_configs(pt['models_configs']),
                 piece_collector_type=STR_TO_PIECE_COLLECTOR_TYPE[pt['collector_type']]
             )
+            self.tasks[pt['id']] = PieceTask(
+                name=pt['name'],
+                config=piece_task_config,
+                inlets=[self.outlets[id_] for id_ in pt['bufs_in']],
+                outlets=[self.outlets[id_] for id_ in pt['bufs_out']]
+            )
+
+    def load_resource_tasks(self) -> None:
+        for rt in self.per_kind.get('ResourceTask', []):
+            resource_task_config = ResourceTaskConfig(
+                task_shifts=join_shifts([self.shifts[id_] for id_ in rt['task_shifts']]),
+                startup_duration=make_distribution(rt['startup_duration']),
+                loading_duration=make_distribution(rt['loading_duration']),
+                startup_operators=self.make_alternative(rt['startup_operators']),
+                loading_operators=self.make_alternative(rt['loading_operators']),
+                operators=self.make_alternative(rt['operators']),
+                operator_scope=STR_TO_SCOPE[rt['operator_scope']],
+                resource_scope=STR_TO_SCOPE[rt['resource_scope']],
+                min_carriers=rt['min_carriers'],
+                max_capacity=rt['max_capacity'],
+                timeout=float(rt['timeout']),
+                priority=rt['priority'],
+                contiguous_carriers=rt['contiguous_carriers'],
+                independent_carriers=rt['independent_carriers'],
+                protocols=make_protocols(rt['policies']),
+                non_transformed_resources=[(self.resources[r['resource']], r['value'])
+                                           for r in rt['non_transformed_resources']],
+                transformed_resources_salvageable=[(self.resources[r['resource']], r['proportion'], r['salvageable'])
+                                                   for r in rt['transformed_resources']],
+                resources_out_distr=[(self.resources[r['resource']],
+                                      sim.Bounded(make_salabim_distribution(r['distribution']),
+                                                  r['lowerbound'], r['upperbound']))
+                                     for r in rt['resources_out']],
+                duration=make_distribution(rt['duration']),
+                resource_collector_type=STR_TO_RESOURCE_COLLECTOR_TYPE[rt['resource_collector_type']],
+                min_carrier_capacity=rt['min_carrier_capacity'],
+                max_carrier_capacity=rt['max_carrier_capacity']
+            )
+            self.tasks[rt['id']] = ResourceTask(
+                name=rt['name'],
+                config=resource_task_config
+            )
+
+    def load_shutdowns(self) -> None:
+        for task_node in self.per_kind.get('Task', []) + self.per_kind.get('ResourceTask', []):
+            task = self.tasks[task_node['id']]
+            for id_ in task_node['shutdowns']:
+                shutdowns_node = self.by_id[id_]
+                intervals = [self.to_interval(i) for i in shutdowns_node['intervals']]
+
+                match shutdowns_node['shutdown_type']:
+                    case 'FLEXIBLE':
+                        FlexibleShutdowns(task=task, intervals=intervals)
+                    case 'NON_FLEXIBLE':
+                        NonFlexibleShutdowns(task=task, intervals=intervals)
+                    case _:
+                        raise NotImplementedError()
+
+    def load_breakdowns(self) -> None:
+        for breakdown in self.per_kind.get('Breakdown', []):
+            Breakdown(
+                name=breakdown['name'],
+                task=self.tasks[breakdown['task']],
+                mtbf=make_mtbf(breakdown['mtbf']),
+                mttr=make_distribution(breakdown['mttr']),
+                outlets=[self.outlets[id_] for id_ in breakdown['outlets']]
+            )
+
+    def load_stopping_criterion(self) -> None:
+        criterion = self.data['stopping_criterion']
+
+        match criterion['type']:
+            case 'ByTime':
+                minutes = ShiftManager.minutes_between(self.sim_start, to_datetime(criterion['time']))
+                self.stopping_criterion = ByTime(time=minutes)
+            case 'ByPiecesProduced':
+                total = sum(mg['goal'] for mg in self.per_kind['PieceGenerator'][0]['models_goals'])
+                exit_buffer = next(self.outlets[b['id']] for b in self.per_kind['Buffer']
+                                   if b['buffer_type'] == 'EXIT')
+                self.stopping_criterion = ByPiecesProduced(
+                    total=total,
+                    exit_buffer=exit_buffer,
+                    timeout=float(criterion['timeout'])
+                )
+            case _:
+                raise NotImplementedError()
+
+        SimulationStopper(criterion=self.stopping_criterion)
