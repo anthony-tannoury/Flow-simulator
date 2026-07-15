@@ -2893,6 +2893,27 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     problems.append(f"Piece Generator '{name}' has no outlets.")
                 self._check_flushability(node, [g.get("model") for g in goals if g.get("model")],
                                          "bufs_out", "Piece Generator", problems)
+                # A scrap buffer must never sit on the generator's outlet chain, not
+                # even through routers (router chains are wire-legal): freshly
+                # generated pieces would be scrapped on arrival (a scrap entry
+                # re-increments the generator's remaining goal, so the generator
+                # would just respin), and the parser could not build the object cycle
+                # generator -> router -> scrap -> generator anyway.
+                frontier = list(connected_nodes_from_port(node, "bufs_out", "output"))
+                seen = set()
+                while frontier:
+                    outlet = frontier.pop()
+                    if id(outlet) in seen:
+                        continue
+                    seen.add(id(outlet))
+                    okind = node_kind(outlet)
+                    if (okind == "Buffer" and outlet.has_property("buffer_type")
+                            and outlet.get_property("buffer_type") == "SCRAP"):
+                        problems.append(f"Piece Generator '{name}': its outlet chain reaches SCRAP "
+                                        f"buffer '{outlet.name()}' (generated pieces would be "
+                                        f"scrapped on arrival).")
+                    elif okind == "Router":
+                        frontier.extend(connected_nodes_from_port(outlet, "to_buffers", "output"))
 
             elif kind == "Buffer":
                 if not get_property_json(node, "valid_models", []):
