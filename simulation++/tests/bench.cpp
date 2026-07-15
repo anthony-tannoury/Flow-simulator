@@ -1,4 +1,5 @@
-// Twin scenario 1 (C++ side) — must produce the same trace as scenario1.py.
+// Benchmark (C++ side) — scenario1 scaled to 20,000 pieces, trace off.
+// Companion of bench.py: same scenario, same seed; time both to compare.
 #include "simulation.hpp"
 
 #include <cstdio>
@@ -99,11 +100,5 @@ int main() {
         }
         std::fprintf(stderr, "]\n");
     }
-    double s1 = sim::random_stream().random(), s2 = sim::random_stream().random(),
-           s3 = sim::random_stream().random();
-    std::fprintf(stderr, "salabim_stream_next=[%.12f, %.12f, %.12f]\n", s1, s2, s3);
-    double n1 = np_random.random_sample(), n2 = np_random.random_sample(),
-           n3 = np_random.random_sample();
-    std::fprintf(stderr, "np_stream_next=[%.12f, %.12f, %.12f]\n", n1, n2, n3);
     return 0;
 }

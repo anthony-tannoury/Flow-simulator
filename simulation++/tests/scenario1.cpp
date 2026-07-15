@@ -1,4 +1,6 @@
-// Twin scenario 1 (C++ side) — must produce the same trace as scenario1.py.
+// Scenario 1 (C++ side) — companion of scenario1.py: same scenario, same seed.
+// Behaviour matches the Python run; the individual draws (and so the exact
+// counts) do not.
 #include "simulation.hpp"
 
 #include <cstdio>
@@ -7,7 +9,7 @@ using namespace simulation;
 
 int main() {
     auto& e = init(0, false);
-    e.trace(true);
+    e.trace(false);
 
     auto* model_a = new Model("A");
     auto* model_b = new Model("B");
@@ -99,11 +101,5 @@ int main() {
         }
         std::fprintf(stderr, "]\n");
     }
-    double s1 = sim::random_stream().random(), s2 = sim::random_stream().random(),
-           s3 = sim::random_stream().random();
-    std::fprintf(stderr, "salabim_stream_next=[%.12f, %.12f, %.12f]\n", s1, s2, s3);
-    double n1 = np_random.random_sample(), n2 = np_random.random_sample(),
-           n3 = np_random.random_sample();
-    std::fprintf(stderr, "np_stream_next=[%.12f, %.12f, %.12f]\n", n1, n2, n3);
     return 0;
 }

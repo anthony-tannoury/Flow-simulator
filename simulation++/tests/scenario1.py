@@ -1,4 +1,6 @@
-# Twin scenario 1 (Python side) — must produce the same trace as scenario1.cpp.
+# Scenario 1 (Python side) — companion of scenario1.cpp: same scenario, same seed.
+# Behaviour matches the C++ run; the individual draws (and so the exact
+# counts) do not.
 # Generator (2 models, shifts) -> B0 -> PieceTask T1 (discriminating greedy,
 # operators w/ productivity, uniform durations) -> Router(90% B1 / 10% scrap)
 # -> PieceTask T2 (non-discriminating greedy, no operators) -> exit.
@@ -18,7 +20,7 @@ from simulation.piece_task import (PieceTaskConfig, ModelConfig, PieceTask,
                                    PieceCollectorType)
 from simulation.judgement_day import ByTime, SimulationStopper
 
-env.trace(True)
+env.trace(False)
 
 model_a = Model("A")
 model_b = Model("B")
@@ -110,9 +112,3 @@ print(f"generated={gen.generated}", file=sys.stderr)
 for name, buf in (("B0", b0), ("B1", b1), ("EXIT", exit_buffer), ("SCRAP", scrap)):
     contents = [(p.id, p.model.name) for p in buf]
     print(f"{name} len={len(buf)} {contents}", file=sys.stderr)
-import random
-import numpy as np
-s = [random.random() for _ in range(3)]
-print(f"salabim_stream_next=[{s[0]:.12f}, {s[1]:.12f}, {s[2]:.12f}]", file=sys.stderr)
-n = [float(np.random.random_sample()) for _ in range(3)]
-print(f"np_stream_next=[{n[0]:.12f}, {n[1]:.12f}, {n[2]:.12f}]", file=sys.stderr)

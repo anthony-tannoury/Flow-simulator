@@ -3,10 +3,11 @@
 // (simulation/*.py) onto salabim++ (salabim.hpp).
 //
 // The translation mirrors the Python modules section by section — same class
-// names, same logic, same validation messages, same event ordering — so the
-// two simulations can be diffed against each other. Python runs salabim in
-// yieldless mode where helper methods block internally; here every such
-// helper is a sim::Process coroutine executed with `co_await call(helper())`
+// names, same logic, same validation messages — so the two codebases read in
+// parallel. Runs are seeded and deterministic, but they do not reproduce
+// Python runs draw for draw; only the behaviour is the same. Python runs
+// salabim in yieldless mode where helper methods block internally; here every
+// such helper is a sim::Process coroutine executed with `co_await call(...)`
 // (the sub-process facility of salabim++).
 //
 // Conventions carried across the whole file:
@@ -25,10 +26,8 @@
 #include "salabim.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <chrono>
-#include <cstdint>
 #include <cmath>
 #include <cstdio>
 #include <functional>
@@ -54,57 +53,16 @@ struct Model;
 class Piece;
 
 // ============================================================================
-// __init__.py — module globals: the environment, the seed, and numpy's stream
+// __init__.py — module globals: the environment and the seed
 // ============================================================================
 
 inline long long SEED = 0;
 inline sim::Environment* env = nullptr;
 
-// Python uses numpy's own RNG for np.random.choice — a stream separate from
-// salabim's. NumpyRandom is a bit-exact mirror of numpy's legacy RandomState:
-// MT19937 with numpy's mt19937_seed (Knuth initializer) and the 53-bit double
-// recipe of mt19937_next_double, so np.random.seed(s) + np.random.choice(...)
-// reproduce identically.
-class NumpyRandom {
-    std::array<std::uint32_t, 624> key_{};
-    int pos_ = 624;
-
-  public:
-    explicit NumpyRandom(std::uint32_t s = 0) { seed(s); }
-
-    void seed(std::uint32_t s) {
-        for (int i = 0; i < 624; ++i) {
-            key_[i] = s;
-            s = static_cast<std::uint32_t>(1812433253u * (s ^ (s >> 30)) + static_cast<std::uint32_t>(i) + 1u);
-        }
-        pos_ = 624;
-    }
-
-    std::uint32_t next32() {
-        if (pos_ == 624) {
-            constexpr int M = 397;
-            constexpr std::uint32_t UPPER = 0x80000000u, LOWER = 0x7fffffffu;
-            for (int i = 0; i < 624; ++i) {
-                std::uint32_t y = (key_[i] & UPPER) | (key_[(i + 1) % 624] & LOWER);
-                key_[i] = key_[(i + M) % 624] ^ (y >> 1) ^ ((y & 1u) ? 0x9908b0dfu : 0u);
-            }
-            pos_ = 0;
-        }
-        std::uint32_t y = key_[pos_++];
-        y ^= y >> 11;
-        y ^= (y << 7) & 0x9d2c5680u;
-        y ^= (y << 15) & 0xefc60000u;
-        y ^= y >> 18;
-        return y;
-    }
-
-    double random_sample() {  // numpy mt19937_next_double
-        double a = next32() >> 5, b = next32() >> 6;
-        return (a * 67108864.0 + b) / 9007199254740992.0;
-    }
-};
-
-inline NumpyRandom np_random{};
+// Python draws model/router choices from numpy's RNG (a stream separate from
+// salabim's); here we simply use salabim's stream. Same seeded determinism and
+// the same distributions — but C++ runs do not reproduce Python runs draw for
+// draw, only their behaviour.
 
 // Class-level counters (Python class attributes); reset by init().
 namespace counters {
@@ -118,36 +76,21 @@ inline sim::Environment& init(long long seed = 0, bool trace = false) {
     delete env;
     SEED = seed;
     env = new sim::Environment({.trace = trace, .random_seed = seed});
-    np_random.seed(static_cast<std::uint32_t>(seed));
     counters::piece_id = 0;
     counters::piece_generators = 0;
     counters::exit_buffers = 0;
     return *env;
 }
 
-// np.random.choice(len(p), p=p) — bit-exact mirror of numpy's legacy choice:
-// validate p (Kahan sum vs sqrt(eps) tolerance), build the cdf, normalise by
-// its last entry, draw ONE double from np_random, searchsorted(side='right').
+// np.random.choice(len(p), p=p): pick an index with the given probabilities.
 inline int weighted_choice(const std::vector<double>& p) {
-    for (double x : p)
-        if (x < 0.0) throw std::invalid_argument("probabilities are not non-negative");
-    double sum = p[0], c = 0.0;  // numpy's kahan_sum starts at darr[0]
-    for (size_t i = 1; i < p.size(); ++i) {
-        double y = p[i] - c, t = sum + y;
-        c = (t - sum) - y;
-        sum = t;
-    }
-    if (std::abs(sum - 1.0) > std::sqrt(2.220446049250313e-16))
-        throw std::invalid_argument("probabilities do not sum to 1");
-
-    std::vector<double> cdf(p.size());
+    double u = sim::random_stream().random();
     double acc = 0.0;
-    for (size_t i = 0; i < p.size(); ++i) { acc += p[i]; cdf[i] = acc; }
-    const double last = cdf.back();
-    for (double& x : cdf) x /= last;
-
-    double u = np_random.random_sample();
-    return static_cast<int>(std::upper_bound(cdf.begin(), cdf.end(), u) - cdf.begin());
+    for (size_t i = 0; i < p.size(); ++i) {
+        acc += p[i];
+        if (u < acc) return static_cast<int>(i);
+    }
+    return static_cast<int>(p.size()) - 1;
 }
 
 // ============================================================================
@@ -647,10 +590,6 @@ class PieceGenerator : public Component, public PickyPieceTaker, public HasShift
     PieceGenerator(std::vector<std::pair<Model*, int>> models_goals, Intervals shifts_,
                    std::vector<Outlet*> outlets_);  // body after outlet.py (check_outlet_validity)
 
-    void setup() override {  // after own activate, like Python (see Task::setup)
-        shift_manager = sim::make<ShiftManager>({}, static_cast<HasShifts*>(this));
-    }
-
     void update_probs() {
         int total_generated = 0;
         for (int g : generated) total_generated += g;
@@ -817,6 +756,8 @@ inline PieceGenerator::PieceGenerator(std::vector<std::pair<Model*, int>> models
 
     models = valid_models;  // PickyPieceTaker was built from the goal keys
     check_outlet_validity(*this, outlets_);
+
+    shift_manager = sim::make<ShiftManager>({}, static_cast<HasShifts*>(this));
 
     outlets = std::move(outlets_);
     for (auto& [m, g] : models_goals) goals.push_back(g);
@@ -1433,13 +1374,6 @@ class Task : public Component, public HasShifts {
                 "shift end at the same time");
 
         request_priority = 10 - config->priority;
-    }
-
-    // Sub-components are created in setup(), not the constructor: salabim
-    // schedules the component's own activation BEFORE setup runs (Python
-    // Component.__init__ activates before calling setup), and same-time
-    // activation order must mirror Python's for event determinism.
-    void setup() override {
         shift_manager = sim::make<TaskShiftManager>({}, static_cast<HasShifts*>(this));
         non_flexible_shutdowns = sim::make<NonFlexibleShutdowns>({}, this, Intervals{});
         flexible_shutdowns = sim::make<FlexibleShutdowns>({}, this, Intervals{});
@@ -1829,7 +1763,6 @@ class PieceCarrier : public Carrier {
     PieceCollector* piece_collector = nullptr;
 
     explicit PieceCarrier(PieceTask* task_);
-    void setup() override;
 
     sim::Process handle_restock() override;
     void abort() override;
@@ -2190,10 +2123,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
     co_await passivate();
 }
 
-inline PieceCarrier::PieceCarrier(PieceTask* task_) : Carrier(task_) {}
-
-inline void PieceCarrier::setup() {  // collector created after own activate (Python order)
-    PieceTask* task_ = ptask_();
+inline PieceCarrier::PieceCarrier(PieceTask* task_) : Carrier(task_) {
     switch (task_->pconfig()->piece_collector_type) {
         case PieceCollectorType::DISCRIMINATING_GREEDY:
             piece_collector = sim::make<DiscriminatingGreedyPieceCollector>({}, task_);
@@ -2341,7 +2271,6 @@ class ResourceCarrier : public Carrier {
     ResourceCollector* resource_collector = nullptr;
 
     explicit ResourceCarrier(ResourceTask* task_);
-    void setup() override;
 
     sim::Process handle_restock() override;
     void abort() override;
@@ -2538,10 +2467,7 @@ inline sim::Process AltruisticResourceCollector::process() {
     co_await passivate();
 }
 
-inline ResourceCarrier::ResourceCarrier(ResourceTask* task_) : Carrier(task_) {}
-
-inline void ResourceCarrier::setup() {  // collector created after own activate (Python order)
-    ResourceTask* task_ = rtask_();
+inline ResourceCarrier::ResourceCarrier(ResourceTask* task_) : Carrier(task_) {
     switch (task_->rconfig()->resource_collector_type) {
         case ResourceCollectorType::GREEDY:
             resource_collector = sim::make<GreedyResourceCollector>({}, task_);

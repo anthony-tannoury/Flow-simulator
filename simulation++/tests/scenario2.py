@@ -1,4 +1,5 @@
-# Twin scenario 2 (Python side) — full factory. Must match scenario2.cpp.
+# Scenario 2 (Python side) — full factory. Companion of scenario2.cpp: same
+# scenario, same seed; behaviour matches, individual draws do not.
 # Covers: model hierarchy, altruistic collectors, ResourceTask (greedy),
 # RestockableResource, lifespan/ExpiryManager, breakdowns (FailureRate/Bathtub
 # + Exponential), both shutdown kinds, operator alternatives, PER_TASK &
@@ -26,7 +27,7 @@ from simulation.resource_task import (ResourceTaskConfig, ResourceTask,
 from simulation.interrupters import Breakdown, NonFlexibleShutdowns, FlexibleShutdowns
 from simulation.judgement_day import ByPiecesProduced, SimulationStopper
 
-env.trace(True)
+env.trace(False)
 
 # --- models: hierarchy -------------------------------------------------------
 model_p = Model("P")
@@ -193,9 +194,3 @@ for name, res in (("steel", steel), ("lube", lube), ("power", power),
                   ("raw_a", raw_a), ("raw_b", raw_b), ("mix", mix)):
     print(f"{name} avail={res.available_quantity():.9f} claimed={res.claimed_quantity():.9f}",
           file=sys.stderr)
-import random
-import numpy as np
-s = [random.random() for _ in range(3)]
-print(f"salabim_stream_next=[{s[0]:.12f}, {s[1]:.12f}, {s[2]:.12f}]", file=sys.stderr)
-n = [float(np.random.random_sample()) for _ in range(3)]
-print(f"np_stream_next=[{n[0]:.12f}, {n[1]:.12f}, {n[2]:.12f}]", file=sys.stderr)

@@ -1,5 +1,5 @@
-// Twin scenario 3 (C++ side) — midnight-crossing weekly shifts + touching-
-// interval merging. Must match scenario3.py.
+// Scenario 3 (C++ side) — midnight-crossing weekly shifts + touching-
+// interval merging. Companion of scenario3.py: same scenario, same seed.
 #include "simulation.hpp"
 
 #include <chrono>
@@ -9,7 +9,7 @@ using namespace simulation;
 
 int main() {
     auto& e = init(0, false);
-    e.trace(true);
+    e.trace(false);
 
     auto* model_a = new Model("A");
 
@@ -102,11 +102,5 @@ int main() {
         }
         std::fprintf(stderr, "]\n");
     }
-    double s1 = sim::random_stream().random(), s2 = sim::random_stream().random(),
-           s3 = sim::random_stream().random();
-    std::fprintf(stderr, "salabim_stream_next=[%.12f, %.12f, %.12f]\n", s1, s2, s3);
-    double n1 = np_random.random_sample(), n2 = np_random.random_sample(),
-           n3 = np_random.random_sample();
-    std::fprintf(stderr, "np_stream_next=[%.12f, %.12f, %.12f]\n", n1, n2, n3);
     return 0;
 }

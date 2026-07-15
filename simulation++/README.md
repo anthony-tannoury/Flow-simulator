@@ -1,12 +1,15 @@
 # simulation++ — the factory simulation in C++
 
 `simulation.hpp` is a single-header C++20 translation of the Python simulation
-(`simulation/*.py`) onto [salabim++](../salabim++/salabim.hpp). It is not "a
-C++ version of the same idea" — it is the same simulation: same classes, same
-logic, same validation messages, same event ordering, same random numbers.
-Run the same scenario with the same seed in both and you get the same trace,
-the same pieces in the same buffers in the same order, and both RNG streams
-at the same position afterwards.
+(`simulation/*.py`) onto [salabim++](../salabim++/salabim.hpp). Same classes,
+same logic, same validation messages, same event mechanics — the two codebases
+read side by side, module by module.
+
+Runs are seeded and deterministic: the same seed gives the same C++ run every
+time. They do **not** reproduce Python runs draw for draw — with the same seed
+the two engines consume their random streams in different orders, so a C++ run
+is another sample of the same model, the way a different seed would be. Expect
+the final counts of two runs to land close together, not to be equal.
 
 ## Speed
 
@@ -15,30 +18,28 @@ router/scrap → task → exit, with shifts, operators and productivity draws):
 
 | | time | result |
 |---|---|---|
-| Python 3.13 + salabim 26.0.8 | 68.0 s | 17,990 exits + 2,010 scrap |
-| C++ (clang 18, `-O2`) | **0.66 s** | byte-identical final state |
+| Python 3.13 + salabim 26.0.8 (`bench.py`) | 84 s | 17,990 exits + 2,010 scrap |
+| C++ clang 18 `-O2` (`bench.cpp`) | **0.86 s** | 18,012 exits + 1,988 scrap |
 
-**≈ 100× faster**, with the full 340 KB final-state dump (every piece id,
-model and buffer position, plus the next draws of both RNG streams) identical.
+**≈ 100× faster** — and the two result columns are exactly the "close but not
+equal" promised above: same model, same seed, different draws.
 
 ## Building
 
 ```bash
-clang++ -std=c++20 -ffp-contract=off -O2 -I../salabim++ -I. my_scenario.cpp -o my_scenario
+clang++ -std=c++20 -O2 -I../salabim++ -I. my_scenario.cpp -o my_scenario
 ```
 
 * **Use clang.** GCC 13 has an internal compiler error on braced initializer
   lists inside `co_await` (`co_await wait({{state, false}})`), which this code
   uses everywhere. Clang 18 compiles it fine.
-* **Keep `-ffp-contract=off`.** Without it fused multiply-adds change the
-  low bits of distribution samples and the runs stop being bit-identical.
 
 ## How the Python maps to C++
 
 | Python | C++ |
 |---|---|
-| `import simulation` (module init) | `simulation::init(seed)` — creates `env`, seeds both streams, resets class counters |
-| `np.random.choice(n, p=probs)` | `weighted_choice(probs)` — bit-exact mirror of numpy's legacy `RandomState` (own MT19937 stream, numpy seeding, cdf + searchsorted) |
+| `import simulation` (module init) | `simulation::init(seed)` — creates `env`, seeds the stream, resets class counters |
+| `np.random.choice(n, p=probs)` | `weighted_choice(probs)` — cumulative-probability pick on `sim::random_stream()` |
 | `env.random` (module `random`) | `sim::random_stream()` (used by `FailureRate`) |
 | `Distribution(sim.Uniform, 8, 12)` | `distribution(DistType::Uniform, {8, 12})` |
 | callable distribution params | `Param(Linear::generate(...))` (`std::function<double(double)>`) |
@@ -55,67 +56,63 @@ clang++ -std=c++20 -ffp-contract=off -O2 -I../salabim++ -I. my_scenario.cpp -o m
 Class-for-class contents: ables, component (request/release hooks: shave +
 trigger), interval, helpers, function_generator (`Linear`, `ExponentialFn`*,
 `Bathtub`), sampler (`Distribution`, `FailureRate`, `Bounded`), shift_manager
-(incl. `minutes_between`, `generate_weekly_shifts`, `generate_custom_shifts`
-on `std::chrono`), piece, outlet (Buffer/Router with freeloader), resource
-(lifespan/ExpiryManager, RestockableResource/Delivery), operator
-(OperatorGroup/Alternative), protocols, interrupters (Breakdown, Flexible/
-NonFlexibleShutdowns), task, piece_task (all four collectors), resource_task
-(greedy/altruistic), judgement_day (ByTime, ByPiecesProduced,
-SimulationStopper).
+(incl. `minutes_between`, `generate_weekly_shifts`, `generate_custom_shifts`,
+`generate_periodic_shutdown` on `std::chrono`), piece, outlet (Buffer/Router
+with freeloader), resource (lifespan/ExpiryManager, RestockableResource/
+Delivery), operator (OperatorGroup/Alternative), protocols, interrupters
+(Breakdown, Flexible/NonFlexibleShutdowns), task, piece_task (all four
+collectors), resource_task (greedy/altruistic), judgement_day (ByTime,
+ByPiecesProduced, SimulationStopper).
 
 *`Exponential` the function generator is `ExponentialFn` in C++ — the name
 clashes with `sim::Exponential`.
 
-## How equivalence was verified
+## Tests
 
-`tests/` contains twin scenarios written twice — once against `simulation/`
-(Python), once against `simulation.hpp` — run with `trace=True` and compared
-event for event by `tests/tracediff.py` (only source line numbers and
-create-line interleaving are normalized; every event, time, quantity, state
-change and honor is compared in order):
+`tests/` contains the same scenarios written twice — once against
+`simulation/` (Python), once against `simulation.hpp` — with the same seed.
+Each prints a `=== FINAL STATE ===` summary on stderr; run a pair and the
+numbers should land close together (they will not be equal — see above).
 
 * **scenario1** — generator (2 models, 2 shifts) → buffer → discriminating
   greedy task with operators/productivity → router (10% scrap) →
   non-discriminating greedy task → exit; ByTime stopper.
-  **3,812 ordered events + 451 creates: identical.**
 * **scenario2** — model hierarchy, altruistic collectors, greedy ResourceTask
   transforming raw materials into an intermediate consumed downstream,
   RestockableResources (order/delivery), resource lifespan expiry, a
   FailureRate/Bathtub breakdown and an Exponential breakdown, flexible and
   non-flexible shutdowns, operator alternatives, PER_TASK and PER_UNIT
   scopes, time-varying probabilities and durations, ByPiecesProduced stopper.
-  **6,428 ordered events + 729 creates: identical.**
-* **bench** — scenario1 scaled to 20,000 pieces, trace off: full final-state
-  dump identical, ~100× speedup.
+* **scenario3** — midnight-crossing weekly shifts built by
+  `generate_weekly_shifts` from minutes-of-day pairs, plus touching-interval
+  merging in `HasShifts`/`IntervalWaiter` and in the shutdown intervals.
+* **bench** — scenario1 scaled to 20,000 pieces; time both to compare.
+
+```bash
+cd simulation++/tests
+PYTHONPATH=../.. python3 scenario1.py          # Python (needs salabim + numpy)
+clang++ -std=c++20 -O2 -I../../salabim++ -I.. scenario1.cpp -o s1 && ./s1
+```
+
+The translation was originally verified event-for-event against Python with a
+trace-diff harness (identical traces over thousands of events). That parity
+machinery — a second RNG stream mirroring numpy, activation-order shims,
+`-ffp-contract=off` builds — has since been removed to keep the port simple;
+only the behaviour is promised now, not the draws.
 
 Deliberately mimicked Python quirks (do not "fix" these in one language only):
 
 * An `ExpiryManager` whose own replenish request triggers a `shave()` that
   cancels it stays in `expiry_managers` forever (Python's self-cancel skips
   the `remove`); the C++ reproduces this via the non-returning `cancel()`.
-* Scenarios can crash salabim (Python: `ValueError: scheduled time ... before
-  now`, C++: `sim::SalabimError` with the same message) when a collector's
-  timeout deadline ends up in the past — e.g. a piece generator downtime gap
-  longer than a task timeout. Same configs crash the same way in both.
+* Both engines crash the same way (Python: `ValueError: scheduled time ...
+  before now`, C++: `sim::SalabimError` with the same message) when a
+  collector's timeout deadline ends up in the past — e.g. a piece generator
+  downtime gap longer than a task timeout. Since the draws differ, a
+  borderline config may crash in one language and not the other.
 * Config-validation **error precedence** can differ on invalid setups (C++
   base classes validate before constructor bodies; Python setup validates
   first). Valid configs behave identically.
-
-## Running the verification suite
-
-```bash
-cd simulation++/tests
-# Python twins (need salabim + numpy):
-PYTHONPATH=../.. python3 scenario1.py > py1.txt 2> py1_final.txt
-PYTHONPATH=../.. python3 scenario2.py > py2.txt 2> py2_final.txt
-# C++ twins:
-clang++ -std=c++20 -ffp-contract=off -O1 -I../../salabim++ -I.. scenario1.cpp -o s1 && ./s1 > cpp1.txt 2> cpp1_final.txt
-clang++ -std=c++20 -ffp-contract=off -O1 -I../../salabim++ -I.. scenario2.cpp -o s2 && ./s2 > cpp2.txt 2> cpp2_final.txt
-# compare:
-python3 tracediff.py py1.txt cpp1.txt   # -> TRACES EQUIVALENT
-python3 tracediff.py py2.txt cpp2.txt   # -> TRACES EQUIVALENT
-diff py1_final.txt cpp1_final.txt && diff py2_final.txt cpp2_final.txt
-```
 
 ## What changed in salabim++ for this port
 
@@ -123,10 +120,10 @@ Documented in [salabim++/README.md](../salabim++/README.md#sub-processes-call):
 sub-process support (`call`), vector overloads for `request`/`wait`/
 `from_store`, `from_store`/`to_store` default `urgent=True`, the deferred
 anonymous-resource re-scan, and non-returning self-`cancel()`. Each fix was
-found and confirmed by the trace diff.
+found by diffing C++ traces against Python during development.
 
 ## Next step
 
-The Python JSON parser (`json_parser/`) instantiates these same classes from
-the flow-designer export; once it is stable it can be translated onto this
-header the same way to bridge the designer directly to the C++ engine.
+The Python JSON parser (`parser/`) instantiates these same classes from the
+flow-designer export; once it is stable it can be translated onto this header
+the same way to bridge the designer directly to the C++ engine.

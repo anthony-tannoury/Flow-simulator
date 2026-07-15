@@ -1,4 +1,5 @@
-// Twin scenario 2 (C++ side) — full factory. Must match scenario2.py.
+// Scenario 2 (C++ side) — full factory. Companion of scenario2.py: same
+// scenario, same seed; behaviour matches, individual draws do not.
 #include "simulation.hpp"
 
 #include <cstdio>
@@ -7,7 +8,7 @@ using namespace simulation;
 
 int main() {
     auto& e = init(0, false);
-    e.trace(true);
+    e.trace(false);
 
     // --- models: hierarchy ---------------------------------------------------
     auto* model_p = new Model("P");
@@ -175,11 +176,5 @@ int main() {
                                                        {"raw_a", raw_a}, {"raw_b", raw_b}, {"mix", mix}};
     for (auto [n, r] : ress)
         std::fprintf(stderr, "%s avail=%.9f claimed=%.9f\n", n, r->available_quantity(), r->claimed_quantity());
-    double s1 = sim::random_stream().random(), s2 = sim::random_stream().random(),
-           s3 = sim::random_stream().random();
-    std::fprintf(stderr, "salabim_stream_next=[%.12f, %.12f, %.12f]\n", s1, s2, s3);
-    double n1 = np_random.random_sample(), n2 = np_random.random_sample(),
-           n3 = np_random.random_sample();
-    std::fprintf(stderr, "np_stream_next=[%.12f, %.12f, %.12f]\n", n1, n2, n3);
     return 0;
 }

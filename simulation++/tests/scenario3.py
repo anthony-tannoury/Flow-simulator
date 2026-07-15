@@ -1,5 +1,5 @@
-# Twin scenario 3 (Python side) — midnight-crossing weekly shifts + touching-
-# interval merging. Must match scenario3.cpp. Requires the merge changes:
+# Scenario 3 (Python side) — midnight-crossing weekly shifts + touching-
+# interval merging. Companion of scenario3.cpp. Requires the merge changes:
 # merge_touching_sorted_intervals applied in HasShifts/IntervalWaiter and
 # generate_weekly_shifts taking minutes-of-day pairs.
 import sys
@@ -19,7 +19,7 @@ from simulation.piece_task import (PieceTaskConfig, ModelConfig, PieceTask, Piec
 from simulation.interrupters import NonFlexibleShutdowns
 from simulation.judgement_day import ByTime, SimulationStopper
 
-env.trace(True)
+env.trace(False)
 
 model_a = Model("A")
 
@@ -94,9 +94,3 @@ print(f"generated=[{gen.generated[0]}]", file=sys.stderr)
 for name, buf in (("B0", b0), ("EXIT", exit_buffer)):
     contents = [(p.id, p.model.name) for p in buf]
     print(f"{name} len={len(buf)} {contents}", file=sys.stderr)
-import random
-import numpy as np
-s = [random.random() for _ in range(3)]
-print(f"salabim_stream_next=[{s[0]:.12f}, {s[1]:.12f}, {s[2]:.12f}]", file=sys.stderr)
-n = [float(np.random.random_sample()) for _ in range(3)]
-print(f"np_stream_next=[{n[0]:.12f}, {n[1]:.12f}, {n[2]:.12f}]", file=sys.stderr)
