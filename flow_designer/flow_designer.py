@@ -3044,14 +3044,28 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                  if c.get("from_node") in uids and c.get("to_node") in uids]
         return {"format": self.CARD_CLIPBOARD_FORMAT, "nodes": cards, "connections": conns}
 
-    def _materialize_cards(self, payload, delta):
-        """Instantiate a payload's cards with fresh uids, offset by delta, and leave
-        the new cards selected. Returns the created nodes."""
+    # rough visual footprint of a card, for centering a pasted group (positions
+    # are top-left corners; exact sizes aren't in the payload)
+    _CARD_FOOTPRINT = (240.0, 200.0)
+
+    def _materialize_cards(self, payload, delta=0.0, center=None):
+        """Instantiate a payload's cards with fresh uids and leave the new cards
+        selected. If center is given, the group is translated so its bounding-box
+        center lands there; delta then nudges it (+x, +y). Returns the created nodes."""
         data = self._remap_ids(payload)
+        positions = [c["position"] for c in data.get("nodes", [])
+                     if isinstance(c.get("position"), list) and len(c["position"]) >= 2]
+        dx = dy = delta
+        if center is not None and positions:
+            fw, fh = self._CARD_FOOTPRINT
+            cx = (min(p[0] for p in positions) + max(p[0] for p in positions) + fw) / 2.0
+            cy = (min(p[1] for p in positions) + max(p[1] for p in positions) + fh) / 2.0
+            dx += center[0] - cx
+            dy += center[1] - cy
         for card in data.get("nodes", []):
             pos = card.get("position")
             if isinstance(pos, list) and len(pos) >= 2:
-                card["position"] = [pos[0] + delta, pos[1] + delta]
+                card["position"] = [pos[0] + dx, pos[1] + dy]
         created = self._instantiate_cards(data)
         if created:
             try:
@@ -3114,13 +3128,15 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         if not isinstance(payload, dict) or payload.get("format") != self.CARD_CLIPBOARD_FORMAT:
             self.statusBar().showMessage("Clipboard holds no copied cards.")
             return
-        # pasting the same clipboard again lands one step further each time
+        # paste lands where the user is looking (view center); pasting the same
+        # clipboard again without moving the view steps each copy further out
         if getattr(self, "_last_paste_text", None) == text:
             self._paste_serial += 1
         else:
             self._last_paste_text = text
-            self._paste_serial = 1
-        created = self._materialize_cards(payload, 40.0 * self._paste_serial)
+            self._paste_serial = 0
+        created = self._materialize_cards(payload, 40.0 * self._paste_serial,
+                                          center=self.current_view_center())
         if not created:
             self.statusBar().showMessage("Clipboard holds no pasteable cards.")
             return
