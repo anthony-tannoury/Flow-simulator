@@ -6,10 +6,10 @@ same logic, same validation messages, same event mechanics — the two codebases
 read side by side, module by module.
 
 Runs are seeded and deterministic: the same seed gives the same C++ run every
-time. They do **not** reproduce Python runs draw for draw — with the same seed
-the two engines consume their random streams in different orders, so a C++ run
-is another sample of the same model, the way a different seed would be. Expect
-the final counts of two runs to land close together, not to be equal.
+time. They do **not** reproduce Python runs draw for draw — the two engines
+draw their own random numbers, so a C++ run is another sample of the same
+model, the way a different seed would be. Expect the final counts of the two
+to land close together, not to be equal.
 
 ## Speed
 
@@ -19,9 +19,9 @@ router/scrap → task → exit, with shifts, operators and productivity draws):
 | | time | result |
 |---|---|---|
 | Python 3.13 + salabim 26.0.8 (`bench.py`) | 84 s | 17,990 exits + 2,010 scrap |
-| C++ clang 18 `-O2` (`bench.cpp`) | **0.86 s** | 18,012 exits + 1,988 scrap |
+| C++ clang 18 `-O2` (`bench.cpp`) | **0.60 s** | 18,040 exits + 1,960 scrap |
 
-**≈ 100× faster** — and the two result columns are exactly the "close but not
+**≈ 140× faster** — and the two result columns are exactly the "close but not
 equal" promised above: same model, same seed, different draws.
 
 ## Building
@@ -94,12 +94,6 @@ PYTHONPATH=../.. python3 scenario1.py          # Python (needs salabim + numpy)
 clang++ -std=c++20 -O2 -I../../salabim++ -I.. scenario1.cpp -o s1 && ./s1
 ```
 
-The translation was originally verified event-for-event against Python with a
-trace-diff harness (identical traces over thousands of events). That parity
-machinery — a second RNG stream mirroring numpy, activation-order shims,
-`-ffp-contract=off` builds — has since been removed to keep the port simple;
-only the behaviour is promised now, not the draws.
-
 Deliberately mimicked Python quirks (do not "fix" these in one language only):
 
 * An `ExpiryManager` whose own replenish request triggers a `shave()` that
@@ -112,7 +106,7 @@ Deliberately mimicked Python quirks (do not "fix" these in one language only):
   borderline config may crash in one language and not the other.
 * Config-validation **error precedence** can differ on invalid setups (C++
   base classes validate before constructor bodies; Python setup validates
-  first). Valid configs behave identically.
+  first). Valid configs behave the same way.
 
 ## What changed in salabim++ for this port
 

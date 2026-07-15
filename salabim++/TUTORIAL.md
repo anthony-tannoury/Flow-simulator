@@ -537,16 +537,13 @@ co_await hold([] { return heavy_math(); });  // call the callable
 sim::make<Customer>({.at = iat});            // also in options
 ```
 
-### The killer feature: the same random numbers as Python
+### Seeded, reproducible randomness
 
 The environment seeds a shared random stream at construction with
-`random_seed = 1234567` — the same default as salabim — and
-`sim::PythonRandom` re-implements CPython's `random.Random` bit for bit
-(MT19937 plus CPython's exact algorithms for every variate). Consequently *a
-salabim++ model and its salabim twin produce identical event times, traces
-and statistics*. That is how this library is tested (see `verification/`),
-and it gives you a debugging superpower: prototype in Python, port to C++,
-diff the traces.
+`random_seed = 1234567` — the same default as salabim. The stream is a
+`sim::Random` (a `std::mt19937_64`): runs are reproducible for a given seed,
+but salabim++ draws its own random numbers — a salabim++ model and its
+Python twin produce statistically equivalent results, not equal ones.
 
 ```cpp
 sim::Environment env({.random_seed = 42});     // sim.Environment(random_seed=42)
@@ -554,12 +551,9 @@ env.random_seed(1234567);                      // reseed later
 sim::Environment env2({.random_seed = sim::seed_no_reseed}); // like seed=""
 sim::Environment env3({.random_seed = sim::seed_random});    // like seed="*"
 
-sim::PythonRandom my_stream(42);               // sim.Random(42): private stream
+sim::Random my_stream(42);                     // private stream
 sim::Exponential iat(10, "", &my_stream);      // distribution on its own stream
 ```
-
-(Bit-exactness holds out of the box with clang; with GCC compile with
-`-ffp-contract=off` so no fused multiply-adds sneak in.)
 
 ## 10. Monitors and statistics
 

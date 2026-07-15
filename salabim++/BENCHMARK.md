@@ -23,11 +23,9 @@ once, at scale:
 * a **State**-triggered refinery refills the depot when a truck notices fuel
   running low (`wait` / `set` / `reset`)
 
-Both versions run with the same default seed (1234567). Because
-`sim::PythonRandom` reproduces CPython's `random.Random` bit for bit, the two
-programs must — and do — produce **byte-identical output**: every counter and
-every statistics block, verified with `diff` at every scale tested, up to
-**4.2 million spawned components**.
+Both versions run with the same default seed (1234567) and print the same
+counters and statistics blocks. The two engines draw their own random
+numbers, so the outputs are statistically equivalent rather than equal.
 
 ## Results
 
@@ -37,14 +35,14 @@ whole process (`/usr/bin/time -l`), best of 3 for C++; RSS is peak resident
 memory. "Components" is the number of simulation objects spawned during the
 run (orders + lots + the fixed machinery).
 
-| horizon T | components spawned | Python salabim | salabim++ (C++) | **speedup** | Python peak RSS | C++ peak RSS | output |
-| --------: | -----------------: | -------------: | --------------: | ----------: | --------------: | -----------: | :----- |
-|    20,000 |             34,636 |          4.9 s |          0.10 s |   **~49×**  |          — | — | identical |
-|   600,000 |          1,048,413 |        176.7 s |          3.96 s | **44.6×**   |        1.00 GB |      1.32 GB | identical |
-| 2,400,000 |          4,203,749 |        758.7 s (12 m 39 s) | 19.7 s | **38.6×** |        3.03 GB |      3.91 GB | identical |
-| 6,000,000 |         10,512,151 |   ~32 min (extrapolated) |  55.4 s | —           |              — |      6.39 GB | —      |
+| horizon T | components spawned | Python salabim | salabim++ (C++) | **speedup** | Python peak RSS | C++ peak RSS |
+| --------: | -----------------: | -------------: | --------------: | ----------: | --------------: | -----------: |
+|    20,000 |             34,636 |          4.9 s |          0.10 s |   **~49×**  |          — | — |
+|   600,000 |          1,048,413 |        176.7 s |          3.96 s | **44.6×**   |        1.00 GB |      1.32 GB |
+| 2,400,000 |          4,203,749 |        758.7 s (12 m 39 s) | 19.7 s | **38.6×** |        3.03 GB |      3.91 GB |
+| 6,000,000 |         10,512,151 |   ~32 min (extrapolated) |  55.4 s | —           |              — |      6.39 GB |
 
-Highlights of the 2.4 M-time-unit run (identical in both languages):
+Highlights of the 2.4 M-time-unit run:
 
 ```text
 orders 1201006
@@ -58,7 +56,7 @@ components 4203749
 ```
 
 …followed by the full `print_statistics()` blocks for the station-B queue,
-station A, the outbox store and the fuel depot — byte-for-byte equal.
+station A, the outbox store and the fuel depot.
 
 ## Notes
 

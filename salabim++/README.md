@@ -2,10 +2,10 @@
 
 A single-header C++20 discrete event simulation library that mimics
 [salabim](https://www.salabim.org) (Python, v26.0.8) — same world view, same
-mechanics, same statistics, same trace format, and (by design) **the same
-random numbers**: run the same model with the same seed in Python salabim and
-in salabim++ and you get the same event times, the same traces and the same
-statistics.
+mechanics, same statistics, same trace format. Runs are seeded and
+deterministic: the same model with the same seed gives the same run every
+time. salabim++ has its own random streams (`sim::Random`, a
+`std::mt19937_64`) — it does not reproduce a Python run's draws.
 
 ```cpp
 #include "salabim.hpp"
@@ -38,11 +38,11 @@ Python generators become C++20 coroutines: `yield self.hold(10)` is
 | `sim.Resource`                | `sim::Resource` (capacity, anonymous, honor_only_first/highest, preemptive bumping) |
 | `sim.State`                   | `sim::State<T>` (set/reset/trigger, predicate waits) |
 | `sim.Store`                   | `sim::Store` (bounded, filters)                      |
-| `sim.Monitor`                 | `sim::Monitor` (level + non-level, identical `print_statistics()` / `print_histogram()` output) |
+| `sim.Monitor`                 | `sim::Monitor` (level + non-level, same `print_statistics()` / `print_histogram()` output format) |
 | `sim.ComponentGenerator`      | `sim::ComponentGenerator<T>()` (iat / spread / equidistant) |
-| distributions                 | `Uniform, Exponential, Normal, Triangular, IntUniform, Constant, Poisson, Weibull, Gamma, Erlang, Beta, Pdf/Pmf, Cdf` — sampling **bit-identical** to CPython `random` |
+| distributions                 | `Uniform, Exponential, Normal, Triangular, IntUniform, Constant, Poisson, Weibull, Gamma, Erlang, Beta, Pdf/Pmf, Cdf` — drawing from shared or private `sim::Random` streams |
 | `sim.Event`                   | `sim::Event` (scheduled callables)                   |
-| trace (`trace=True`)          | identical column layout, actions and wording         |
+| trace (`trace=True`)          | same column layout, actions and wording              |
 
 Not ported: animation/UI, video, string-eval wait conditions (use lambdas),
 monitor slicing/merging/freezing, datetime mode. See the
@@ -78,7 +78,7 @@ destroyed as a chain when the component is cancelled mid-call. Return values
 travel through out-parameters.
 
 Three fidelity fixes that came out of trace-diffing full factory models against
-Python salabim (each verified by event-for-event trace equality):
+Python salabim during development:
 
 * `from_store`/`to_store` schedule their fail event with `urgent=True`,
   matching Python's default (affects same-time ordering).
@@ -94,35 +94,20 @@ Python salabim (each verified by event-for-event trace equality):
 
 ## Verified against the real thing
 
-`verification/` contains paired Python/C++ models — the salabim sample models
-(bank with 1 clerk; 3 clerks via resources, states, standby, stores,
-ComponentGenerator) plus a mechanics torture test (interrupt/resume, urgent,
-priorities, oneof and failing requests, anonymous resources, predicate waits).
-Each pair runs with the same seed; outputs are compared line by line:
+The event mechanics were verified against Python salabim during development:
+paired Python/C++ models — the salabim sample models (bank with 1 clerk;
+3 clerks via resources, states, standby, stores, ComponentGenerator) plus a
+mechanics torture test (interrupt/resume, urgent, priorities, oneof and
+failing requests, anonymous resources, predicate waits) — were run with the
+same seed and compared line by line, event for event. That comparison relied
+on a Python-compatible RNG which has since been replaced by the plain
+`std::mt19937_64` behind `sim::Random`, so salabim++ no longer reproduces
+Python runs draw for draw; the verified event mechanics are unchanged.
 
-```text
-bank1             OK   (82 lines match)
-bank1_long        OK   (27394 lines match)
-bank3cg           OK   (195 lines match)
-bank3res          OK   (82 lines match)
-bank3standby      OK   (94 lines match)
-bank3state        OK   (150 lines match)
-bank3store        OK   (22 lines match)
-mechanics         OK   (458 lines match)
-standby_trace     OK   (2687 lines match)
-```
-
-(Only source line numbers in traces are masked — they differ between the two
-languages by nature. Statistics blocks are compared byte for byte.)
-
-`tests/test_rng.cpp` further checks `sim::PythonRandom` against values
-recorded from CPython 3.14 for every distribution.
-
-As a bonus, salabim++ is about **40–45× faster** than Python salabim:
-[benchmark/](benchmark/) contains *GigaFab*, a factory model spanning nearly
-every library feature, run identically in both languages — at 4.2 million
-spawned components the outputs are still byte-identical (Python: 12 m 39 s,
-C++: 19.7 s). Details in [BENCHMARK.md](BENCHMARK.md).
+As a bonus, salabim++ is about **40–45× faster** than Python salabim —
+measured on *GigaFab*, a factory model spanning nearly every library feature,
+at 4.2 million spawned components (Python: 12 m 39 s, C++: 19.7 s). Details
+in [BENCHMARK.md](BENCHMARK.md).
 
 ## Requirements & building
 
@@ -134,16 +119,7 @@ C++: 19.7 s). Details in [BENCHMARK.md](BENCHMARK.md).
 clang++ -std=c++20 -O2 my_model.cpp -o my_model
 ```
 
-or use the provided `Makefile` / `CMakeLists.txt`:
-
-```bash
-make            # builds examples and tests into build/
-make test       # RNG + smoke tests
-make verify     # Python-vs-C++ comparison (needs python3 + salabim)
-```
-
-> **GCC note:** add `-ffp-contract=off` to keep random streams bit-identical
-> with Python (clang is handled in-source).
+or use the provided `CMakeLists.txt`.
 
 ## Documentation
 
