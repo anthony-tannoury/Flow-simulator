@@ -18,20 +18,31 @@ from simulation.interrupters import Breakdown, FlexibleShutdowns, NonFlexibleShu
 from simulation.protocols import (AbortPendingCarriers, WaitForCarriers, AbortOrWaitForCarriers,
                                   ConstrainedByShift, NotConstrainedByShift, PartiallyConstrainedByShift,
                                   Conscious, Unconscious)
-from typing import Callable, NamedTuple
+from typing import Callable
 
 
-class DayTime(NamedTuple):
-    # stands in for datetime.time, which cannot represent the designer's
-    # end-of-day '24:00' (generate_weekly_shifts only reads .hour and .minute)
-    hour: int
-    minute: int
+class DayTime(time):
+    """A datetime.time that can also say '24:00', the designer's end-of-day
+    (plain time stops at 23:59). Only .hour and .minute are meaningful --
+    exactly what generate_weekly_shifts reads. Do not compare or print one:
+    the inherited value stores 24 as 0."""
+
+    _hour: int
+
+    def __new__(cls, hour: int, minute: int):
+        instance = super().__new__(cls, hour % 24, minute)
+        instance._hour = hour
+        return instance
+
+    @property
+    def hour(self) -> int:
+        return self._hour
 
 
 def to_date(date_str: str) -> date:
     return datetime.strptime(date_str, '%d-%m-%Y').date()
 
-def to_time(time_str: str) -> DayTime:
+def to_time(time_str: str) -> time:
     hour, minute = time_str.split(':')
     return DayTime(int(hour), int(minute))
 
