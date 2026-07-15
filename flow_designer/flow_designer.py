@@ -283,7 +283,6 @@ class BufferNode(SimNode):
         self.add_input("from_task", multi_input=True, color=PORT_COLORS["task"])
         self.add_output("to_task", multi_output=True, color=PORT_COLORS["buffer"])
         self.create_property("valid_models", "[]")
-        self.create_property("capacity", "inf")
         self.create_property("buffer_type", "PASSAGE")  # PASSAGE | SCRAP | EXIT
         self.create_property("monitor", "{}")  # {stat: bool}; monitored iff any stat is true
 
@@ -293,7 +292,6 @@ class BufferNode(SimNode):
             "kind": self.kind,
             "name": self.name(),
             "valid_models": get_property_json(self, "valid_models", []),
-            "capacity": self.get_property("capacity"),
             "buffer_type": self.get_property("buffer_type") if self.has_property("buffer_type") else "PASSAGE",
             "monitor": {key: bool(get_property_json(self, "monitor", {}).get(key, False))
                         for key, _, _ in MONITOR_STATS},
@@ -1847,7 +1845,7 @@ class BufferMenuDialog(QtWidgets.QDialog):
         tabs = QtWidgets.QTabWidget()
         lay.addWidget(tabs)
 
-        # --- Buffer tab: valid models, type, capacity ---
+        # --- Buffer tab: valid models + type ---
         buf_tab = QtWidgets.QWidget()
         bl = QtWidgets.QVBoxLayout(buf_tab)
         bl.addWidget(QtWidgets.QLabel("valid models (selecting a model selects its children):"))
@@ -1861,8 +1859,6 @@ class BufferMenuDialog(QtWidgets.QDialog):
         i = self.buffer_type.findData(cur_type)
         self.buffer_type.setCurrentIndex(i if i >= 0 else 0)
         form.addRow("type", self.buffer_type)
-        self.capacity = InfFloatWidget(node.get_property("capacity") if node.has_property("capacity") else "inf")
-        form.addRow("capacity", self.capacity)
         bl.addLayout(form)
         tabs.addTab(buf_tab, "Buffer")
 
@@ -1885,7 +1881,6 @@ class BufferMenuDialog(QtWidgets.QDialog):
 
     def apply(self):
         set_property_json(self.node, "valid_models", self.models.checked_models())
-        self.node.set_property("capacity", self.capacity.get_value())
         self.node.set_property("buffer_type", self.buffer_type.currentData())
         set_property_json(self.node, "monitor", {k: cb.isChecked() for k, cb in self._monitor.items()})
 
@@ -3399,7 +3394,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     }
     _IMPORT_SCALAR_PROPS = {
         "Shutdowns": ["shutdown_type", "mode"],
-        "Buffer": ["capacity", "buffer_type"],
+        "Buffer": ["buffer_type"],
         "Task": ["operator_scope", "resource_scope", "min_carriers", "max_capacity",
                  "contiguous_carriers", "independent_carriers", "timeout", "priority", "collector_type"],
         "ResourceTask": ["resource_scope", "operator_scope", "resource_collector_type",

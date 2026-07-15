@@ -321,7 +321,6 @@
       "valid_models": [
         "m_widget"
       ],
-      "capacity": "inf",
       "buffer_type": "PASSAGE",
       "monitor": {
         "avg_length": true,
@@ -526,7 +525,6 @@
         "m_widgetA",
         "m_widgetB"
       ],
-      "capacity": "inf",
       "buffer_type": "EXIT",
       "monitor": {
         "avg_length": false,
@@ -555,7 +553,6 @@
         "m_widgetA",
         "m_widgetB"
       ],
-      "capacity": "inf",
       "buffer_type": "SCRAP",
       "monitor": {
         "avg_length": false,
