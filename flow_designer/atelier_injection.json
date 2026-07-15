@@ -7,43 +7,53 @@
   "models": [
     {
       "name": "M88",
-      "parent": null
+      "parent": null,
+      "id": "model_f6960dbd"
     },
     {
       "name": "LEAP",
-      "parent": null
+      "parent": null,
+      "id": "model_3853af8a"
     },
     {
       "name": "MBP M88",
-      "parent": "M88"
+      "parent": "model_f6960dbd",
+      "id": "model_c1c20e4c"
     },
     {
       "name": "MHP M88",
-      "parent": "M88"
+      "parent": "model_f6960dbd",
+      "id": "model_f551538b"
     },
     {
       "name": "DHP M88 Dr",
-      "parent": "M88"
+      "parent": "model_f6960dbd",
+      "id": "model_f8a1d4ad"
     },
     {
       "name": "DHP M88 Gche",
-      "parent": "M88"
+      "parent": "model_f6960dbd",
+      "id": "model_742fd366"
     },
     {
       "name": "RM1 LEAP 1A​",
-      "parent": "LEAP"
+      "parent": "model_3853af8a",
+      "id": "model_300990ff"
     },
     {
       "name": "RM2 LEAP 1B​",
-      "parent": "LEAP"
+      "parent": "model_3853af8a",
+      "id": "model_e093ec36"
     },
     {
       "name": "RM3 LEAP 1B​",
-      "parent": "LEAP"
+      "parent": "model_3853af8a",
+      "id": "model_02d3ef7d"
     },
     {
       "name": "D1 LEAP 1B​",
-      "parent": "LEAP"
+      "parent": "model_3853af8a",
+      "id": "model_256d4101"
     }
   ],
   "resources": [
@@ -71,7 +81,8 @@
           }
         }
       },
-      "threshold": 20.0
+      "threshold": 20.0,
+      "id": "resource_9de24cdb"
     },
     {
       "name": "CIRE_BRUTE",
@@ -97,7 +108,8 @@
           }
         }
       },
-      "threshold": 20.0
+      "threshold": 20.0,
+      "id": "resource_a07d9691"
     }
   ],
   "operators": [
@@ -114,8 +126,9 @@
         }
       },
       "shifts": [
-        "SHIFT_MATIN"
-      ]
+        "shift_496aeb46"
+      ],
+      "id": "operator_bbad2cd0"
     },
     {
       "name": "POOL_CIRE_APREM",
@@ -130,8 +143,9 @@
         }
       },
       "shifts": [
-        "SHIFT_APREM"
-      ]
+        "shift_04b8cc03"
+      ],
+      "id": "operator_f0ba684d"
     },
     {
       "name": "POOL_CIRE_NUIT",
@@ -146,8 +160,9 @@
         }
       },
       "shifts": [
-        "SHIFT_NUIT"
-      ]
+        "shift_a02b817c"
+      ],
+      "id": "operator_97fcb1f5"
     },
     {
       "name": "POOL_CIRE_SAM",
@@ -162,14 +177,66 @@
         }
       },
       "shifts": [
-        "SHITF_RENFORT_SAM"
-      ]
+        "shift_74a22217"
+      ],
+      "id": "operator_796ea384"
+    }
+  ],
+  "closing_days": [
+    {
+      "date": "01-01-2026",
+      "name": "",
+      "id": "closingday_fcd95861"
+    },
+    {
+      "date": "01-05-2026",
+      "name": "",
+      "id": "closingday_f5ba34fa"
+    },
+    {
+      "date": "08-05-2026",
+      "name": "",
+      "id": "closingday_8389bb93"
+    },
+    {
+      "date": "14-05-2026",
+      "name": "",
+      "id": "closingday_745a3415"
+    },
+    {
+      "date": "14-07-2026",
+      "name": "",
+      "id": "closingday_9e5d6ccf"
+    },
+    {
+      "date": "21-08-2026",
+      "name": "",
+      "id": "closingday_61cc949d"
+    },
+    {
+      "date": "01-11-2026",
+      "name": "",
+      "id": "closingday_c040805a"
+    },
+    {
+      "date": "11-11-2026",
+      "name": "",
+      "id": "closingday_914d12ae"
+    },
+    {
+      "date": "25-12-2026",
+      "name": "",
+      "id": "closingday_bc9e8f7e"
     }
   ],
   "shifts": [
     {
+      "id": "shift_c01ba51b",
       "name": "Temps d'ouverture P1",
       "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861"
+      ],
       "days": [
         {
           "working": true,
@@ -225,18 +292,20 @@
           "intervals": []
         }
       ],
-      "days_off": [
-        "01-01-2026"
-      ],
       "horizon": {
         "start": "01-01-2026",
         "end": "30-04-2026"
-      },
-      "custom_intervals": []
+      }
     },
     {
+      "id": "shift_191d58b8",
       "name": "Temps d'ouverture P3",
       "mode": "weekly",
+      "days_off": [
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
       "days": [
         {
           "working": true,
@@ -297,61 +366,22 @@
           "intervals": []
         }
       ],
-      "days_off": [
-        "01-11-2026",
-        "11-11-2026",
-        "25-12-2026"
-      ],
       "horizon": {
         "start": "01-10-2026",
         "end": "31-12-2026"
-      },
-      "custom_intervals": []
+      }
     },
     {
+      "id": "shift_43a68d28",
       "name": "Temps d'ouverture P2",
       "mode": "custom",
-      "days": [
-        {
-          "working": false,
-          "intervals": []
-        },
-        {
-          "working": false,
-          "intervals": []
-        },
-        {
-          "working": false,
-          "intervals": []
-        },
-        {
-          "working": false,
-          "intervals": []
-        },
-        {
-          "working": false,
-          "intervals": []
-        },
-        {
-          "working": false,
-          "intervals": []
-        },
-        {
-          "working": false,
-          "intervals": []
-        }
-      ],
       "days_off": [
-        "01-05-2026",
-        "08-05-2026",
-        "14-05-2026",
-        "14-07-2026",
-        "21-08-2026"
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d"
       ],
-      "horizon": {
-        "start": "01-01-2026",
-        "end": "01-01-2026"
-      },
       "custom_intervals": [
         {
           "start": "01-05-2026 08:00",
@@ -360,8 +390,20 @@
       ]
     },
     {
+      "id": "shift_496aeb46",
       "name": "SHIFT_MATIN",
       "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_61cc949d",
+        "closingday_bc9e8f7e"
+      ],
       "days": [
         {
           "working": true,
@@ -417,26 +459,26 @@
           "intervals": []
         }
       ],
-      "days_off": [
-        "01-01-2026",
-        "01-05-2026",
-        "08-05-2026",
-        "14-05-2026",
-        "14-07-2026",
-        "01-11-2026",
-        "11-11-2026",
-        "21-08-2026",
-        "25-12-2026"
-      ],
       "horizon": {
         "start": "01-01-2026",
         "end": "31-12-2026"
-      },
-      "custom_intervals": []
+      }
     },
     {
+      "id": "shift_04b8cc03",
       "name": "SHIFT_APREM",
       "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
       "days": [
         {
           "working": true,
@@ -492,26 +534,26 @@
           "intervals": []
         }
       ],
-      "days_off": [
-        "01-01-2026",
-        "01-05-2026",
-        "08-05-2026",
-        "14-05-2026",
-        "14-07-2026",
-        "21-08-2026",
-        "01-11-2026",
-        "11-11-2026",
-        "25-12-2026"
-      ],
       "horizon": {
         "start": "01-01-2026",
         "end": "31-12-2026"
-      },
-      "custom_intervals": []
+      }
     },
     {
+      "id": "shift_a02b817c",
       "name": "SHIFT_NUIT",
       "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
       "days": [
         {
           "working": true,
@@ -583,26 +625,26 @@
           "intervals": []
         }
       ],
-      "days_off": [
-        "01-01-2026",
-        "01-05-2026",
-        "08-05-2026",
-        "14-05-2026",
-        "14-07-2026",
-        "21-08-2026",
-        "01-11-2026",
-        "11-11-2026",
-        "25-12-2026"
-      ],
       "horizon": {
         "start": "01-01-2026",
         "end": "31-12-2026"
-      },
-      "custom_intervals": []
+      }
     },
     {
+      "id": "shift_74a22217",
       "name": "SHITF_RENFORT_SAM",
       "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
       "days": [
         {
           "working": false,
@@ -638,22 +680,10 @@
           "intervals": []
         }
       ],
-      "days_off": [
-        "01-01-2026",
-        "01-05-2026",
-        "08-05-2026",
-        "14-05-2026",
-        "14-07-2026",
-        "21-08-2026",
-        "01-11-2026",
-        "11-11-2026",
-        "25-12-2026"
-      ],
       "horizon": {
         "start": "01-01-2026",
         "end": "31-12-2026"
-      },
-      "custom_intervals": []
+      }
     }
   ],
   "stopping_criterion": {
@@ -663,51 +693,51 @@
   "start_date": "01-01-2026 00:00",
   "nodes": [
     {
-      "id": "piecegenerator_677a28fe",
+      "id": "piecegenerator_e9bade43",
       "kind": "PieceGenerator",
       "name": "Piece Generator",
       "models_goals": [
         {
-          "model": "MBP M88",
-          "goal": 315
+          "model": "model_c1c20e4c",
+          "goal": 300
         },
         {
-          "model": "MHP M88",
-          "goal": 297
+          "model": "model_f551538b",
+          "goal": 300
         },
         {
-          "model": "DHP M88 Dr",
-          "goal": 66
+          "model": "model_f8a1d4ad",
+          "goal": 300
         },
         {
-          "model": "DHP M88 Gche",
-          "goal": 70
+          "model": "model_742fd366",
+          "goal": 300
         },
         {
-          "model": "RM1 LEAP 1A​",
-          "goal": 420
+          "model": "model_300990ff",
+          "goal": 450
         },
         {
-          "model": "RM2 LEAP 1B​",
-          "goal": 302
+          "model": "model_e093ec36",
+          "goal": 450
         },
         {
-          "model": "RM3 LEAP 1B​",
-          "goal": 40
+          "model": "model_02d3ef7d",
+          "goal": 450
         },
         {
-          "model": "D1 LEAP 1B​",
-          "goal": 67
+          "model": "model_256d4101",
+          "goal": 450
         }
       ],
       "shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "outlets": [
-        "buffer_e2ef517e",
-        "buffer_591093da"
+        "buffer_7c72a9e6",
+        "buffer_3b79da26"
       ],
       "position": [
         271.34534068445913,
@@ -715,24 +745,24 @@
       ]
     },
     {
-      "id": "task_36a5acb2",
+      "id": "task_242220b4",
       "kind": "Task",
       "name": "PREP_NOY_01",
       "models_configs": [
         {
-          "model": "M88",
+          "model": "model_f6960dbd",
           "duration": {
             "dist_type": "Constant",
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 2.0
+                "value": 5.0
               }
             }
           },
           "resources": [
             {
-              "resource": "NOYAU MBP M88",
+              "resource": "resource_9de24cdb",
               "value": 1.0
             }
           ],
@@ -745,7 +775,7 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 5.0
+            "value": 0.0
           }
         }
       },
@@ -754,92 +784,67 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.0
+            "value": 1.0
           }
         }
       },
       "operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
+            "operator": "operator_bbad2cd0",
             "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
+            "operator": "operator_bbad2cd0",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ]
       ],
       "loading_operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
+            "operator": "operator_bbad2cd0",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ]
       ],
-      "startup_operators": [
-        [
-          {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
-          }
-        ]
-      ],
+      "startup_operators": [],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -860,18 +865,18 @@
       },
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
-      "min_carriers": 5,
-      "max_capacity": 10.0,
+      "min_carriers": 1,
+      "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 100.0,
+      "timeout": "inf",
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_e2ef517e"
+        "buffer_7c72a9e6"
       ],
       "bufs_out": [
-        "buffer_69cff006"
+        "buffer_5509043d"
       ],
       "shutdowns": [],
       "breakdowns": [],
@@ -881,15 +886,15 @@
       ]
     },
     {
-      "id": "buffer_e2ef517e",
+      "id": "buffer_7c72a9e6",
       "kind": "Buffer",
       "name": "Entrée M88 ET Retouche / Prep noyaux",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -904,11 +909,11 @@
         "throughput": false
       },
       "inputs_from": [
-        "piecegenerator_677a28fe"
+        "piecegenerator_e9bade43"
       ],
       "outputs_to": [
-        "task_36a5acb2",
-        "task_9a27b261"
+        "task_242220b4",
+        "task_97251896"
       ],
       "position": [
         687.857952853282,
@@ -916,24 +921,24 @@
       ]
     },
     {
-      "id": "task_9a27b261",
+      "id": "task_97251896",
       "kind": "Task",
       "name": "PREP_NOY_02",
       "models_configs": [
         {
-          "model": "M88",
+          "model": "model_f6960dbd",
           "duration": {
             "dist_type": "Constant",
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 2.0
+                "value": 5.0
               }
             }
           },
           "resources": [
             {
-              "resource": "NOYAU MBP M88",
+              "resource": "resource_9de24cdb",
               "value": 1.0
             }
           ],
@@ -946,7 +951,7 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 5.0
+            "value": 0.0
           }
         }
       },
@@ -955,26 +960,26 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.0
+            "value": 5.0
           }
         }
       },
       "operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
+            "operator": "operator_bbad2cd0",
             "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
+            "operator": "operator_f0ba684d",
             "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
+            "operator": "operator_796ea384",
             "count": 1
           }
         ]
@@ -982,59 +987,34 @@
       "loading_operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
+            "operator": "operator_bbad2cd0",
             "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
+            "operator": "operator_f0ba684d",
             "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
+            "operator": "operator_97fcb1f5",
             "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
-          }
-        ]
-      ],
-      "startup_operators": [
-        [
-          {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 1
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_APREM",
-            "count": 1
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 1
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_SAM",
+            "operator": "operator_796ea384",
             "count": 1
           }
         ]
       ],
+      "startup_operators": [],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1053,20 +1033,20 @@
           "type": "Conscious"
         }
       },
-      "operator_scope": "PER_BATCH",
+      "operator_scope": "PER_TASK",
       "resource_scope": "PER_BATCH",
-      "min_carriers": 5,
-      "max_capacity": 10.0,
+      "min_carriers": 1,
+      "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 100.0,
+      "timeout": "inf",
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_e2ef517e"
+        "buffer_7c72a9e6"
       ],
       "bufs_out": [
-        "buffer_69cff006"
+        "buffer_5509043d"
       ],
       "shutdowns": [],
       "breakdowns": [],
@@ -1076,15 +1056,15 @@
       ]
     },
     {
-      "id": "buffer_69cff006",
+      "id": "buffer_5509043d",
       "kind": "Buffer",
       "name": "Prep noyaux / Injection manuelle",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -1099,13 +1079,15 @@
         "throughput": false
       },
       "inputs_from": [
-        "task_36a5acb2",
-        "task_9a27b261",
-        "task_114ab643"
+        "task_242220b4",
+        "task_97251896",
+        "task_d6f2ee6e",
+        "task_5508c42f",
+        "task_5a3501d1"
       ],
       "outputs_to": [
-        "task_91f9541f",
-        "task_c08ebdf8"
+        "task_abcbde22",
+        "task_0cf5bf52"
       ],
       "position": [
         1427.884048299756,
@@ -1113,10 +1095,31 @@
       ]
     },
     {
-      "id": "task_c08ebdf8",
+      "id": "task_0cf5bf52",
       "kind": "Task",
       "name": "PRSINJM88_02",
-      "models_configs": [],
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "resource_a07d9691",
+              "value": 0.4
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
       "startup_duration": {
         "dist_type": "Constant",
         "params": {
@@ -1131,17 +1134,67 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.0
+            "value": 5.0
           }
         }
       },
-      "operators": [],
-      "loading_operators": [],
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
       "startup_operators": [],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1166,27 +1219,48 @@
       "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 1000000000.0,
-      "priority": 5,
+      "timeout": "inf",
+      "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_69cff006"
+        "buffer_5509043d"
       ],
       "bufs_out": [
-        "router_1b3c4ab4"
+        "router_80a9d9bc"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        1823.6959492895294,
+        1825.5716981487205,
         187.25529907088276
       ]
     },
     {
-      "id": "task_91f9541f",
+      "id": "task_abcbde22",
       "kind": "Task",
       "name": "PRSINJM88_01",
-      "models_configs": [],
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "resource_a07d9691",
+              "value": 0.4
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
       "startup_duration": {
         "dist_type": "Constant",
         "params": {
@@ -1201,17 +1275,67 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.0
+            "value": 5.0
           }
         }
       },
-      "operators": [],
-      "loading_operators": [],
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
       "startup_operators": [],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1236,14 +1360,14 @@
       "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 1000000000.0,
-      "priority": 5,
+      "timeout": "inf",
+      "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_69cff006"
+        "buffer_5509043d"
       ],
       "bufs_out": [
-        "router_1b3c4ab4"
+        "router_80a9d9bc"
       ],
       "shutdowns": [],
       "breakdowns": [],
@@ -1253,15 +1377,15 @@
       ]
     },
     {
-      "id": "buffer_591093da",
+      "id": "buffer_3b79da26",
       "kind": "Buffer",
       "name": "Entrée LEAP / Injection cire moule",
       "valid_models": [
-        "LEAP",
-        "RM1 LEAP 1A​",
-        "RM2 LEAP 1B​",
-        "RM3 LEAP 1B​",
-        "D1 LEAP 1B​"
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -1276,11 +1400,11 @@
         "throughput": false
       },
       "inputs_from": [
-        "piecegenerator_677a28fe"
+        "piecegenerator_e9bade43"
       ],
       "outputs_to": [
-        "task_e9d15d2f",
-        "task_6cf8bffe"
+        "task_9309ac3c",
+        "task_6f2e94c7"
       ],
       "position": [
         718.3895042300152,
@@ -1288,24 +1412,24 @@
       ]
     },
     {
-      "id": "task_e9d15d2f",
+      "id": "task_9309ac3c",
       "kind": "Task",
       "name": "PRSINJLEAP_01",
       "models_configs": [
         {
-          "model": "LEAP",
+          "model": "model_3853af8a",
           "duration": {
             "dist_type": "Constant",
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 1.0
+                "value": 5.0
               }
             }
           },
           "resources": [
             {
-              "resource": "CIRE_BRUTE",
+              "resource": "resource_a07d9691",
               "value": 0.4
             }
           ],
@@ -1318,7 +1442,7 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 5.0
+            "value": 10.0
           }
         }
       },
@@ -1327,17 +1451,67 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.1
+            "value": 5.0
           }
         }
       },
       "operators": [],
-      "loading_operators": [],
-      "startup_operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1362,14 +1536,14 @@
       "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 100.0,
+      "timeout": "inf",
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_591093da"
+        "buffer_3b79da26"
       ],
       "bufs_out": [
-        "buffer_2bae77c4"
+        "buffer_b2e81191"
       ],
       "shutdowns": [],
       "breakdowns": [],
@@ -1379,24 +1553,24 @@
       ]
     },
     {
-      "id": "task_6cf8bffe",
+      "id": "task_6f2e94c7",
       "kind": "Task",
       "name": "PRSINJLEAP_02",
       "models_configs": [
         {
-          "model": "LEAP",
+          "model": "model_3853af8a",
           "duration": {
             "dist_type": "Constant",
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 1.0
+                "value": 5.0
               }
             }
           },
           "resources": [
             {
-              "resource": "CIRE_BRUTE",
+              "resource": "resource_a07d9691",
               "value": 0.4
             }
           ],
@@ -1409,7 +1583,7 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 5.0
+            "value": 10.0
           }
         }
       },
@@ -1418,91 +1592,67 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.1
+            "value": 5.0
           }
         }
       },
-      "operators": [
-        [
-          {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
-          }
-        ]
-      ],
+      "operators": [],
       "loading_operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
+            "operator": "operator_bbad2cd0",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
+            "operator": "operator_f0ba684d",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
+            "operator": "operator_97fcb1f5",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ]
       ],
       "startup_operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
+            "operator": "operator_bbad2cd0",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
+            "operator": "operator_f0ba684d",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
+            "operator": "operator_97fcb1f5",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ]
       ],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1527,32 +1677,32 @@
       "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 100.0,
+      "timeout": "inf",
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_591093da"
+        "buffer_3b79da26"
       ],
       "bufs_out": [
-        "buffer_2bae77c4"
+        "buffer_b2e81191"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        1125.3299800412908,
-        820.6579953830104
+        1126.8056733089095,
+        820.6579953830105
       ]
     },
     {
-      "id": "buffer_8b2b7af0",
+      "id": "buffer_eca2ad5d",
       "kind": "Buffer",
       "name": "Injection cire noyaux / Prison 1",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -1567,10 +1717,10 @@
         "throughput": false
       },
       "inputs_from": [
-        "router_e38cbf4b"
+        "router_6bfb15a2"
       ],
       "outputs_to": [
-        "task_1745c3d2"
+        "task_6ab7cc7f"
       ],
       "position": [
         2855.0245559291484,
@@ -1578,18 +1728,18 @@
       ]
     },
     {
-      "id": "task_1745c3d2",
+      "id": "task_6ab7cc7f",
       "kind": "Task",
       "name": "Prison 1",
       "models_configs": [
         {
-          "model": "M88",
+          "model": "model_f6960dbd",
           "duration": {
             "dist_type": "Constant",
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 2.0
+                "value": 480.0
               }
             }
           },
@@ -1612,42 +1762,42 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.0
+            "value": 5.0
           }
         }
       },
-      "operators": [
+      "operators": [],
+      "loading_operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
+            "operator": "operator_bbad2cd0",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
+            "operator": "operator_f0ba684d",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
+            "operator": "operator_97fcb1f5",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ]
       ],
-      "loading_operators": [],
       "startup_operators": [],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1672,14 +1822,14 @@
       "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 100.0,
+      "timeout": "inf",
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_8b2b7af0"
+        "buffer_eca2ad5d"
       ],
       "bufs_out": [
-        "router_cd193964"
+        "router_c4f8150f"
       ],
       "shutdowns": [],
       "breakdowns": [],
@@ -1689,20 +1839,20 @@
       ]
     },
     {
-      "id": "buffer_2bae77c4",
+      "id": "buffer_b2e81191",
       "kind": "Buffer",
       "name": "Injection cire / Attente 4h",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche",
-        "LEAP",
-        "RM1 LEAP 1A​",
-        "RM2 LEAP 1B​",
-        "RM3 LEAP 1B​",
-        "D1 LEAP 1B​"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366",
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -1717,12 +1867,12 @@
         "throughput": false
       },
       "inputs_from": [
-        "task_e9d15d2f",
-        "task_6cf8bffe",
-        "router_e38cbf4b"
+        "task_9309ac3c",
+        "task_6f2e94c7",
+        "router_6bfb15a2"
       ],
       "outputs_to": [
-        "task_fe6e0baf"
+        "task_8e3741e2"
       ],
       "position": [
         4160.388171597086,
@@ -1730,12 +1880,12 @@
       ]
     },
     {
-      "id": "task_fe6e0baf",
+      "id": "task_8e3741e2",
       "kind": "Task",
       "name": "Attente de 4h",
       "models_configs": [
         {
-          "model": "M88",
+          "model": "model_f6960dbd",
           "duration": {
             "dist_type": "Constant",
             "params": {
@@ -1750,7 +1900,7 @@
           "max_carrier_capacity": 1
         },
         {
-          "model": "LEAP",
+          "model": "model_3853af8a",
           "duration": {
             "dist_type": "Constant",
             "params": {
@@ -1779,7 +1929,7 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 0.0
+            "value": 5.0
           }
         }
       },
@@ -1787,34 +1937,34 @@
       "loading_operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
+            "operator": "operator_bbad2cd0",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
+            "operator": "operator_f0ba684d",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
+            "operator": "operator_97fcb1f5",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ]
       ],
       "startup_operators": [],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1839,37 +1989,37 @@
       "max_capacity": 1000000000.0,
       "contiguous_carriers": true,
       "independent_carriers": true,
-      "timeout": 1000000000.0,
-      "priority": 5,
+      "timeout": "inf",
+      "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_2bae77c4"
+        "buffer_b2e81191"
       ],
       "bufs_out": [
-        "buffer_8756611d"
+        "buffer_2e1bb63f"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        4626.628174393969,
-        169.87117329375013
+        4560.138684568385,
+        161.74444872400449
       ]
     },
     {
-      "id": "buffer_8756611d",
+      "id": "buffer_2e1bb63f",
       "kind": "Buffer",
       "name": "Attente 4h / Marquage laser",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche",
-        "LEAP",
-        "RM1 LEAP 1A​",
-        "RM2 LEAP 1B​",
-        "RM3 LEAP 1B​",
-        "D1 LEAP 1B​"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366",
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -1884,10 +2034,10 @@
         "throughput": false
       },
       "inputs_from": [
-        "task_fe6e0baf"
+        "task_8e3741e2"
       ],
       "outputs_to": [
-        "task_2c18bb31"
+        "task_d20e0389"
       ],
       "position": [
         4871.282618781259,
@@ -1895,12 +2045,12 @@
       ]
     },
     {
-      "id": "task_2c18bb31",
+      "id": "task_d20e0389",
       "kind": "Task",
       "name": "MACHINEMARQUAGELASER",
       "models_configs": [
         {
-          "model": "M88",
+          "model": "model_f6960dbd",
           "duration": {
             "dist_type": "Constant",
             "params": {
@@ -1915,7 +2065,7 @@
           "max_carrier_capacity": 1
         },
         {
-          "model": "M88",
+          "model": "model_f6960dbd",
           "duration": {
             "dist_type": "Constant",
             "params": {
@@ -1944,92 +2094,67 @@
         "params": {
           "value": {
             "kind": "constant",
-            "value": 1.0
+            "value": 5.0
           }
         }
       },
-      "operators": [
-        [
-          {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
-          }
-        ],
-        [
-          {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
-          }
-        ]
-      ],
+      "operators": [],
       "loading_operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
+            "operator": "operator_bbad2cd0",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
+            "operator": "operator_f0ba684d",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
+            "operator": "operator_97fcb1f5",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ]
       ],
       "startup_operators": [
         [
           {
-            "operator": "POOL_CIRE_MATIN",
-            "count": 0
+            "operator": "operator_bbad2cd0",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_APREM",
-            "count": 0
+            "operator": "operator_f0ba684d",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_NUIT",
-            "count": 0
+            "operator": "operator_97fcb1f5",
+            "count": 1
           }
         ],
         [
           {
-            "operator": "POOL_CIRE_SAM",
-            "count": 0
+            "operator": "operator_796ea384",
+            "count": 1
           }
         ]
       ],
       "task_shifts": [
-        "Temps d'ouverture P1",
-        "Temps d'ouverture P3",
-        "Temps d'ouverture P2"
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2054,33 +2179,33 @@
       "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 100.0,
+      "timeout": "inf",
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_8756611d"
+        "buffer_2e1bb63f"
       ],
       "bufs_out": [
-        "buffer_37f71770",
-        "buffer_e6e4c504"
+        "buffer_690ccaa0",
+        "buffer_8ba1f94b"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        5211.78107230999,
-        138.3435387077564
+        5210.472171313223,
+        138.34353870775644
       ]
     },
     {
-      "id": "buffer_e6e4c504",
+      "id": "buffer_8ba1f94b",
       "kind": "Buffer",
       "name": "Marquage laser / Stockage",
       "valid_models": [
-        "LEAP",
-        "RM1 LEAP 1A​",
-        "RM2 LEAP 1B​",
-        "RM3 LEAP 1B​",
-        "D1 LEAP 1B​"
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -2095,26 +2220,26 @@
         "throughput": false
       },
       "inputs_from": [
-        "task_2c18bb31"
+        "task_d20e0389"
       ],
       "outputs_to": [
-        "task_fe7c30e7"
+        "task_793c66af"
       ],
       "position": [
-        7180.353406904509,
-        403.573859971512
+        7735.350280459644,
+        643.3203512291246
       ]
     },
     {
-      "id": "buffer_37f71770",
+      "id": "buffer_690ccaa0",
       "kind": "Buffer",
       "name": "Marquage laser / Contrôle US",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -2129,60 +2254,187 @@
         "throughput": false
       },
       "inputs_from": [
-        "task_2c18bb31"
+        "task_d20e0389"
       ],
       "outputs_to": [
-        "task_aef37cb8"
+        "task_c6205ce9"
       ],
       "position": [
-        5702.5186458046865,
-        -163.84316596674893
+        5703.679606457507,
+        -163.84316596674896
       ]
     },
     {
-      "id": "task_aef37cb8",
+      "id": "task_c6205ce9",
       "kind": "Task",
       "name": "EQUIPEMENTCABINEUS",
-      "models_configs": [],
-      "startup_duration": null,
-      "loading_duration": null,
-      "operators": [],
-      "loading_operators": [],
-      "startup_operators": [],
-      "task_shifts": [],
-      "policies": {},
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 3,
+          "max_carrier_capacity": 5
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
       "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 1000000000.0,
-      "priority": 5,
+      "timeout": "inf",
+      "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_37f71770"
+        "buffer_690ccaa0"
       ],
       "bufs_out": [
-        "buffer_fb220c3a"
+        "router_ca37e6ab"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        6156.986297889212,
-        -199.38826363540375
+        6160.469179847673,
+        -199.38826363540372
       ]
     },
     {
-      "id": "buffer_fb220c3a",
+      "id": "buffer_20e417b2",
       "kind": "Buffer",
       "name": "Contrôle US / Contrôle RX",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -2197,60 +2449,26 @@
         "throughput": false
       },
       "inputs_from": [
-        "task_aef37cb8"
+        "router_ca37e6ab"
       ],
       "outputs_to": [
-        "task_fcdfeed0"
+        "task_51e866c2"
       ],
       "position": [
-        6439.225517057399,
-        -178.3000068531337
+        6880.492178284414,
+        39.562923347672324
       ]
     },
     {
-      "id": "task_fcdfeed0",
-      "kind": "Task",
-      "name": "EQUIPEMENTCABINERX",
-      "models_configs": [],
-      "startup_duration": null,
-      "loading_duration": null,
-      "operators": [],
-      "loading_operators": [],
-      "startup_operators": [],
-      "task_shifts": [],
-      "policies": {},
-      "operator_scope": "PER_BATCH",
-      "resource_scope": "PER_BATCH",
-      "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
-      "timeout": 1000000000.0,
-      "priority": 5,
-      "collector_type": "NON_DISCRIMINATING_GREEDY",
-      "bufs_in": [
-        "buffer_fb220c3a"
-      ],
-      "bufs_out": [
-        "buffer_c4141461"
-      ],
-      "shutdowns": [],
-      "breakdowns": [],
-      "position": [
-        6701.778270524319,
-        -180.483252867286
-      ]
-    },
-    {
-      "id": "buffer_c4141461",
+      "id": "buffer_e5e9522b",
       "kind": "Buffer",
       "name": "Contrôle RX / Expertise cire",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -2265,156 +2483,53 @@
         "throughput": false
       },
       "inputs_from": [
-        "task_fcdfeed0"
+        "task_51e866c2"
       ],
       "outputs_to": [
-        "task_10a5f96f",
-        "task_5cf6cde4"
+        "task_1ef4e552",
+        "task_6ee345dd"
       ],
       "position": [
-        6933.189920705197,
-        -159.27733178402033
+        7833.284881667255,
+        104.38684869981466
       ]
     },
     {
-      "id": "task_10a5f96f",
-      "kind": "Task",
-      "name": "PCEXPCIRE_01",
-      "models_configs": [],
-      "startup_duration": null,
-      "loading_duration": null,
-      "operators": [],
-      "loading_operators": [],
-      "startup_operators": [],
-      "task_shifts": [],
-      "policies": {},
-      "operator_scope": "PER_BATCH",
-      "resource_scope": "PER_BATCH",
-      "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
-      "timeout": 1000000000.0,
-      "priority": 5,
-      "collector_type": "NON_DISCRIMINATING_GREEDY",
-      "bufs_in": [
-        "buffer_c4141461"
-      ],
-      "bufs_out": [
-        "router_6b98f858"
-      ],
-      "shutdowns": [],
-      "breakdowns": [],
-      "position": [
-        7238.625934192812,
-        -267.95476759484086
-      ]
-    },
-    {
-      "id": "task_5cf6cde4",
-      "kind": "Task",
-      "name": "PCEXPCIRE_02",
-      "models_configs": [],
-      "startup_duration": null,
-      "loading_duration": null,
-      "operators": [],
-      "loading_operators": [],
-      "startup_operators": [],
-      "task_shifts": [],
-      "policies": {},
-      "operator_scope": "PER_BATCH",
-      "resource_scope": "PER_BATCH",
-      "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
-      "timeout": 1000000000.0,
-      "priority": 5,
-      "collector_type": "NON_DISCRIMINATING_GREEDY",
-      "bufs_in": [
-        "buffer_c4141461"
-      ],
-      "bufs_out": [
-        "router_6b98f858"
-      ],
-      "shutdowns": [],
-      "breakdowns": [],
-      "position": [
-        7234.743371747814,
-        -79.41878455355555
-      ]
-    },
-    {
-      "id": "router_6b98f858",
+      "id": "router_dbcbb393",
       "kind": "Router",
-      "name": "Modèle cire conforme ?",
+      "name": "Modèle cire conforme ? 2",
       "inputs_from": [
-        "task_10a5f96f",
-        "task_5cf6cde4"
+        "task_1ef4e552",
+        "task_6ee345dd"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_fa2b2699",
+          "buffer": "buffer_d612276d",
           "probability": {
             "kind": "constant",
-            "value": 0.0
+            "value": 0.08
           }
         },
         {
-          "buffer": "buffer_393aa5b9",
-          "probability": {
-            "kind": "constant",
-            "value": 0.0
-          }
+          "buffer": "buffer_7ba4481d",
+          "probability": null
         }
       ],
       "position": [
-        7601.834053425113,
-        -188.25265651943573
+        8505.256493891691,
+        75.41152396439927
       ]
     },
     {
-      "id": "buffer_fa2b2699",
+      "id": "buffer_d612276d",
       "kind": "Buffer",
-      "name": "Rebuts 3",
+      "name": "Expertise cire / Prison 3",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
-      ],
-      "capacity": "inf",
-      "buffer_type": "SCRAP",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
-      "inputs_from": [
-        "router_6b98f858"
-      ],
-      "outputs_to": [],
-      "position": [
-        7986.49213073489,
-        -252.6969482811802
-      ]
-    },
-    {
-      "id": "buffer_393aa5b9",
-      "kind": "Buffer",
-      "name": "Expertise cire / Stockage",
-      "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -2429,73 +2544,69 @@
         "throughput": false
       },
       "inputs_from": [
-        "router_6b98f858"
+        "router_dbcbb393"
       ],
       "outputs_to": [
-        "task_fe7c30e7"
+        "task_13d1aa8d"
       ],
       "position": [
-        7984.5047786099385,
-        -54.77873831864929
+        8881.695641950797,
+        12.128192855475675
       ]
     },
     {
-      "id": "task_fe7c30e7",
-      "kind": "Task",
-      "name": "Stockage",
-      "models_configs": [],
-      "startup_duration": null,
-      "loading_duration": null,
-      "operators": [],
-      "loading_operators": [],
-      "startup_operators": [],
-      "task_shifts": [],
-      "policies": {},
-      "operator_scope": "PER_BATCH",
-      "resource_scope": "PER_BATCH",
-      "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
-      "timeout": 1000000000.0,
-      "priority": 5,
-      "collector_type": "NON_DISCRIMINATING_GREEDY",
-      "bufs_in": [
-        "buffer_393aa5b9",
-        "buffer_e6e4c504"
+      "id": "buffer_7ba4481d",
+      "kind": "Buffer",
+      "name": "Expertise cire / Stockage",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
-      "bufs_out": [
-        "buffer_17ccbe3e"
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_dbcbb393"
       ],
-      "shutdowns": [],
-      "breakdowns": [],
+      "outputs_to": [
+        "task_793c66af"
+      ],
       "position": [
-        8481.103552771901,
-        251.01917145940575
+        8884.599739571997,
+        208.88544216518574
       ]
     },
     {
-      "id": "router_1b3c4ab4",
+      "id": "router_80a9d9bc",
       "kind": "Router",
       "name": "Rebut direct ?",
       "inputs_from": [
-        "task_91f9541f",
-        "task_c08ebdf8"
+        "task_0cf5bf52",
+        "task_abcbde22"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_6b4e2c25",
+          "buffer": "buffer_ac880d3c",
           "probability": {
             "kind": "constant",
             "value": 0.02
           }
         },
         {
-          "buffer": "router_e38cbf4b",
-          "probability": {
-            "kind": "constant",
-            "value": 0.0
-          }
+          "buffer": "router_6bfb15a2",
+          "probability": null
         }
       ],
       "position": [
@@ -2504,15 +2615,15 @@
       ]
     },
     {
-      "id": "buffer_6b4e2c25",
+      "id": "buffer_ac880d3c",
       "kind": "Buffer",
       "name": "Rebuts 1",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "SCRAP",
@@ -2527,7 +2638,7 @@
         "throughput": false
       },
       "inputs_from": [
-        "router_1b3c4ab4"
+        "router_80a9d9bc"
       ],
       "outputs_to": [],
       "position": [
@@ -2536,22 +2647,22 @@
       ]
     },
     {
-      "id": "router_e38cbf4b",
+      "id": "router_6bfb15a2",
       "kind": "Router",
       "name": "Prison ?",
       "inputs_from": [
-        "router_1b3c4ab4"
+        "router_80a9d9bc"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_8b2b7af0",
+          "buffer": "buffer_eca2ad5d",
           "probability": {
             "kind": "constant",
             "value": 0.05
           }
         },
         {
-          "buffer": "buffer_2bae77c4",
+          "buffer": "buffer_b2e81191",
           "probability": null
         }
       ],
@@ -2561,22 +2672,22 @@
       ]
     },
     {
-      "id": "router_cd193964",
+      "id": "router_c4f8150f",
       "kind": "Router",
-      "name": "Retouche ?",
+      "name": "Rework ? 1",
       "inputs_from": [
-        "task_1745c3d2"
+        "task_6ab7cc7f"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_6924866c",
+          "buffer": "buffer_d3487950",
           "probability": {
             "kind": "constant",
             "value": 0.6
           }
         },
         {
-          "buffer": "buffer_df6996ec",
+          "buffer": "buffer_5471d183",
           "probability": null
         }
       ],
@@ -2586,49 +2697,151 @@
       ]
     },
     {
-      "id": "task_114ab643",
+      "id": "task_d6f2ee6e",
       "kind": "Task",
-      "name": "Rework",
-      "models_configs": [],
-      "startup_duration": null,
-      "loading_duration": null,
-      "operators": [],
-      "loading_operators": [],
+      "name": "Rework 1",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 20.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
       "startup_operators": [],
-      "task_shifts": [],
-      "policies": {},
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
       "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 1000000000.0,
-      "priority": 5,
+      "timeout": "inf",
+      "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_6924866c"
+        "buffer_d3487950"
       ],
       "bufs_out": [
-        "buffer_69cff006"
+        "buffer_5509043d"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        3936.2915359097083,
-        -369.0698201115532
+        3937.452496562529,
+        -369.06982011155316
       ]
     },
     {
-      "id": "buffer_df6996ec",
+      "id": "buffer_5471d183",
       "kind": "Buffer",
       "name": "Rebuts 2",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "SCRAP",
@@ -2643,7 +2856,7 @@
         "throughput": false
       },
       "inputs_from": [
-        "router_cd193964"
+        "router_c4f8150f"
       ],
       "outputs_to": [],
       "position": [
@@ -2652,15 +2865,15 @@
       ]
     },
     {
-      "id": "buffer_6924866c",
+      "id": "buffer_d3487950",
       "kind": "Buffer",
       "name": "Prison 1 / Rework",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
       ],
       "capacity": "inf",
       "buffer_type": "PASSAGE",
@@ -2675,10 +2888,10 @@
         "throughput": false
       },
       "inputs_from": [
-        "router_cd193964"
+        "router_c4f8150f"
       ],
       "outputs_to": [
-        "task_114ab643"
+        "task_d6f2ee6e"
       ],
       "position": [
         3709.950541459977,
@@ -2686,20 +2899,20 @@
       ]
     },
     {
-      "id": "buffer_17ccbe3e",
+      "id": "buffer_c0eba5a6",
       "kind": "Buffer",
-      "name": "Sortie",
+      "name": "Sorties",
       "valid_models": [
-        "M88",
-        "MBP M88",
-        "MHP M88",
-        "DHP M88 Dr",
-        "DHP M88 Gche",
-        "LEAP",
-        "RM1 LEAP 1A​",
-        "RM2 LEAP 1B​",
-        "RM3 LEAP 1B​",
-        "D1 LEAP 1B​"
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366",
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
       ],
       "capacity": "inf",
       "buffer_type": "EXIT",
@@ -2714,351 +2927,1811 @@
         "throughput": false
       },
       "inputs_from": [
-        "task_fe7c30e7"
+        "task_793c66af"
       ],
       "outputs_to": [],
       "position": [
-        8769.706163107741,
-        263.0343126094249
+        9669.8011240698,
+        527.7282345639496
+      ]
+    },
+    {
+      "id": "task_51e866c2",
+      "kind": "Task",
+      "name": "EQUIPEMENTCABINERX",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 3,
+          "max_carrier_capacity": 5
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_20e417b2"
+      ],
+      "bufs_out": [
+        "buffer_e5e9522b"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        7405.574417315589,
+        75.51766848258853
+      ]
+    },
+    {
+      "id": "task_1ef4e552",
+      "kind": "Task",
+      "name": "PCEXPCIRE_01",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_e5e9522b"
+      ],
+      "bufs_out": [
+        "router_dbcbb393"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        8153.356067027368,
+        27.831784103793908
+      ]
+    },
+    {
+      "id": "task_6ee345dd",
+      "kind": "Task",
+      "name": "PCEXPCIRE_02",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_e5e9522b"
+      ],
+      "bufs_out": [
+        "router_dbcbb393"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        8148.712224416083,
+        177.59570831768536
+      ]
+    },
+    {
+      "id": "task_13d1aa8d",
+      "kind": "Task",
+      "name": "Prison 3",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 720.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_d612276d"
+      ],
+      "bufs_out": [
+        "router_06527131"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        9175.326696049273,
+        -8.046280891221542
+      ]
+    },
+    {
+      "id": "buffer_c4c6e17c",
+      "kind": "Buffer",
+      "name": "Prison 3 / Rework 3",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_06527131"
+      ],
+      "outputs_to": [
+        "task_5508c42f"
+      ],
+      "position": [
+        9759.515588112674,
+        -83.60750423791482
+      ]
+    },
+    {
+      "id": "router_06527131",
+      "kind": "Router",
+      "name": "Rework ? 3",
+      "inputs_from": [
+        "task_13d1aa8d"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_c4c6e17c",
+          "probability": {
+            "kind": "constant",
+            "value": 0.7
+          }
+        },
+        {
+          "buffer": "buffer_0ce4d4b8",
+          "probability": null
+        }
+      ],
+      "position": [
+        9456.340344913624,
+        1.8984101903786978
+      ]
+    },
+    {
+      "id": "buffer_0ce4d4b8",
+      "kind": "Buffer",
+      "name": "Rebuts 4",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "SCRAP",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_06527131"
+      ],
+      "outputs_to": [],
+      "position": [
+        9762.039797861009,
+        97.67786269224672
+      ]
+    },
+    {
+      "id": "task_5508c42f",
+      "kind": "Task",
+      "name": "Rework 3",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 20.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_c4c6e17c"
+      ],
+      "bufs_out": [
+        "buffer_5509043d"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        10038.508560073351,
+        -98.71292705367391
+      ]
+    },
+    {
+      "id": "buffer_a2f9808e",
+      "kind": "Buffer",
+      "name": "Prison 3 / Rework 2",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_2c82b04e"
+      ],
+      "outputs_to": [
+        "task_5a3501d1"
+      ],
+      "position": [
+        7696.0880289759825,
+        -416.7216066457279
+      ]
+    },
+    {
+      "id": "router_2c82b04e",
+      "kind": "Router",
+      "name": "Rework ? 2",
+      "inputs_from": [
+        "task_f2357c3f"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_a2f9808e",
+          "probability": {
+            "kind": "constant",
+            "value": 0.7
+          }
+        },
+        {
+          "buffer": "buffer_c5462a3c",
+          "probability": null
+        }
+      ],
+      "position": [
+        7392.912785776933,
+        -331.2156922174345
+      ]
+    },
+    {
+      "id": "task_5a3501d1",
+      "kind": "Task",
+      "name": "Rework 2",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 20.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_a2f9808e"
+      ],
+      "bufs_out": [
+        "buffer_5509043d"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        7974.16764741871,
+        -431.827029461487
+      ]
+    },
+    {
+      "id": "buffer_c5462a3c",
+      "kind": "Buffer",
+      "name": "Rebuts 3",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "SCRAP",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_2c82b04e"
+      ],
+      "outputs_to": [],
+      "position": [
+        7708.478232098457,
+        -234.6261192411553
+      ]
+    },
+    {
+      "id": "router_ca37e6ab",
+      "kind": "Router",
+      "name": "Modèle cire conforme ? 1",
+      "inputs_from": [
+        "task_c6205ce9"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_20e417b2",
+          "probability": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        },
+        {
+          "buffer": "buffer_7d0f843e",
+          "probability": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      ],
+      "position": [
+        6436.285840399139,
+        -184.19512887243894
+      ]
+    },
+    {
+      "id": "buffer_7d0f843e",
+      "kind": "Buffer",
+      "name": "Contrôle US / Prison 2",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_ca37e6ab"
+      ],
+      "outputs_to": [
+        "task_f2357c3f"
+      ],
+      "position": [
+        6828.057921977772,
+        -306.2935175700597
+      ]
+    },
+    {
+      "id": "task_f2357c3f",
+      "kind": "Task",
+      "name": "Prison 2",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 720.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_7d0f843e"
+      ],
+      "bufs_out": [
+        "router_2c82b04e"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        7118.964173475384,
+        -335.8413749248625
+      ]
+    },
+    {
+      "id": "task_793c66af",
+      "kind": "Task",
+      "name": "Stockage",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 480.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        },
+        {
+          "model": "model_3853af8a",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 480.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_8ba1f94b",
+        "buffer_7ba4481d"
+      ],
+      "bufs_out": [
+        "buffer_c0eba5a6"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        9273.992640115852,
+        484.00586262665513
       ]
     }
   ],
   "connections": [
     {
-      "from_node": "piecegenerator_677a28fe",
+      "from_node": "piecegenerator_e9bade43",
       "from_kind": "PieceGenerator",
       "from_port": "bufs_out",
-      "to_node": "buffer_e2ef517e",
+      "to_node": "buffer_7c72a9e6",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "piecegenerator_677a28fe",
+      "from_node": "piecegenerator_e9bade43",
       "from_kind": "PieceGenerator",
       "from_port": "bufs_out",
-      "to_node": "buffer_591093da",
+      "to_node": "buffer_3b79da26",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_36a5acb2",
+      "from_node": "task_242220b4",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_69cff006",
+      "to_node": "buffer_5509043d",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_e2ef517e",
+      "from_node": "buffer_7c72a9e6",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_36a5acb2",
+      "to_node": "task_242220b4",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_e2ef517e",
+      "from_node": "buffer_7c72a9e6",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_9a27b261",
+      "to_node": "task_97251896",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_9a27b261",
+      "from_node": "task_97251896",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_69cff006",
+      "to_node": "buffer_5509043d",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_69cff006",
+      "from_node": "buffer_5509043d",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_91f9541f",
+      "to_node": "task_abcbde22",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_69cff006",
+      "from_node": "buffer_5509043d",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_c08ebdf8",
+      "to_node": "task_0cf5bf52",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_c08ebdf8",
+      "from_node": "task_0cf5bf52",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_1b3c4ab4",
+      "to_node": "router_80a9d9bc",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_91f9541f",
+      "from_node": "task_abcbde22",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_1b3c4ab4",
+      "to_node": "router_80a9d9bc",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_591093da",
+      "from_node": "buffer_3b79da26",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_e9d15d2f",
+      "to_node": "task_9309ac3c",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_591093da",
+      "from_node": "buffer_3b79da26",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_6cf8bffe",
+      "to_node": "task_6f2e94c7",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_e9d15d2f",
+      "from_node": "task_9309ac3c",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_2bae77c4",
+      "to_node": "buffer_b2e81191",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_6cf8bffe",
+      "from_node": "task_6f2e94c7",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_2bae77c4",
+      "to_node": "buffer_b2e81191",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_8b2b7af0",
+      "from_node": "buffer_eca2ad5d",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_1745c3d2",
+      "to_node": "task_6ab7cc7f",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_1745c3d2",
+      "from_node": "task_6ab7cc7f",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_cd193964",
+      "to_node": "router_c4f8150f",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_2bae77c4",
+      "from_node": "buffer_b2e81191",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_fe6e0baf",
+      "to_node": "task_8e3741e2",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_fe6e0baf",
+      "from_node": "task_8e3741e2",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_8756611d",
+      "to_node": "buffer_2e1bb63f",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_8756611d",
+      "from_node": "buffer_2e1bb63f",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_2c18bb31",
+      "to_node": "task_d20e0389",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_2c18bb31",
+      "from_node": "task_d20e0389",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_37f71770",
+      "to_node": "buffer_690ccaa0",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_2c18bb31",
+      "from_node": "task_d20e0389",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_e6e4c504",
+      "to_node": "buffer_8ba1f94b",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_e6e4c504",
+      "from_node": "buffer_8ba1f94b",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_fe7c30e7",
+      "to_node": "task_793c66af",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_37f71770",
+      "from_node": "buffer_690ccaa0",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_aef37cb8",
+      "to_node": "task_c6205ce9",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_aef37cb8",
+      "from_node": "task_c6205ce9",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_fb220c3a",
-      "to_kind": "Buffer",
-      "to_port": "from_task"
-    },
-    {
-      "from_node": "buffer_fb220c3a",
-      "from_kind": "Buffer",
-      "from_port": "to_task",
-      "to_node": "task_fcdfeed0",
-      "to_kind": "Task",
-      "to_port": "bufs_in"
-    },
-    {
-      "from_node": "task_fcdfeed0",
-      "from_kind": "Task",
-      "from_port": "bufs_out",
-      "to_node": "buffer_c4141461",
-      "to_kind": "Buffer",
-      "to_port": "from_task"
-    },
-    {
-      "from_node": "buffer_c4141461",
-      "from_kind": "Buffer",
-      "from_port": "to_task",
-      "to_node": "task_10a5f96f",
-      "to_kind": "Task",
-      "to_port": "bufs_in"
-    },
-    {
-      "from_node": "buffer_c4141461",
-      "from_kind": "Buffer",
-      "from_port": "to_task",
-      "to_node": "task_5cf6cde4",
-      "to_kind": "Task",
-      "to_port": "bufs_in"
-    },
-    {
-      "from_node": "task_10a5f96f",
-      "from_kind": "Task",
-      "from_port": "bufs_out",
-      "to_node": "router_6b98f858",
+      "to_node": "router_ca37e6ab",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_5cf6cde4",
-      "from_kind": "Task",
-      "from_port": "bufs_out",
-      "to_node": "router_6b98f858",
-      "to_kind": "Router",
-      "to_port": "from_task"
-    },
-    {
-      "from_node": "router_6b98f858",
-      "from_kind": "Router",
-      "from_port": "to_buffers",
-      "to_node": "buffer_fa2b2699",
-      "to_kind": "Buffer",
-      "to_port": "from_task"
-    },
-    {
-      "from_node": "router_6b98f858",
-      "from_kind": "Router",
-      "from_port": "to_buffers",
-      "to_node": "buffer_393aa5b9",
-      "to_kind": "Buffer",
-      "to_port": "from_task"
-    },
-    {
-      "from_node": "buffer_393aa5b9",
+      "from_node": "buffer_20e417b2",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_fe7c30e7",
+      "to_node": "task_51e866c2",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_fe7c30e7",
-      "from_kind": "Task",
-      "from_port": "bufs_out",
-      "to_node": "buffer_17ccbe3e",
+      "from_node": "buffer_e5e9522b",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_1ef4e552",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_e5e9522b",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_6ee345dd",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "router_dbcbb393",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_d612276d",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_1b3c4ab4",
+      "from_node": "router_dbcbb393",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_6b4e2c25",
+      "to_node": "buffer_7ba4481d",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_1b3c4ab4",
+      "from_node": "buffer_d612276d",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_13d1aa8d",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_7ba4481d",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_793c66af",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "router_80a9d9bc",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "router_e38cbf4b",
+      "to_node": "buffer_ac880d3c",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_80a9d9bc",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "router_6bfb15a2",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_e38cbf4b",
+      "from_node": "router_6bfb15a2",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_8b2b7af0",
+      "to_node": "buffer_eca2ad5d",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_e38cbf4b",
+      "from_node": "router_6bfb15a2",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_2bae77c4",
+      "to_node": "buffer_b2e81191",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_cd193964",
+      "from_node": "router_c4f8150f",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_6924866c",
+      "to_node": "buffer_d3487950",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_cd193964",
+      "from_node": "router_c4f8150f",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_df6996ec",
+      "to_node": "buffer_5471d183",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_114ab643",
+      "from_node": "task_d6f2ee6e",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_69cff006",
+      "to_node": "buffer_5509043d",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_6924866c",
+      "from_node": "buffer_d3487950",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_114ab643",
+      "to_node": "task_d6f2ee6e",
       "to_kind": "Task",
       "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_51e866c2",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_e5e9522b",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_1ef4e552",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_dbcbb393",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_6ee345dd",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_dbcbb393",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_13d1aa8d",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_06527131",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_c4c6e17c",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_5508c42f",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "router_06527131",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_c4c6e17c",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_06527131",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_0ce4d4b8",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_5508c42f",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_5509043d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_a2f9808e",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_5a3501d1",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "router_2c82b04e",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_a2f9808e",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_2c82b04e",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_c5462a3c",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_5a3501d1",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_5509043d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_ca37e6ab",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_20e417b2",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_ca37e6ab",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_7d0f843e",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_7d0f843e",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_f2357c3f",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_f2357c3f",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_2c82b04e",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_793c66af",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_c0eba5a6",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
     }
   ],
   "backdrops": []

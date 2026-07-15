@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from simulation import env
+from datetime import datetime, date, time, timedelta
 from .component import Component
 from .interval import Interval, IntervalWaiter
 from .protocols import Action
@@ -46,7 +47,7 @@ class Breakdown(Component, ABC):
             self.task.is_in_breakdown.set(False)
 
 
-class Shutdowns(IntervalWaiter):
+class Shutdowns(ABC, IntervalWaiter):
     def setup(self, task: Task, intervals: list[Interval]):
         super().setup(intervals=intervals)
         self.task = task
@@ -71,7 +72,33 @@ class Shutdowns(IntervalWaiter):
         self.task.is_in_shutdown.set(False)
         self.task.is_frozen.set(False)
 
+    @staticmethod
+    def generate_periodic_shutdown(task: Task, in_between: float, shutdown_duration: float, sim_start: datetime, sim_end: datetime) -> list[Interval]:
+        end = sim_start + timedelta(minutes=shutdown_duration)
+        intervals = [Interval(start=0.0, end=shutdown_duration)]
+        while end < sim_end:
+            next_interval = intervals[-1].copy()
+            next_interval.translate(in_between)
+            shutdown_is_in_shift = False
+            i=0
+            while i <= len(task.shifts):
+                if (next_interval.start >= task.shifts[i].start) and (next_interval.end <= task.shifts[i].end):
+                    shutdown_is_in_shift = True
+                    break
+                elif next_interval.end <= task.shifts[i].end:
+                    break
+                i += 1
 
+            if not shutdown_is_in_shift:
+                till_next_shift = task.shifts[i].start - next_interval.start
+                next_interval.translate(till_next_shift)
+
+            intervals.append(next_interval)
+            end = sim_start + timedelta(minutes=next_interval.end)
+
+        return intervals
+        
+        
 class FlexibleShutdowns(Shutdowns):
     def setup(self, task: Task, intervals: list[Interval]):
         super().setup(task=task, intervals=intervals)
