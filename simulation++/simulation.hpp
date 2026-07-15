@@ -467,6 +467,12 @@ struct HasShifts {
         }
         return shifts.empty() ? nullptr : shifts.back().get();
     }
+
+    const Interval* next_or_current_shift_from(double cursor) const {
+        for (const auto& shift : shifts)
+            if (shift->end > cursor) return shift.get();
+        return nullptr;
+    }
 };
 
 class ShiftManager : public IntervalWaiter {
@@ -1194,6 +1200,47 @@ class Shutdowns : public IntervalWaiter {
     double get_deadline() const {
         const Interval* next = get_next_shutdown();
         return next != nullptr ? next->start : sim::inf;
+    }
+
+    // Periodic shutdown calendar: every in_between minutes a shutdown of
+    // shutdown_duration minutes, placed inside the entity's (merged) shifts;
+    // a shutdown that no longer fits moves into the next shift, randomized
+    // uniformly when it enters a fresh shift. Mirrors the Python line by line
+    // (Python's `task` parameter is only used as a HasShifts).
+    static Intervals generate_periodic_shutdown(const HasShifts* task, double in_between,
+                                                double shutdown_duration,
+                                                const ShiftManager::DateTime& sim_start,
+                                                const ShiftManager::DateTime& start,
+                                                const ShiftManager::DateTime& end) {
+        if (ShiftManager::minutes_between(sim_start, start) < 0)
+            throw std::invalid_argument("Periodic shutdowns start must be after simulation start");
+        if (ShiftManager::minutes_between(start, end) <= 0)
+            throw std::invalid_argument("Periodic shutdowns start must be before end");
+
+        double cursor = static_cast<double>(ShiftManager::minutes_between(sim_start, start));
+        double horizon_end = static_cast<double>(ShiftManager::minutes_between(sim_start, end));
+        Intervals intervals;
+
+        while (cursor < horizon_end) {
+            const Interval* current_or_next_shift = task->next_or_current_shift_from(cursor);
+            if (current_or_next_shift == nullptr) break;
+
+            cursor = std::max(cursor, current_or_next_shift->start);
+
+            if (cursor > current_or_next_shift->start &&
+                cursor + shutdown_duration <= current_or_next_shift->end) {
+                intervals.push_back(interval(cursor, cursor + shutdown_duration));
+                cursor += in_between;
+            } else if (double wiggle_room = current_or_next_shift->end - cursor - shutdown_duration;
+                       wiggle_room >= 0) {
+                cursor += sim::Uniform(0, wiggle_room).sample();
+                intervals.push_back(interval(cursor, cursor + shutdown_duration));
+                cursor += in_between;
+            } else {
+                cursor = current_or_next_shift->end;
+            }
+        }
+        return intervals;
     }
 
     void on_enter() override;  // needs Task

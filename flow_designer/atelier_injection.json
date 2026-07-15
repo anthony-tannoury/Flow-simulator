@@ -1,0 +1,4738 @@
+{
+  "editor": {
+    "name": "Simulation Flow Designer",
+    "version": "0.3.0",
+    "format": "clean-json"
+  },
+  "models": [
+    {
+      "name": "M88",
+      "parent": null,
+      "id": "model_f6960dbd"
+    },
+    {
+      "name": "LEAP",
+      "parent": null,
+      "id": "model_3853af8a"
+    },
+    {
+      "name": "MBP M88",
+      "parent": "model_f6960dbd",
+      "id": "model_c1c20e4c"
+    },
+    {
+      "name": "MHP M88",
+      "parent": "model_f6960dbd",
+      "id": "model_f551538b"
+    },
+    {
+      "name": "DHP M88 Dr",
+      "parent": "model_f6960dbd",
+      "id": "model_f8a1d4ad"
+    },
+    {
+      "name": "DHP M88 Gche",
+      "parent": "model_f6960dbd",
+      "id": "model_742fd366"
+    },
+    {
+      "name": "RM1 LEAP 1A​",
+      "parent": "model_3853af8a",
+      "id": "model_300990ff"
+    },
+    {
+      "name": "RM2 LEAP 1B​",
+      "parent": "model_3853af8a",
+      "id": "model_e093ec36"
+    },
+    {
+      "name": "RM3 LEAP 1B​",
+      "parent": "model_3853af8a",
+      "id": "model_02d3ef7d"
+    },
+    {
+      "name": "D1 LEAP 1B​",
+      "parent": "model_3853af8a",
+      "id": "model_256d4101"
+    }
+  ],
+  "resources": [
+    {
+      "name": "NOYAU MBP M88",
+      "restockable": true,
+      "lifespan": "inf",
+      "max_capacity": 100.0,
+      "initial_capacity": 50.0,
+      "order_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "delivery_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 100.0
+          }
+        }
+      },
+      "threshold": 20.0,
+      "id": "resource_9de24cdb"
+    },
+    {
+      "name": "CIRE_BRUTE",
+      "restockable": true,
+      "lifespan": "inf",
+      "max_capacity": 100.0,
+      "initial_capacity": 30.0,
+      "order_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "delivery_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 100.0
+          }
+        }
+      },
+      "threshold": 20.0,
+      "id": "resource_a07d9691"
+    }
+  ],
+  "operators": [
+    {
+      "name": "POOL_CIRE_MATIN",
+      "capacity": 4,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.85
+          }
+        }
+      },
+      "shifts": [
+        "shift_496aeb46"
+      ],
+      "id": "operator_bbad2cd0"
+    },
+    {
+      "name": "POOL_CIRE_APREM",
+      "capacity": 4,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.85
+          }
+        }
+      },
+      "shifts": [
+        "shift_04b8cc03"
+      ],
+      "id": "operator_f0ba684d"
+    },
+    {
+      "name": "POOL_CIRE_NUIT",
+      "capacity": 4,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.8
+          }
+        }
+      },
+      "shifts": [
+        "shift_a02b817c"
+      ],
+      "id": "operator_97fcb1f5"
+    },
+    {
+      "name": "POOL_CIRE_SAM",
+      "capacity": 4,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.85
+          }
+        }
+      },
+      "shifts": [
+        "shift_74a22217"
+      ],
+      "id": "operator_796ea384"
+    }
+  ],
+  "closing_days": [
+    {
+      "date": "01-01-2026",
+      "name": "",
+      "id": "closingday_fcd95861"
+    },
+    {
+      "date": "01-05-2026",
+      "name": "",
+      "id": "closingday_f5ba34fa"
+    },
+    {
+      "date": "08-05-2026",
+      "name": "",
+      "id": "closingday_8389bb93"
+    },
+    {
+      "date": "14-05-2026",
+      "name": "",
+      "id": "closingday_745a3415"
+    },
+    {
+      "date": "14-07-2026",
+      "name": "",
+      "id": "closingday_9e5d6ccf"
+    },
+    {
+      "date": "21-08-2026",
+      "name": "",
+      "id": "closingday_61cc949d"
+    },
+    {
+      "date": "01-11-2026",
+      "name": "",
+      "id": "closingday_c040805a"
+    },
+    {
+      "date": "11-11-2026",
+      "name": "",
+      "id": "closingday_914d12ae"
+    },
+    {
+      "date": "25-12-2026",
+      "name": "",
+      "id": "closingday_bc9e8f7e"
+    }
+  ],
+  "shifts": [
+    {
+      "id": "shift_c01ba51b",
+      "name": "Temps d'ouverture P1",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2026",
+        "end": "30-04-2026"
+      }
+    },
+    {
+      "id": "shift_191d58b8",
+      "name": "Temps d'ouverture P3",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 480.0,
+              "end": 960.0
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-10-2026",
+        "end": "31-12-2026"
+      }
+    },
+    {
+      "id": "shift_43a68d28",
+      "name": "Temps d'ouverture P2",
+      "mode": "custom",
+      "days_off": [
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d"
+      ],
+      "custom_intervals": [
+        {
+          "start": "01-05-2026 08:00",
+          "end": "30-09-2026 17:00"
+        }
+      ]
+    },
+    {
+      "id": "shift_496aeb46",
+      "name": "SHIFT_MATIN",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_61cc949d",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 840.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 840.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 840.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 840.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 360.0,
+              "end": 840.0
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2026",
+        "end": "31-12-2026"
+      }
+    },
+    {
+      "id": "shift_04b8cc03",
+      "name": "SHIFT_APREM",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 840.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 840.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 840.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 840.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 840.0,
+              "end": 1320.0
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2026",
+        "end": "31-12-2026"
+      }
+    },
+    {
+      "id": "shift_a02b817c",
+      "name": "SHIFT_NUIT",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 1320.0,
+              "end": 1440.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 0.0,
+              "end": 360.0
+            },
+            {
+              "start": 1320.0,
+              "end": 1440.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 0.0,
+              "end": 360.0
+            },
+            {
+              "start": 1320.0,
+              "end": 1440.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 0.0,
+              "end": 360.0
+            },
+            {
+              "start": 1320.0,
+              "end": 1440.0
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 0.0,
+              "end": 360.0
+            },
+            {
+              "start": 1320.0,
+              "end": 1440.0
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2026",
+        "end": "31-12-2026"
+      }
+    },
+    {
+      "id": "shift_74a22217",
+      "name": "SHITF_RENFORT_SAM",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": 480.0,
+              "end": 960.0
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2026",
+        "end": "31-12-2026"
+      }
+    }
+  ],
+  "stopping_criterion": {
+    "type": "ByTime",
+    "time": "01-01-2027 00:00"
+  },
+  "start_date": "01-01-2026 00:00",
+  "nodes": [
+    {
+      "id": "piecegenerator_e9bade43",
+      "kind": "PieceGenerator",
+      "name": "Piece Generator",
+      "models_goals": [
+        {
+          "model": "model_c1c20e4c",
+          "goal": 300
+        },
+        {
+          "model": "model_f551538b",
+          "goal": 300
+        },
+        {
+          "model": "model_f8a1d4ad",
+          "goal": 300
+        },
+        {
+          "model": "model_742fd366",
+          "goal": 300
+        },
+        {
+          "model": "model_300990ff",
+          "goal": 450
+        },
+        {
+          "model": "model_e093ec36",
+          "goal": 450
+        },
+        {
+          "model": "model_02d3ef7d",
+          "goal": 450
+        },
+        {
+          "model": "model_256d4101",
+          "goal": 450
+        }
+      ],
+      "shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "outlets": [
+        "buffer_7c72a9e6",
+        "buffer_3b79da26"
+      ],
+      "position": [
+        271.34534068445913,
+        398.65414835828165
+      ]
+    },
+    {
+      "id": "task_242220b4",
+      "kind": "Task",
+      "name": "PREP_NOY_01",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "resource_9de24cdb",
+              "value": 1.0
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 1.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_7c72a9e6"
+      ],
+      "bufs_out": [
+        "buffer_5509043d"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        1124.6503601633,
+        -2.960128339699203
+      ]
+    },
+    {
+      "id": "buffer_7c72a9e6",
+      "kind": "Buffer",
+      "name": "Entrée M88 ET Retouche / Prep noyaux",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "piecegenerator_e9bade43"
+      ],
+      "outputs_to": [
+        "task_242220b4",
+        "task_97251896"
+      ],
+      "position": [
+        687.857952853282,
+        104.09014868485383
+      ]
+    },
+    {
+      "id": "task_97251896",
+      "kind": "Task",
+      "name": "PREP_NOY_02",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "resource_9de24cdb",
+              "value": 1.0
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_TASK",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_7c72a9e6"
+      ],
+      "bufs_out": [
+        "buffer_5509043d"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        1134.209497407077,
+        212.69240567652952
+      ]
+    },
+    {
+      "id": "buffer_5509043d",
+      "kind": "Buffer",
+      "name": "Prep noyaux / Injection manuelle",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "task_242220b4",
+        "task_97251896",
+        "task_d6f2ee6e",
+        "task_5508c42f",
+        "task_5a3501d1"
+      ],
+      "outputs_to": [
+        "task_abcbde22",
+        "task_0cf5bf52"
+      ],
+      "position": [
+        1427.884048299756,
+        104.31410979039963
+      ]
+    },
+    {
+      "id": "task_0cf5bf52",
+      "kind": "Task",
+      "name": "PRSINJM88_02",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "resource_a07d9691",
+              "value": 0.4
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_5509043d"
+      ],
+      "bufs_out": [
+        "router_80a9d9bc"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        1825.5716981487205,
+        187.25529907088276
+      ]
+    },
+    {
+      "id": "task_abcbde22",
+      "kind": "Task",
+      "name": "PRSINJM88_01",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "resource_a07d9691",
+              "value": 0.4
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_5509043d"
+      ],
+      "bufs_out": [
+        "router_80a9d9bc"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        1821.4438960387965,
+        -30.787596121532633
+      ]
+    },
+    {
+      "id": "buffer_3b79da26",
+      "kind": "Buffer",
+      "name": "Entrée LEAP / Injection cire moule",
+      "valid_models": [
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "piecegenerator_e9bade43"
+      ],
+      "outputs_to": [
+        "task_9309ac3c",
+        "task_6f2e94c7"
+      ],
+      "position": [
+        718.3895042300152,
+        737.4877937085225
+      ]
+    },
+    {
+      "id": "task_9309ac3c",
+      "kind": "Task",
+      "name": "PRSINJLEAP_01",
+      "models_configs": [
+        {
+          "model": "model_3853af8a",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "resource_a07d9691",
+              "value": 0.4
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_3b79da26"
+      ],
+      "bufs_out": [
+        "buffer_b2e81191"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        1131.5125444732323,
+        607.5755897728653
+      ]
+    },
+    {
+      "id": "task_6f2e94c7",
+      "kind": "Task",
+      "name": "PRSINJLEAP_02",
+      "models_configs": [
+        {
+          "model": "model_3853af8a",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [
+            {
+              "resource": "resource_a07d9691",
+              "value": 0.4
+            }
+          ],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_3b79da26"
+      ],
+      "bufs_out": [
+        "buffer_b2e81191"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        1126.8056733089095,
+        820.6579953830105
+      ]
+    },
+    {
+      "id": "buffer_eca2ad5d",
+      "kind": "Buffer",
+      "name": "Injection cire noyaux / Prison 1",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_6bfb15a2"
+      ],
+      "outputs_to": [
+        "task_6ab7cc7f"
+      ],
+      "position": [
+        2855.0245559291484,
+        -199.27886824248804
+      ]
+    },
+    {
+      "id": "task_6ab7cc7f",
+      "kind": "Task",
+      "name": "Prison 1",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 480.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_eca2ad5d"
+      ],
+      "bufs_out": [
+        "router_c4f8150f"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        3160.269194095718,
+        -233.92743365650645
+      ]
+    },
+    {
+      "id": "buffer_b2e81191",
+      "kind": "Buffer",
+      "name": "Injection cire / Attente 4h",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366",
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "task_9309ac3c",
+        "task_6f2e94c7",
+        "router_6bfb15a2"
+      ],
+      "outputs_to": [
+        "task_8e3741e2"
+      ],
+      "position": [
+        4160.388171597086,
+        189.82052188192512
+      ]
+    },
+    {
+      "id": "task_8e3741e2",
+      "kind": "Task",
+      "name": "Attente de 4h",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 240.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        },
+        {
+          "model": "model_3853af8a",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 240.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_b2e81191"
+      ],
+      "bufs_out": [
+        "buffer_2e1bb63f"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        4560.138684568385,
+        161.74444872400449
+      ]
+    },
+    {
+      "id": "buffer_2e1bb63f",
+      "kind": "Buffer",
+      "name": "Attente 4h / Marquage laser",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366",
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "task_8e3741e2"
+      ],
+      "outputs_to": [
+        "task_d20e0389"
+      ],
+      "position": [
+        4871.282618781259,
+        168.61006791030997
+      ]
+    },
+    {
+      "id": "task_d20e0389",
+      "kind": "Task",
+      "name": "MACHINEMARQUAGELASER",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        },
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_2e1bb63f"
+      ],
+      "bufs_out": [
+        "buffer_690ccaa0",
+        "buffer_8ba1f94b"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        5210.472171313223,
+        138.34353870775644
+      ]
+    },
+    {
+      "id": "buffer_8ba1f94b",
+      "kind": "Buffer",
+      "name": "Marquage laser / Stockage",
+      "valid_models": [
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "task_d20e0389"
+      ],
+      "outputs_to": [
+        "task_793c66af"
+      ],
+      "position": [
+        7735.350280459644,
+        643.3203512291246
+      ]
+    },
+    {
+      "id": "buffer_690ccaa0",
+      "kind": "Buffer",
+      "name": "Marquage laser / Contrôle US",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "task_d20e0389"
+      ],
+      "outputs_to": [
+        "task_c6205ce9"
+      ],
+      "position": [
+        5703.679606457507,
+        -163.84316596674896
+      ]
+    },
+    {
+      "id": "task_c6205ce9",
+      "kind": "Task",
+      "name": "EQUIPEMENTCABINEUS",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 3,
+          "max_carrier_capacity": 5
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_690ccaa0"
+      ],
+      "bufs_out": [
+        "router_ca37e6ab"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        6160.469179847673,
+        -199.38826363540372
+      ]
+    },
+    {
+      "id": "buffer_20e417b2",
+      "kind": "Buffer",
+      "name": "Contrôle US / Contrôle RX",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_ca37e6ab"
+      ],
+      "outputs_to": [
+        "task_51e866c2"
+      ],
+      "position": [
+        6880.492178284414,
+        39.562923347672324
+      ]
+    },
+    {
+      "id": "buffer_e5e9522b",
+      "kind": "Buffer",
+      "name": "Contrôle RX / Expertise cire",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "task_51e866c2"
+      ],
+      "outputs_to": [
+        "task_1ef4e552",
+        "task_6ee345dd"
+      ],
+      "position": [
+        7833.284881667255,
+        104.38684869981466
+      ]
+    },
+    {
+      "id": "router_dbcbb393",
+      "kind": "Router",
+      "name": "Modèle cire conforme ? 2",
+      "inputs_from": [
+        "task_1ef4e552",
+        "task_6ee345dd"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_d612276d",
+          "probability": {
+            "kind": "constant",
+            "value": 0.08
+          }
+        },
+        {
+          "buffer": "buffer_7ba4481d",
+          "probability": null
+        }
+      ],
+      "position": [
+        8505.256493891691,
+        75.41152396439927
+      ]
+    },
+    {
+      "id": "buffer_d612276d",
+      "kind": "Buffer",
+      "name": "Expertise cire / Prison 3",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_dbcbb393"
+      ],
+      "outputs_to": [
+        "task_13d1aa8d"
+      ],
+      "position": [
+        8881.695641950797,
+        12.128192855475675
+      ]
+    },
+    {
+      "id": "buffer_7ba4481d",
+      "kind": "Buffer",
+      "name": "Expertise cire / Stockage",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_dbcbb393"
+      ],
+      "outputs_to": [
+        "task_793c66af"
+      ],
+      "position": [
+        8884.599739571997,
+        208.88544216518574
+      ]
+    },
+    {
+      "id": "router_80a9d9bc",
+      "kind": "Router",
+      "name": "Rebut direct ?",
+      "inputs_from": [
+        "task_0cf5bf52",
+        "task_abcbde22"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_ac880d3c",
+          "probability": {
+            "kind": "constant",
+            "value": 0.02
+          }
+        },
+        {
+          "buffer": "router_6bfb15a2",
+          "probability": null
+        }
+      ],
+      "position": [
+        2099.5506432953944,
+        46.979822599044525
+      ]
+    },
+    {
+      "id": "buffer_ac880d3c",
+      "kind": "Buffer",
+      "name": "Rebuts 1",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "SCRAP",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_80a9d9bc"
+      ],
+      "outputs_to": [],
+      "position": [
+        2408.2751918034,
+        -256.151889885266
+      ]
+    },
+    {
+      "id": "router_6bfb15a2",
+      "kind": "Router",
+      "name": "Prison ?",
+      "inputs_from": [
+        "router_80a9d9bc"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_eca2ad5d",
+          "probability": {
+            "kind": "constant",
+            "value": 0.05
+          }
+        },
+        {
+          "buffer": "buffer_b2e81191",
+          "probability": null
+        }
+      ],
+      "position": [
+        2496.6420009777817,
+        13.422806456869793
+      ]
+    },
+    {
+      "id": "router_c4f8150f",
+      "kind": "Router",
+      "name": "Rework ? 1",
+      "inputs_from": [
+        "task_6ab7cc7f"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_d3487950",
+          "probability": {
+            "kind": "constant",
+            "value": 0.6
+          }
+        },
+        {
+          "buffer": "buffer_5471d183",
+          "probability": null
+        }
+      ],
+      "position": [
+        3450.779826620251,
+        -241.61051622365454
+      ]
+    },
+    {
+      "id": "task_d6f2ee6e",
+      "kind": "Task",
+      "name": "Rework 1",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 20.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_d3487950"
+      ],
+      "bufs_out": [
+        "buffer_5509043d"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        3937.452496562529,
+        -369.06982011155316
+      ]
+    },
+    {
+      "id": "buffer_5471d183",
+      "kind": "Buffer",
+      "name": "Rebuts 2",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "SCRAP",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_c4f8150f"
+      ],
+      "outputs_to": [],
+      "position": [
+        3714.4160780905377,
+        -165.4547076837369
+      ]
+    },
+    {
+      "id": "buffer_d3487950",
+      "kind": "Buffer",
+      "name": "Prison 1 / Rework",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_c4f8150f"
+      ],
+      "outputs_to": [
+        "task_d6f2ee6e"
+      ],
+      "position": [
+        3709.950541459977,
+        -359.56413819233103
+      ]
+    },
+    {
+      "id": "buffer_c0eba5a6",
+      "kind": "Buffer",
+      "name": "Sorties",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366",
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
+      ],
+      "capacity": "inf",
+      "buffer_type": "EXIT",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "task_793c66af"
+      ],
+      "outputs_to": [],
+      "position": [
+        9669.8011240698,
+        527.7282345639496
+      ]
+    },
+    {
+      "id": "task_51e866c2",
+      "kind": "Task",
+      "name": "EQUIPEMENTCABINERX",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 3,
+          "max_carrier_capacity": 5
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_20e417b2"
+      ],
+      "bufs_out": [
+        "buffer_e5e9522b"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        7405.574417315589,
+        75.51766848258853
+      ]
+    },
+    {
+      "id": "task_1ef4e552",
+      "kind": "Task",
+      "name": "PCEXPCIRE_01",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_e5e9522b"
+      ],
+      "bufs_out": [
+        "router_dbcbb393"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        8153.356067027368,
+        27.831784103793908
+      ]
+    },
+    {
+      "id": "task_6ee345dd",
+      "kind": "Task",
+      "name": "PCEXPCIRE_02",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 5.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_e5e9522b"
+      ],
+      "bufs_out": [
+        "router_dbcbb393"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        8148.712224416083,
+        177.59570831768536
+      ]
+    },
+    {
+      "id": "task_13d1aa8d",
+      "kind": "Task",
+      "name": "Prison 3",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 720.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_d612276d"
+      ],
+      "bufs_out": [
+        "router_06527131"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        9175.326696049273,
+        -8.046280891221542
+      ]
+    },
+    {
+      "id": "buffer_c4c6e17c",
+      "kind": "Buffer",
+      "name": "Prison 3 / Rework 3",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_06527131"
+      ],
+      "outputs_to": [
+        "task_5508c42f"
+      ],
+      "position": [
+        9759.515588112674,
+        -83.60750423791482
+      ]
+    },
+    {
+      "id": "router_06527131",
+      "kind": "Router",
+      "name": "Rework ? 3",
+      "inputs_from": [
+        "task_13d1aa8d"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_c4c6e17c",
+          "probability": {
+            "kind": "constant",
+            "value": 0.7
+          }
+        },
+        {
+          "buffer": "buffer_0ce4d4b8",
+          "probability": null
+        }
+      ],
+      "position": [
+        9456.340344913624,
+        1.8984101903786978
+      ]
+    },
+    {
+      "id": "buffer_0ce4d4b8",
+      "kind": "Buffer",
+      "name": "Rebuts 4",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "SCRAP",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_06527131"
+      ],
+      "outputs_to": [],
+      "position": [
+        9762.039797861009,
+        97.67786269224672
+      ]
+    },
+    {
+      "id": "task_5508c42f",
+      "kind": "Task",
+      "name": "Rework 3",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 20.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_c4c6e17c"
+      ],
+      "bufs_out": [
+        "buffer_5509043d"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        10038.508560073351,
+        -98.71292705367391
+      ]
+    },
+    {
+      "id": "buffer_a2f9808e",
+      "kind": "Buffer",
+      "name": "Prison 3 / Rework 2",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_2c82b04e"
+      ],
+      "outputs_to": [
+        "task_5a3501d1"
+      ],
+      "position": [
+        7696.0880289759825,
+        -416.7216066457279
+      ]
+    },
+    {
+      "id": "router_2c82b04e",
+      "kind": "Router",
+      "name": "Rework ? 2",
+      "inputs_from": [
+        "task_f2357c3f"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_a2f9808e",
+          "probability": {
+            "kind": "constant",
+            "value": 0.7
+          }
+        },
+        {
+          "buffer": "buffer_c5462a3c",
+          "probability": null
+        }
+      ],
+      "position": [
+        7392.912785776933,
+        -331.2156922174345
+      ]
+    },
+    {
+      "id": "task_5a3501d1",
+      "kind": "Task",
+      "name": "Rework 2",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 20.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_a2f9808e"
+      ],
+      "bufs_out": [
+        "buffer_5509043d"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        7974.16764741871,
+        -431.827029461487
+      ]
+    },
+    {
+      "id": "buffer_c5462a3c",
+      "kind": "Buffer",
+      "name": "Rebuts 3",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "SCRAP",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_2c82b04e"
+      ],
+      "outputs_to": [],
+      "position": [
+        7708.478232098457,
+        -234.6261192411553
+      ]
+    },
+    {
+      "id": "router_ca37e6ab",
+      "kind": "Router",
+      "name": "Modèle cire conforme ? 1",
+      "inputs_from": [
+        "task_c6205ce9"
+      ],
+      "buffer_probs": [
+        {
+          "buffer": "buffer_20e417b2",
+          "probability": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        },
+        {
+          "buffer": "buffer_7d0f843e",
+          "probability": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      ],
+      "position": [
+        6436.285840399139,
+        -184.19512887243894
+      ]
+    },
+    {
+      "id": "buffer_7d0f843e",
+      "kind": "Buffer",
+      "name": "Contrôle US / Prison 2",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366"
+      ],
+      "capacity": "inf",
+      "buffer_type": "PASSAGE",
+      "monitor": {
+        "avg_length": false,
+        "max_length": false,
+        "length_std": false,
+        "current_length": false,
+        "avg_stay": false,
+        "max_stay": false,
+        "avg_time_before_arrival": false,
+        "throughput": false
+      },
+      "inputs_from": [
+        "router_ca37e6ab"
+      ],
+      "outputs_to": [
+        "task_f2357c3f"
+      ],
+      "position": [
+        6828.057921977772,
+        -306.2935175700597
+      ]
+    },
+    {
+      "id": "task_f2357c3f",
+      "kind": "Task",
+      "name": "Prison 2",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 720.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_7d0f843e"
+      ],
+      "bufs_out": [
+        "router_2c82b04e"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        7118.964173475384,
+        -335.8413749248625
+      ]
+    },
+    {
+      "id": "task_793c66af",
+      "kind": "Task",
+      "name": "Stockage",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 480.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        },
+        {
+          "model": "model_3853af8a",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 480.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 5.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
+      "timeout": "inf",
+      "priority": 10,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [
+        "buffer_8ba1f94b",
+        "buffer_7ba4481d"
+      ],
+      "bufs_out": [
+        "buffer_c0eba5a6"
+      ],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        9273.992640115852,
+        484.00586262665513
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from_node": "piecegenerator_e9bade43",
+      "from_kind": "PieceGenerator",
+      "from_port": "bufs_out",
+      "to_node": "buffer_7c72a9e6",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "piecegenerator_e9bade43",
+      "from_kind": "PieceGenerator",
+      "from_port": "bufs_out",
+      "to_node": "buffer_3b79da26",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_242220b4",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_5509043d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_7c72a9e6",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_242220b4",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_7c72a9e6",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_97251896",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_97251896",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_5509043d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_5509043d",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_abcbde22",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_5509043d",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_0cf5bf52",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_0cf5bf52",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_80a9d9bc",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_abcbde22",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_80a9d9bc",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_3b79da26",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_9309ac3c",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_3b79da26",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_6f2e94c7",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_9309ac3c",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_b2e81191",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_6f2e94c7",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_b2e81191",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_eca2ad5d",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_6ab7cc7f",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_6ab7cc7f",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_c4f8150f",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_b2e81191",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_8e3741e2",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_8e3741e2",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_2e1bb63f",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_2e1bb63f",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_d20e0389",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_d20e0389",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_690ccaa0",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_d20e0389",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_8ba1f94b",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_8ba1f94b",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_793c66af",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_690ccaa0",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_c6205ce9",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_c6205ce9",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_ca37e6ab",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_20e417b2",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_51e866c2",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_e5e9522b",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_1ef4e552",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_e5e9522b",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_6ee345dd",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "router_dbcbb393",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_d612276d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_dbcbb393",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_7ba4481d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_d612276d",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_13d1aa8d",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "buffer_7ba4481d",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_793c66af",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "router_80a9d9bc",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_ac880d3c",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_80a9d9bc",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "router_6bfb15a2",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_6bfb15a2",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_eca2ad5d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_6bfb15a2",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_b2e81191",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_c4f8150f",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_d3487950",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_c4f8150f",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_5471d183",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_d6f2ee6e",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_5509043d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_d3487950",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_d6f2ee6e",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_51e866c2",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_e5e9522b",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_1ef4e552",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_dbcbb393",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_6ee345dd",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_dbcbb393",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_13d1aa8d",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_06527131",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_c4c6e17c",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_5508c42f",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "router_06527131",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_c4c6e17c",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_06527131",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_0ce4d4b8",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_5508c42f",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_5509043d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_a2f9808e",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_5a3501d1",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "router_2c82b04e",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_a2f9808e",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_2c82b04e",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_c5462a3c",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_5a3501d1",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_5509043d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_ca37e6ab",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_20e417b2",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "router_ca37e6ab",
+      "from_kind": "Router",
+      "from_port": "to_buffers",
+      "to_node": "buffer_7d0f843e",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "buffer_7d0f843e",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_f2357c3f",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    },
+    {
+      "from_node": "task_f2357c3f",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "router_2c82b04e",
+      "to_kind": "Router",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "task_793c66af",
+      "from_kind": "Task",
+      "from_port": "bufs_out",
+      "to_node": "buffer_c0eba5a6",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    }
+  ],
+  "backdrops": []
+}

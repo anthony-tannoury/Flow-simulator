@@ -251,17 +251,26 @@ class ShutdownsNode(SimNode):
         super().__init__()
         self.add_output("shutdowns", color=PORT_COLORS["shutdown"])
         add_combo_input(self, "shutdown_type", "type", SHUTDOWN_TYPES, "NON_FLEXIBLE")
+        self.create_property("mode", "custom")   # "custom" (explicit intervals) | "generator" (periodic)
         self.create_property("intervals", "[]")  # [{start, end}]
+        self.create_property("generator", "{}")  # {in_between, duration, start, end}
 
     def to_clean_json(self) -> dict:
-        return {
+        mode = self.get_property("mode") if self.has_property("mode") else "custom"
+        out = {
             "id": node_uid(self),
             "kind": self.kind,
             "name": self.name(),
             "shutdown_type": self.get_property("shutdown_type") if self.has_property("shutdown_type") else "NON_FLEXIBLE",
-            "intervals": get_property_json(self, "intervals", []),
+            "mode": mode,
             "position": [self.x_pos(), self.y_pos()],
         }
+        # like shifts: only the fields the mode actually uses
+        if mode == "generator":
+            out["generator"] = get_property_json(self, "generator", {})
+        else:
+            out["intervals"] = get_property_json(self, "intervals", [])
+        return out
 
 
 class BufferNode(SimNode):
@@ -1756,6 +1765,13 @@ class NameValuePicker(QtWidgets.QWidget):
 
 
 class ShutdownsMenuDialog(QtWidgets.QDialog):
+    """Shutdown windows are either 'custom' (an explicit list of absolute date
+    intervals) or 'generator' (periodic: every N minutes a shutdown of D minutes,
+    placed inside the attached task's shifts by generate_periodic_shutdown). A
+    mode dropdown picks which; both configurations are kept on the node."""
+
+    MODES = [("Custom", "custom"), ("Generator", "generator")]
+
     def __init__(self, parent, node):
         super().__init__(parent)
         self.node = node
@@ -1765,16 +1781,61 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         self.type = QtWidgets.QComboBox(); self.type.addItems(SHUTDOWN_TYPES)
         self.type.setCurrentText(node.get_property("shutdown_type") if node.has_property("shutdown_type") else "NON_FLEXIBLE")
         form.addRow("type", self.type)
+        self.mode = QtWidgets.QComboBox()
+        for label, canonical in self.MODES:
+            self.mode.addItem(label, canonical)
+        form.addRow("intervals", self.mode)
         lay.addLayout(form)
-        lay.addWidget(QtWidgets.QLabel("intervals (absolute dates, dd-mm-yyyy hh:mm):"))
+        self._stack = QtWidgets.QStackedWidget()
+        lay.addWidget(self._stack)
+
+        # --- Custom page: the explicit interval list ---
+        custom = QtWidgets.QWidget()
+        cl = QtWidgets.QVBoxLayout(custom); cl.setContentsMargins(0, 0, 0, 0)
+        cl.addWidget(QtWidgets.QLabel("intervals (absolute dates, dd-mm-yyyy hh:mm):"))
         self.intervals = CustomIntervalListWidget(get_property_json(node, "intervals", []))
-        lay.addWidget(self.intervals)
+        cl.addWidget(self.intervals)
+        cl.addStretch(1)
+        self._stack.addWidget(custom)
+
+        # --- Generator page: periodic shutdowns placed inside the task's shifts ---
+        gen = QtWidgets.QWidget()
+        gl = QtWidgets.QVBoxLayout(gen); gl.setContentsMargins(0, 0, 0, 0)
+        gl.addWidget(QtWidgets.QLabel("Periodic: a shutdown every 'in between' minutes, placed inside\n"
+                                      "the attached task's shifts (parser calls the shutdown generator)."))
+        gform = QtWidgets.QFormLayout()
+        g = get_property_json(node, "generator", {})
+        default_start = g.get("start") or getattr(parent, "start_date", "")
+        self.g_in_between = QtWidgets.QLineEdit(str(g.get("in_between", 480.0)))
+        self.g_duration = QtWidgets.QLineEdit(str(g.get("duration", 30.0)))
+        self.g_start = DateTimeWidget(default_start)
+        self.g_end = DateTimeWidget(g.get("end", ""))
+        gform.addRow("in between (minutes)", self.g_in_between)
+        gform.addRow("duration (minutes)", self.g_duration)
+        gform.addRow("from", self.g_start)
+        gform.addRow("to", self.g_end)
+        gl.addLayout(gform)
+        gl.addStretch(1)
+        self._stack.addWidget(gen)
+
+        self.mode.currentIndexChanged.connect(self._stack.setCurrentIndex)
+        mi = self.mode.findData(node.get_property("mode") if node.has_property("mode") else "custom")
+        self.mode.setCurrentIndex(mi if mi >= 0 else 0)
+        self._stack.setCurrentIndex(self.mode.currentIndex())
+
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
 
     def apply(self):
         self.node.set_property("shutdown_type", self.type.currentText())
+        self.node.set_property("mode", self.mode.currentData())
         set_property_json(self.node, "intervals", self.intervals.value())
+        set_property_json(self.node, "generator", {
+            "in_between": as_float(self.g_in_between.text()),
+            "duration": as_float(self.g_duration.text()),
+            "start": self.g_start.get_value(),
+            "end": self.g_end.get_value(),
+        })
 
 
 class BufferMenuDialog(QtWidgets.QDialog):
@@ -2831,6 +2892,24 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     for m in mc:
                         if not m.get("duration"):
                             problems.append(f"Piece Task '{name}' model '{m.get('model')}' has no duration.")
+                    # The vacant-slot pool (max_capacity) must fit the carrier
+                    # capacities, or collectors deadlock waiting for slots that
+                    # can never exist (they hold what they have while asking
+                    # for the remainder with no timeout).
+                    cap = as_float(node.get_property("max_capacity") if node.has_property("max_capacity") else 1.0, 1.0)
+                    contiguous = bool(node.get_property("contiguous_carriers")) if node.has_property("contiguous_carriers") else False
+                    for m in mc:
+                        mn = as_float(m.get("min_carrier_capacity", 1))
+                        mx = as_float(m.get("max_carrier_capacity", 1))
+                        if cap < mn:
+                            problems.append(f"Piece Task '{name}': max_capacity {cap:g} is smaller than "
+                                            f"min_carrier_capacity {mn:g} (model '{m.get('model')}') — "
+                                            f"carriers can never collect their minimum batch.")
+                        elif not contiguous and cap < mx:
+                            problems.append(f"Piece Task '{name}': non-contiguous carriers reserve "
+                                            f"max_carrier_capacity {mx:g} slots (model '{m.get('model')}') "
+                                            f"but max_capacity is {cap:g} — the collector deadlocks "
+                                            f"waiting for slots that cannot exist.")
                     # non-discriminating collectors need uniform duration / carrier-capacity across models
                     ct = str(node.get_property("collector_type") if node.has_property("collector_type") else "")
                     if ct.startswith("NON_DISCRIMINATING"):
@@ -2846,6 +2925,19 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             elif kind == "ResourceTask":
                 if not get_property_json(node, "duration", None):
                     problems.append(f"Resource Task '{name}' has no duration.")
+                # same slot-pool rule as piece tasks
+                cap = as_float(node.get_property("max_capacity") if node.has_property("max_capacity") else 1.0, 1.0)
+                contiguous = bool(node.get_property("contiguous_carriers")) if node.has_property("contiguous_carriers") else False
+                mn = as_float(node.get_property("min_carrier_capacity") if node.has_property("min_carrier_capacity") else 1.0, 1.0)
+                mx = as_float(node.get_property("max_carrier_capacity") if node.has_property("max_carrier_capacity") else 1.0, 1.0)
+                if cap < mn:
+                    problems.append(f"Resource Task '{name}': max_capacity {cap:g} is smaller than "
+                                    f"min_carrier_capacity {mn:g} — carriers can never collect "
+                                    f"their minimum batch.")
+                elif not contiguous and cap < mx:
+                    problems.append(f"Resource Task '{name}': non-contiguous carriers reserve "
+                                    f"max_carrier_capacity {mx:g} slots but max_capacity is {cap:g} — "
+                                    f"the collector deadlocks waiting for slots that cannot exist.")
                 outs = get_property_json(node, "resources_out", [])
                 if not outs:
                     problems.append(f"Resource Task '{name}' has no output resources.")
@@ -2894,10 +2986,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 self._check_flushability(node, [g.get("model") for g in goals if g.get("model")],
                                          "bufs_out", "Piece Generator", problems)
                 # A scrap buffer must never sit on the generator's outlet chain, not
-                # even through routers (router chains are wire-legal): freshly
-                # generated pieces would be scrapped on arrival (a scrap entry
-                # re-increments the generator's remaining goal, so the generator
-                # would just respin), and the parser could not build the object cycle
+                # even through routers: freshly generated pieces would be scrapped on
+                # arrival, and the parser cannot build the object cycle
                 # generator -> router -> scrap -> generator anyway.
                 frontier = list(connected_nodes_from_port(node, "bufs_out", "output"))
                 seen = set()
@@ -2931,9 +3021,33 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                                         f"(router outlets must overlap).")
 
             elif kind == "Shutdowns":
-                _check_date_intervals(f"Shutdowns '{name}'",
-                                      get_property_json(node, "intervals", []),
-                                      start_dt, problems)
+                mode = node.get_property("mode") if node.has_property("mode") else "custom"
+                if mode == "generator":
+                    g = get_property_json(node, "generator", {})
+                    g_start = parse_date_time(g.get("start"))
+                    g_end = parse_date_time(g.get("end"))
+                    if g_start is None or g_end is None:
+                        problems.append(f"Shutdowns '{name}': generator dates must be 'dd-mm-yyyy hh:mm'.")
+                    else:
+                        if start_dt is not None and g_start < start_dt:
+                            problems.append(f"Shutdowns '{name}': generator starts before the "
+                                            f"simulation start date.")
+                        if g_end <= g_start:
+                            problems.append(f"Shutdowns '{name}': generator start must be before its end.")
+                    in_between = as_float(g.get("in_between", 0.0))
+                    duration = as_float(g.get("duration", 0.0))
+                    if in_between <= 0:
+                        problems.append(f"Shutdowns '{name}': 'in between' must be > 0 minutes.")
+                    if duration <= 0:
+                        problems.append(f"Shutdowns '{name}': duration must be > 0 minutes.")
+                    if in_between > 0 and duration > in_between:
+                        problems.append(f"Shutdowns '{name}': duration exceeds 'in between' — "
+                                        f"consecutive shutdowns would overlap (the simulation "
+                                        f"rejects overlapping intervals).")
+                else:
+                    _check_date_intervals(f"Shutdowns '{name}'",
+                                          get_property_json(node, "intervals", []),
+                                          start_dt, problems)
 
         # Aggregate (whole-graph) checks.
         # Registry entries are picked by name in the card menus, so two entries that
@@ -3273,7 +3387,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     # Import is the inverse of each node's to_clean_json: restore stored properties
     # from the same-named keys. Structured (JSON) properties vs plain scalars:
     _IMPORT_JSON_PROPS = {
-        "Shutdowns": ["intervals"],
+        "Shutdowns": ["intervals", "generator"],
         "Buffer": ["valid_models", "monitor"],
         "PieceGenerator": ["models_goals", "shifts"],
         "Task": ["models_configs", "startup_duration", "loading_duration", "operators",
@@ -3284,7 +3398,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         "Breakdown": ["mtbf", "mttr"],
     }
     _IMPORT_SCALAR_PROPS = {
-        "Shutdowns": ["shutdown_type"],
+        "Shutdowns": ["shutdown_type", "mode"],
         "Buffer": ["capacity", "buffer_type"],
         "Task": ["operator_scope", "resource_scope", "min_carriers", "max_capacity",
                  "contiguous_carriers", "independent_carriers", "timeout", "priority", "collector_type"],

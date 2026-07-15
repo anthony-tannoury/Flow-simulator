@@ -1,6 +1,8 @@
 from __future__ import annotations
+import salabim as sim
 
 from simulation import env
+from datetime import datetime, date, time, timedelta
 from .component import Component
 from .interval import Interval, IntervalWaiter
 from .protocols import Action
@@ -46,7 +48,7 @@ class Breakdown(Component, ABC):
             self.task.is_in_breakdown.set(False)
 
 
-class Shutdowns(IntervalWaiter):
+class Shutdowns(IntervalWaiter, ABC):
     def setup(self, task: Task, intervals: list[Interval]):
         super().setup(intervals=intervals)
         self.task = task
@@ -70,6 +72,36 @@ class Shutdowns(IntervalWaiter):
     def on_leave(self, *args):
         self.task.is_in_shutdown.set(False)
         self.task.is_frozen.set(False)
+
+    @staticmethod
+    def generate_periodic_shutdown(task: Task, in_between: float, shutdown_duration: float, sim_start: datetime, start: datetime, end: datetime) -> list[Interval]:
+        if start < sim_start:
+            raise ValueError("Periodic shutdowns start must be after simulation start")
+        if start >= end:
+            raise ValueError("Periodic shutdowns start must be before end")
+
+        cursor = (start - sim_start).total_seconds() // 60
+        horizon_end = (end - sim_start).total_seconds() // 60
+        intervals: list[Interval] = []
+
+        while cursor < horizon_end:
+            current_or_next_shift = task.next_or_current_shift_from(cursor)
+            if current_or_next_shift is None:
+                break
+
+            cursor = max(cursor, current_or_next_shift.start)
+
+            if cursor > current_or_next_shift.start and cursor + shutdown_duration <= current_or_next_shift.end:
+                intervals.append(Interval(cursor, cursor + shutdown_duration))
+                cursor += in_between
+            elif (wiggle_room := current_or_next_shift.end - cursor - shutdown_duration) >= 0:
+                cursor += sim.Uniform(0, wiggle_room).sample()
+                intervals.append(Interval(cursor, cursor + shutdown_duration))
+                cursor += in_between
+            else:
+                cursor = current_or_next_shift.end
+
+        return intervals
 
 
 class FlexibleShutdowns(Shutdowns):

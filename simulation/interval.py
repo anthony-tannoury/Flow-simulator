@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .helpers import check_disjoint_sorted_intervals
+from .helpers import check_disjoint_sorted_intervals, merge_touching_sorted_intervals
 from .component import Component
 
 from abc import ABC, abstractmethod
@@ -40,7 +40,7 @@ class Interval:
 
 class IntervalWaiter(Component, ABC):
     def setup(self, intervals: list[Interval]) -> None:
-        self.intervals = sorted(intervals, key=lambda i: i.start)
+        self.intervals = merge_touching_sorted_intervals(sorted(intervals, key=lambda i: i.start))
         check_disjoint_sorted_intervals(self.intervals)
 
     @abstractmethod

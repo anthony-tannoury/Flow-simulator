@@ -14,37 +14,21 @@ from simulation.interval import Interval
 from simulation.shift_manager import ShiftManager
 from simulation.resource import Resource, RestockableResource
 from simulation.operator import Alternative, OperatorGroup
-from simulation.interrupters import Breakdown, FlexibleShutdowns, NonFlexibleShutdowns
+from simulation.interrupters import Breakdown, Shutdowns, FlexibleShutdowns, NonFlexibleShutdowns
 from simulation.protocols import (AbortPendingCarriers, WaitForCarriers, AbortOrWaitForCarriers,
                                   ConstrainedByShift, NotConstrainedByShift, PartiallyConstrainedByShift,
                                   Conscious, Unconscious)
 from typing import Callable
 
 
-class DayTime(time):
-    """A datetime.time that can also say '24:00', the designer's end-of-day
-    (plain time stops at 23:59). Only .hour and .minute are meaningful --
-    exactly what generate_weekly_shifts reads. Do not compare or print one:
-    the inherited value stores 24 as 0."""
-
-    _hour: int
-
-    def __new__(cls, hour: int, minute: int):
-        instance = super().__new__(cls, hour % 24, minute)
-        instance._hour = hour
-        return instance
-
-    @property
-    def hour(self) -> int:
-        return self._hour
-
-
 def to_date(date_str: str) -> date:
     return datetime.strptime(date_str, '%d-%m-%Y').date()
 
-def to_time(time_str: str) -> time:
+def to_minutes(time_str: str | float) -> float:
+    if isinstance(time_str, (int, float)):   # legacy exports carry raw minutes
+        return float(time_str)
     hour, minute = time_str.split(':')
-    return DayTime(int(hour), int(minute))
+    return 60 * int(hour) + int(minute)
 
 def to_datetime(datetime_str: str) -> datetime:
     return datetime.strptime(datetime_str, '%d-%m-%Y %H:%M')
@@ -81,8 +65,6 @@ def make_distribution(distribution: dict) -> Distribution:
 
 
 def make_salabim_distribution(distribution: dict) -> sim.Distribution:
-    # sim.Bounded samples the wrapped distribution with no time argument,
-    # so the parameters must be plain numbers here
     params = [make_callable(p) for p in distribution['params'].values()]
 
     if not all(isinstance(p, (int, float)) for p in params):
@@ -168,7 +150,6 @@ STR_TO_SCOPE = {
     'PER_TASK': Scope.PER_TASK
 }
 
-# what the flow designer means when a policy is left unset
 DEFAULT_POLICIES = {
     'pending_carriers_pre_flexible_shutdowns': {'type': 'AbortPendingCarriers'},
     'pending_carrier_pre_task_shift_end': {'type': 'AbortPendingCarriers'},
@@ -211,10 +192,14 @@ class Parser:
 
     def make_models_configs(self, json_models_configs: dict) -> dict[Model, ModelConfig]:
         models_configs: dict[Model, ModelConfig] = {}
+        durations: dict[str, Distribution] = {}
 
         for model_config in json_models_configs:
             model = self.models[model_config['model']]
-            duration = make_distribution(model_config['duration'])
+            key = json.dumps(model_config['duration'], sort_keys=True)
+            if key not in durations:
+                durations[key] = make_distribution(model_config['duration'])
+            duration = durations[key]
             resources = [(self.resources[r['resource']], r['value']) for r in model_config['resources']]
             models_configs[model] = ModelConfig(
                 duration=duration,
@@ -271,7 +256,7 @@ class Parser:
             match shift['mode']:
                 case 'weekly':
                     working_days = [d['working'] for d in shift['days']]
-                    shifts_per_day = [[(to_time(s['start']), to_time(s['end'])) for s in d['intervals']] for d in shift['days']]
+                    shifts_per_day = [[(to_minutes(s['start']), to_minutes(s['end'])) for s in d['intervals']] for d in shift['days']]
                     start = to_date(shift['horizon']['start'])
                     end = to_date(shift['horizon']['end'])
                     self.shifts[shift['id']] = ShiftManager.generate_weekly_shifts(
@@ -313,8 +298,6 @@ class Parser:
 
     def load_operators(self) -> None:
         self.operator_groups: dict[str, OperatorGroup] = {}
-        # groups with the same productivity must share one Distribution object:
-        # Alternative checks productivities by identity, the designer by value
         productivities: dict[str, Distribution] = {}
 
         for operator in self.data['operators']:
@@ -330,7 +313,6 @@ class Parser:
             )
 
     def load_non_scrap_buffers(self) -> None:
-        # First step in loading the flow so we initialize self.outlets here
         self.outlets: dict[str, Outlet] = {}
         self.scrap_buffers_ids = []
 
@@ -451,13 +433,26 @@ class Parser:
             )
 
     def load_shutdowns(self) -> None:
-        # a Shutdowns card attached to several tasks gives each task its own
-        # Interval objects (flexible shutdowns translate and consume them)
         for task_node in self.per_kind.get('Task', []) + self.per_kind.get('ResourceTask', []):
             task = self.tasks[task_node['id']]
             for id_ in task_node['shutdowns']:
                 shutdowns_node = self.by_id[id_]
-                intervals = [self.to_interval(i) for i in shutdowns_node['intervals']]
+
+                match shutdowns_node.get('mode', 'custom'):
+                    case 'custom':
+                        intervals = [self.to_interval(i) for i in shutdowns_node['intervals']]
+                    case 'generator':
+                        generator = shutdowns_node['generator']
+                        intervals = Shutdowns.generate_periodic_shutdown(
+                            task=task,
+                            in_between=generator['in_between'],
+                            shutdown_duration=generator['duration'],
+                            sim_start=self.sim_start,
+                            start=to_datetime(generator['start']),
+                            end=to_datetime(generator['end'])
+                        )
+                    case _:
+                        raise NotImplementedError()
 
                 match shutdowns_node['shutdown_type']:
                     case 'FLEXIBLE':
