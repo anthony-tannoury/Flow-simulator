@@ -89,19 +89,17 @@ class Shutdowns(IntervalWaiter, ABC):
             if current_or_next_shift is None:
                 break
 
+            cursor = max(cursor, current_or_next_shift.start)
+
             if cursor > current_or_next_shift.start and cursor + shutdown_duration <= current_or_next_shift.end:
                 intervals.append(Interval(cursor, cursor + shutdown_duration))
                 cursor += in_between
-            elif (wiggle_room := current_or_next_shift.length - shutdown_duration) >= 0:
+            elif (wiggle_room := current_or_next_shift.end - cursor - shutdown_duration) >= 0:
                 cursor += sim.Uniform(0, wiggle_room).sample()
                 intervals.append(Interval(cursor, cursor + shutdown_duration))
                 cursor += in_between
             else:
                 cursor = current_or_next_shift.end
-                next_shift = task.next_or_current_shift_from(cursor)
-                if next_shift is None:
-                    break
-                cursor = next_shift.start
 
         return intervals
 
