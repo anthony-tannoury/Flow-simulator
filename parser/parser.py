@@ -2,9 +2,10 @@ import json
 import salabim as sim
 
 from datetime import date, time, datetime
-from simulation.piece import Model
+from simulation.piece import Model, PieceGenerator
 from simulation.sampler import Distribution
 from simulation.function_generator import Linear, Exponential
+from simulation.outlet import Outlet, Buffer, Router, BufferType
 from simulation.judgement_day import ByTime, ByPiecesProduced
 from simulation.interval import Interval
 from simulation.shift_manager import ShiftManager
@@ -21,20 +22,14 @@ def to_datetime(datetime_str: str) -> datetime:
     return datetime.strptime(datetime_str, '%d-%m-%Y %H:%M')
 
 
-class Parser:
-    DISTR_TYPE_TO_CLASS = {
-        'Constant': sim.Constant,
-        'Normal': sim.Normal,
-        'Exponential': sim.Exponential
-    }
+def join_shifts(shifts: list[list[Interval]]) -> list[Interval]:
+        joined = []
+        for shift in shifts:
+            joined.extend(shift)
+        return joined
 
-    def __init__(self, filename: str) -> None:
-        with open(filename, 'r') as file:
-            self.data = json.load(file)
-        self.sim_start = to_datetime(self.data['start_date'])
 
-    @staticmethod
-    def make_distribution(distribution: dict) -> Distribution:
+def make_distribution(distribution: dict) -> Distribution:
         params = []
         for param in distribution['params']:
             match param['kind']:
@@ -48,13 +43,34 @@ class Parser:
                     raise NotImplementedError()
             params.append(param)
         
-        if distribution['dist_type'] not in Parser.DISTR_TYPE_TO_CLASS:
+        if distribution['dist_type'] not in DISTR_TYPE_TO_CLASS:
             raise NotImplementedError()
 
-        return Distribution(Parser.DISTR_TYPE_TO_CLASS[distribution['dist_type']], *params)
-    
+        return Distribution(DISTR_TYPE_TO_CLASS[distribution['dist_type']], *params)
+
+
+DISTR_TYPE_TO_CLASS = {
+    'Constant': sim.Constant,
+    'Normal': sim.Normal,
+    'Exponential': sim.Exponential
+}
+
+STR_TO_BUFFER_TYPE = {
+    'PASSAGE': BufferType.PASSAGE,
+    'SCRAP': BufferType.SCRAP,
+    'EXIT': BufferType.EXIT
+}
+
+
+class Parser:
+    def __init__(self, filename: str) -> None:
+        with open(filename, 'r') as file:
+            self.data = json.load(file)
+        self.sim_start = to_datetime(self.data['start_date'])
+        self.discriminate()
+     
     def discriminate(self) -> None:
-        self.per_kind = {}
+        self.per_kind: dict[str, list[dict]] = {}
 
         for node in self.data['nodes']:
             if node['kind'] not in self.per_kind:
@@ -119,8 +135,32 @@ class Parser:
             }
 
             if resource['restockable']:
-                kwargs['order_duration'] = Parser.make_distribution(resource['order_duration'])
-                kwargs['delivery_duration'] = Parser.make_distribution(resource['delivery_duration'])
+                kwargs['order_duration'] = make_distribution(resource['order_duration'])
+                kwargs['delivery_duration'] = make_distribution(resource['delivery_duration'])
                 self.resources[resource['id']] = RestockableResource(**kwargs)
             else:
                 self.resources[resource['id']] = Resource(**kwargs)
+
+    def load_non_exit_buffers(self) -> None:
+        self.buffers: dict[str, Outlet] = {}
+
+        for buffer in self.per_kind['Buffer']:
+            if buffer['buffer_type'] == 'EXIT':
+                self.outlets[buffer['id']] = None
+                continue
+            valid_models = [self.models[model] for model in buffer['valid_models']]
+            self.buffers[buffer['id']] = Buffer(
+                capacity=float(buffer['capacity']),
+                valid_models=valid_models,
+                buffer_type=STR_TO_BUFFER_TYPE[buffer['buffer_type']]
+            )
+
+    def preload_routers(self) -> None:
+        for router in self.per_kind['Router']:
+
+
+    def load_piece_generator(self) -> None:
+        assert len(self.per_kind['PieceGenerator']) == 1
+        piece_generator_node = self.per_kind['PieceGenerator'][0]
+        shifts = join_shifts(self.shifts[shift] for shift in piece_generator_node['shifts'])
+        outlets = [self.buffers]
