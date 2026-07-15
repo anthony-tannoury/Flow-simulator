@@ -75,13 +75,13 @@ class Shutdowns(ABC, IntervalWaiter):
     @staticmethod
     def generate_periodic_shutdown(task: Task, in_between: float, shutdown_duration: float, sim_start: datetime, sim_end: datetime) -> list[Interval]:
         end = sim_start + timedelta(minutes=shutdown_duration)
-        intervals = [Interval(start=0.0, end=shutdown_duration)]
+        intervals = [Interval(start=in_between, end=in_between + shutdown_duration)]
         while end < sim_end:
             next_interval = intervals[-1].copy()
             next_interval.translate(in_between)
             shutdown_is_in_shift = False
             i=0
-            while i <= len(task.shifts):
+            while i < len(task.shifts):
                 if (next_interval.start >= task.shifts[i].start) and (next_interval.end <= task.shifts[i].end):
                     shutdown_is_in_shift = True
                     break
