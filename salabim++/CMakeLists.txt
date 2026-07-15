@@ -1,17 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(salabimpp VERSION 1.0.0 LANGUAGES CXX)
 
-# salabim++ is a single header: this interface target is all you need.
 add_library(salabimpp INTERFACE)
 add_library(salabimpp::salabimpp ALIAS salabimpp)
 target_include_directories(salabimpp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(salabimpp INTERFACE cxx_std_20)
-
-# keep random streams bit-identical to CPython (no fused multiply-add);
-# clang is handled in-source via pragmas, gcc needs the flag
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(salabimpp INTERFACE -ffp-contract=off)
-endif()
 
 option(SALABIMPP_BUILD_EXAMPLES "Build salabim++ examples" ON)
 option(SALABIMPP_BUILD_TESTS "Build salabim++ tests" ON)
