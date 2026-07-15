@@ -103,6 +103,23 @@
       ]
     }
   ],
+  "closing_days": [
+    {
+      "id": "cd_maint1",
+      "name": "maintenance monday",
+      "date": "12-01-2026"
+    },
+    {
+      "id": "cd_maint2",
+      "name": "",
+      "date": "19-01-2026"
+    },
+    {
+      "id": "cd_maint3",
+      "name": "line rewiring",
+      "date": "13-01-2026"
+    }
+  ],
   "shifts": [
     {
       "id": "s_day",
@@ -174,8 +191,8 @@
       "name": "night",
       "mode": "weekly",
       "days_off": [
-        "12-01-2026",
-        "19-01-2026"
+        "cd_maint1",
+        "cd_maint2"
       ],
       "days": [
         {
@@ -252,7 +269,7 @@
       "name": "audit-window",
       "mode": "custom",
       "days_off": [
-        "13-01-2026"
+        "cd_maint3"
       ],
       "custom_intervals": [
         {
