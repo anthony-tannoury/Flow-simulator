@@ -1,4 +1,5 @@
 from __future__ import annotations
+import salabim as sim
 
 from simulation import env
 from datetime import datetime, date, time, timedelta
@@ -87,11 +88,18 @@ class Shutdowns(IntervalWaiter, ABC):
                     break
                 elif next_interval.end <= task.shifts[i].end:
                     break
+                elif i==len(task.shifts):
+                    break
                 i += 1
 
             if not shutdown_is_in_shift:
+                if i==len(task.shifts):
+                    break
+                
                 till_next_shift = task.shifts[i].start - next_interval.start
                 next_interval.translate(till_next_shift)
+                gap = task.shifts[i].length - shutdown_duration
+                next_interval.translate(sim.Uniform(lowerbound=0.0, upperbound=gap))
 
             intervals.append(next_interval)
             end = sim_start + timedelta(minutes=next_interval.end)
