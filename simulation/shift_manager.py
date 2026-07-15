@@ -22,6 +22,12 @@ class HasShifts:
             if shift.end >= env.now():
                 return shift
         return self.shifts[-1] if self.shifts else None
+    
+    def next_or_current_shift_from(self, cursor: float) -> Interval | None:
+        for shift in self.shifts:
+            if shift.end > cursor:
+                return shift
+        return None
 
 
 class ShiftManager(IntervalWaiter):

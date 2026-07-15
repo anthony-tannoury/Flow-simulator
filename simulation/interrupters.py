@@ -74,39 +74,38 @@ class Shutdowns(IntervalWaiter, ABC):
         self.task.is_frozen.set(False)
 
     @staticmethod
-    def generate_periodic_shutdown(task: Task, in_between: float, shutdown_duration: float, sim_start: datetime, sim_end: datetime) -> list[Interval]:
-        end = sim_start + timedelta(minutes=shutdown_duration)
-        intervals = [Interval(start=in_between, end=in_between + shutdown_duration)]
-        while end < sim_end:
-            next_interval = intervals[-1].copy()
-            next_interval.translate(in_between)
-            shutdown_is_in_shift = False
-            i=0
-            while i < len(task.shifts):
-                if (next_interval.start >= task.shifts[i].start) and (next_interval.end <= task.shifts[i].end):
-                    shutdown_is_in_shift = True
-                    break
-                elif next_interval.end <= task.shifts[i].end:
-                    break
-                elif i==len(task.shifts):
-                    break
-                i += 1
+    def generate_periodic_shutdown(task: Task, in_between: float, shutdown_duration: float, sim_start: datetime, start: datetime, end: datetime) -> list[Interval]:
+        if start < sim_start:
+            raise ValueError("Periodic shutdowns start must be after simulation start")
+        if start >= end:
+            raise ValueError("Periodic shutdowns start must be before end")
 
-            if not shutdown_is_in_shift:
-                if i==len(task.shifts):
-                    break
-                
-                till_next_shift = task.shifts[i].start - next_interval.start
-                next_interval.translate(till_next_shift)
-                gap = task.shifts[i].length - shutdown_duration
-                next_interval.translate(sim.Uniform(lowerbound=0.0, upperbound=gap))
+        cursor = (start - sim_start).total_seconds() // 60
+        horizon_end = (end - sim_start).total_seconds() // 60
+        intervals: list[Interval] = []
 
-            intervals.append(next_interval)
-            end = sim_start + timedelta(minutes=next_interval.end)
+        while cursor < horizon_end:
+            current_or_next_shift = task.next_or_current_shift_from(cursor)
+            if current_or_next_shift is None:
+                break
+
+            if cursor > current_or_next_shift.start and cursor + shutdown_duration <= current_or_next_shift.end:
+                intervals.append(Interval(cursor, cursor + shutdown_duration))
+                cursor += in_between
+            elif (wiggle_room := current_or_next_shift.length - shutdown_duration) >= 0:
+                cursor += sim.Uniform(0, wiggle_room).sample()
+                intervals.append(Interval(cursor, cursor + shutdown_duration))
+                cursor += in_between
+            else:
+                cursor = current_or_next_shift.end
+                next_shift = task.next_or_current_shift_from(cursor)
+                if next_shift is None:
+                    break
+                cursor = next_shift.start
 
         return intervals
-        
-        
+
+
 class FlexibleShutdowns(Shutdowns):
     def setup(self, task: Task, intervals: list[Interval]):
         super().setup(task=task, intervals=intervals)
