@@ -322,7 +322,10 @@ class Parser:
                 continue
 
             self.outlets[buffer['id']] = Buffer(
+<<<<<<< HEAD
                 capacity=float(buffer['capacity']),
+=======
+>>>>>>> claude/latest-commit-check-tl51wu
                 valid_models=[self.models[m] for m in buffer['valid_models']],
                 buffer_type=STR_TO_BUFFER_TYPE[buffer['buffer_type']],
             )
@@ -360,7 +363,10 @@ class Parser:
         for id_ in self.scrap_buffers_ids:
             buffer = self.by_id[id_]
             self.outlets[buffer['id']] = Buffer(
+<<<<<<< HEAD
                 capacity=float(buffer['capacity']),
+=======
+>>>>>>> claude/latest-commit-check-tl51wu
                 valid_models=[self.models[m] for m in buffer['valid_models']],
                 buffer_type=BufferType.SCRAP,
                 piece_generator=self.piece_generator,
@@ -491,4 +497,8 @@ class Parser:
             case _:
                 raise NotImplementedError()
 
+<<<<<<< HEAD
         SimulationStopper(criterion=self.stopping_criterion)
+=======
+        SimulationStopper(criterion=self.stopping_criterion)
+>>>>>>> claude/latest-commit-check-tl51wu

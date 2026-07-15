@@ -13,7 +13,13 @@
 //      State, Store, Monitor (level and non-level), ComponentGenerator
 //    * same statistics, same print_statistics()/print_histogram() output format
 //    * same tracing format
+<<<<<<< HEAD
 //    * same random distributions (seeded, reproducible streams via sim::Random)
+=======
+//    * same random distributions producing *bit-identical* samples as salabim,
+//      because sim::PythonRandom re-implements CPython's random.Random
+//      (MT19937 + the exact CPython sampling algorithms)
+>>>>>>> claude/latest-commit-check-tl51wu
 //
 //  Animation and the Python-specific facilities (string-eval wait conditions,
 //  monitor slicing/merging, video export, ...) are intentionally not ported.
@@ -26,6 +32,10 @@
 
 #include <algorithm>
 #include <any>
+<<<<<<< HEAD
+=======
+#include <array>
+>>>>>>> claude/latest-commit-check-tl51wu
 #include <cmath>
 #include <coroutine>
 #include <cstdint>
@@ -61,6 +71,16 @@
 #include <cxxabi.h>
 #endif
 
+<<<<<<< HEAD
+=======
+// bit-exact float semantics (CPython never fuses a*b+c into fma; clang would)
+#if defined(__clang__)
+#define SALABIM_FP_EXACT _Pragma("clang fp contract(off)")
+#else
+#define SALABIM_FP_EXACT
+#endif
+
+>>>>>>> claude/latest-commit-check-tl51wu
 namespace sim {
 
 inline constexpr double inf = std::numeric_limits<double>::infinity();
@@ -99,7 +119,11 @@ class Resource;
 class StateBase;
 template <class T> class State;
 class Monitor;
+<<<<<<< HEAD
 class Random;
+=======
+class PythonRandom;
+>>>>>>> claude/latest-commit-check-tl51wu
 
 class SalabimError : public std::runtime_error {
   public:
@@ -257,6 +281,7 @@ inline std::string py_str(T v) { return std::to_string(v); }
 } // namespace detail
 
 // ---------------------------------------------------------------------------
+<<<<<<< HEAD
 // Random — a seeded random stream (std::mt19937_64) plus the sampling
 // helpers the distributions below build on. Runs with the same seed are
 // reproducible.
@@ -283,6 +308,46 @@ class Random {
     }
 
     // uniform integer in [0, n): rejection sampling on bit_length-sized draws
+=======
+// PythonRandom — a faithful re-implementation of CPython's random.Random
+// (MT19937 core plus the exact CPython distribution algorithms), so that
+// simulations produce bit-identical random streams to Python salabim.
+// ---------------------------------------------------------------------------
+class PythonRandom {
+  public:
+    explicit PythonRandom(std::uint64_t seed_value = 5489u) { seed(seed_value); }
+
+    // equivalent to Python's random.seed(int); uses |n|'s 32-bit words as init key
+    void seed(std::uint64_t n) {
+        std::vector<std::uint32_t> key;
+        if (n == 0) key.push_back(0);
+        while (n) {
+            key.push_back(static_cast<std::uint32_t>(n & 0xffffffffu));
+            n >>= 32;
+        }
+        init_by_array(key);
+        gauss_next_.reset();
+    }
+
+    // random() -> float in [0, 1): CPython's genrand_res53
+    double random() {
+        std::uint32_t a = genrand_uint32() >> 5, b = genrand_uint32() >> 6;
+        return (a * 67108864.0 + b) * (1.0 / 9007199254740992.0);
+    }
+
+    // getrandbits(k) for k >= 1 (k <= 64 supported here)
+    std::uint64_t getrandbits(int k) {
+        if (k <= 0) throw SalabimError("getrandbits: k must be > 0");
+        if (k <= 32) return genrand_uint32() >> (32 - k);
+        // little-endian words, exactly as CPython builds the integer
+        std::uint64_t lo = genrand_uint32();
+        int rem = k - 32;
+        std::uint64_t hi = genrand_uint32() >> (32 - rem);
+        return lo | (hi << 32);
+    }
+
+    // CPython's _randbelow_with_getrandbits
+>>>>>>> claude/latest-commit-check-tl51wu
     std::uint64_t randbelow(std::uint64_t n) {
         if (n == 0) return 0;
         int k = 64 - std::countl_zero(n); // bit_length
@@ -297,14 +362,26 @@ class Random {
     }
 
     double uniform(double a, double b) {
+<<<<<<< HEAD
+=======
+        SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
         return a + (b - a) * random();
     }
 
     double expovariate(double lambd) {
+<<<<<<< HEAD
+=======
+        SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
         return -std::log(1.0 - random()) / lambd;
     }
 
     double normalvariate(double mu = 0.0, double sigma = 1.0) {
+<<<<<<< HEAD
+=======
+        SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
         static const double NV_MAGICCONST = 4 * std::exp(-0.5) / std::sqrt(2.0);
         double u1, u2, z;
         while (true) {
@@ -317,6 +394,10 @@ class Random {
     }
 
     double gauss(double mu = 0.0, double sigma = 1.0) {
+<<<<<<< HEAD
+=======
+        SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
         static const double TWOPI = 2.0 * 3.14159265358979323846;
         std::optional<double> z = gauss_next_;
         gauss_next_.reset();
@@ -331,6 +412,10 @@ class Random {
 
     double triangular(double low = 0.0, double high = 1.0,
                       std::optional<double> mode = std::nullopt) {
+<<<<<<< HEAD
+=======
+        SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
         double u = random();
         if (high == low) return low;
         double c = mode ? (*mode - low) / (high - low) : 0.5;
@@ -343,6 +428,10 @@ class Random {
     }
 
     double gammavariate(double alpha, double beta) {
+<<<<<<< HEAD
+=======
+        SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
         static const double LOG4 = std::log(4.0);
         static const double SG_MAGICCONST = 1.0 + std::log(4.5);
         if (alpha <= 0.0 || beta <= 0.0)
@@ -392,11 +481,19 @@ class Random {
     }
 
     double weibullvariate(double alpha, double beta) {
+<<<<<<< HEAD
+=======
+        SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
         double u = 1.0 - random();
         return alpha * std::pow(-std::log(u), 1.0 / beta);
     }
 
+<<<<<<< HEAD
     // pick a uniform index in [0, n)
+=======
+    // one draw of random.sample(population, 1)[0] — always exactly one randbelow(n)
+>>>>>>> claude/latest-commit-check-tl51wu
     std::size_t sample_index(std::size_t n) { return static_cast<std::size_t>(randbelow(n)); }
 
     template <class T>
@@ -410,8 +507,70 @@ class Random {
     }
 
   private:
+<<<<<<< HEAD
     std::mt19937_64 eng_;
     std::optional<double> gauss_next_;
+=======
+    static constexpr int N = 624, M = 397;
+    static constexpr std::uint32_t MATRIX_A = 0x9908b0dfu, UPPER_MASK = 0x80000000u,
+                                   LOWER_MASK = 0x7fffffffu;
+    std::array<std::uint32_t, N> mt_{};
+    int mti_ = N + 1;
+    std::optional<double> gauss_next_;
+
+    void init_genrand(std::uint32_t s) {
+        mt_[0] = s;
+        for (mti_ = 1; mti_ < N; mti_++)
+            mt_[static_cast<size_t>(mti_)] =
+                1812433253u * (mt_[static_cast<size_t>(mti_ - 1)] ^ (mt_[static_cast<size_t>(mti_ - 1)] >> 30)) +
+                static_cast<std::uint32_t>(mti_);
+    }
+
+    void init_by_array(const std::vector<std::uint32_t>& key) {
+        init_genrand(19650218u);
+        std::size_t i = 1, j = 0;
+        std::size_t k = std::max<std::size_t>(N, key.size());
+        for (; k; k--) {
+            mt_[i] = (mt_[i] ^ ((mt_[i - 1] ^ (mt_[i - 1] >> 30)) * 1664525u)) +
+                     key[j] + static_cast<std::uint32_t>(j);
+            i++; j++;
+            if (i >= N) { mt_[0] = mt_[N - 1]; i = 1; }
+            if (j >= key.size()) j = 0;
+        }
+        for (k = N - 1; k; k--) {
+            mt_[i] = (mt_[i] ^ ((mt_[i - 1] ^ (mt_[i - 1] >> 30)) * 1566083941u)) -
+                     static_cast<std::uint32_t>(i);
+            i++;
+            if (i >= N) { mt_[0] = mt_[N - 1]; i = 1; }
+        }
+        mt_[0] = 0x80000000u;
+    }
+
+    std::uint32_t genrand_uint32() {
+        std::uint32_t y;
+        if (mti_ >= N) {
+            if (mti_ == N + 1) init_genrand(5489u);
+            int kk;
+            for (kk = 0; kk < N - M; kk++) {
+                y = (mt_[static_cast<size_t>(kk)] & UPPER_MASK) | (mt_[static_cast<size_t>(kk + 1)] & LOWER_MASK);
+                mt_[static_cast<size_t>(kk)] = mt_[static_cast<size_t>(kk + M)] ^ (y >> 1) ^ ((y & 1u) ? MATRIX_A : 0u);
+            }
+            for (; kk < N - 1; kk++) {
+                y = (mt_[static_cast<size_t>(kk)] & UPPER_MASK) | (mt_[static_cast<size_t>(kk + 1)] & LOWER_MASK);
+                mt_[static_cast<size_t>(kk)] = mt_[static_cast<size_t>(kk + (M - N))] ^ (y >> 1) ^ ((y & 1u) ? MATRIX_A : 0u);
+            }
+            y = (mt_[N - 1] & UPPER_MASK) | (mt_[0] & LOWER_MASK);
+            mt_[N - 1] = mt_[M - 1] ^ (y >> 1) ^ ((y & 1u) ? MATRIX_A : 0u);
+            mti_ = 0;
+        }
+        y = mt_[static_cast<size_t>(mti_++)];
+        y ^= (y >> 11);
+        y ^= (y << 7) & 0x9d2c5680u;
+        y ^= (y << 15) & 0xefc60000u;
+        y ^= (y >> 18);
+        return y;
+    }
+>>>>>>> claude/latest-commit-check-tl51wu
 };
 
 // ---------------------------------------------------------------------------
@@ -419,11 +578,19 @@ class Random {
 // ---------------------------------------------------------------------------
 struct g {
     inline static Environment* default_env = nullptr;
+<<<<<<< HEAD
     inline static Random random{};   // the shared default stream
     inline static bool default_cap_now = false;
 };
 
 inline Random& random_stream() { return g::random; }
+=======
+    inline static PythonRandom random{};   // the shared "random module" stream
+    inline static bool default_cap_now = false;
+};
+
+inline PythonRandom& random_stream() { return g::random; }
+>>>>>>> claude/latest-commit-check-tl51wu
 
 inline void random_seed(std::uint64_t seed) { g::random.seed(seed); }
 
@@ -455,7 +622,12 @@ double time_unit_factor(std::string_view time_unit, const Environment* env); // 
 } // namespace detail
 
 // ---------------------------------------------------------------------------
+<<<<<<< HEAD
 // distributions — every sample() draws from the shared (or given) Random stream.
+=======
+// distributions — every sample() calls the shared (or given) PythonRandom with
+// exactly the same algorithm and draw sequence as Python salabim / CPython.
+>>>>>>> claude/latest-commit-check-tl51wu
 // ---------------------------------------------------------------------------
 class Distribution_ {
   public:
@@ -483,12 +655,20 @@ class Distribution_ {
     }
 
   protected:
+<<<<<<< HEAD
     Random* stream_ = &g::random;
+=======
+    PythonRandom* stream_ = &g::random;
+>>>>>>> claude/latest-commit-check-tl51wu
     std::string time_unit_{};
     mutable std::optional<double> tuf_cache_;
     const Environment* tu_env_ = nullptr;
 
+<<<<<<< HEAD
     void set_stream(Random* rs) { stream_ = rs ? rs : &g::random; }
+=======
+    void set_stream(PythonRandom* rs) { stream_ = rs ? rs : &g::random; }
+>>>>>>> claude/latest-commit-check-tl51wu
     double tuf() const; // time unit factor, lazily resolved (defined after Environment)
 };
 
@@ -496,7 +676,11 @@ using Dist = Distribution_; // short alias
 
 class Constant : public Distribution_ {
   public:
+<<<<<<< HEAD
     explicit Constant(double value, std::string time_unit = {}, Random* randomstream = nullptr)
+=======
+    explicit Constant(double value, std::string time_unit = {}, PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : value_(value) {
         time_unit_ = std::move(time_unit);
         set_stream(randomstream);
@@ -511,7 +695,11 @@ class Constant : public Distribution_ {
 class Uniform : public Distribution_ {
   public:
     explicit Uniform(double lowerbound, std::optional<double> upperbound = std::nullopt,
+<<<<<<< HEAD
                      std::string time_unit = {}, Random* randomstream = nullptr)
+=======
+                     std::string time_unit = {}, PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : lb_(lowerbound), ub_(upperbound.value_or(lowerbound)) {
         if (lb_ > ub_) throw SalabimError("lowerbound>upperbound");
         time_unit_ = std::move(time_unit);
@@ -527,7 +715,11 @@ class Uniform : public Distribution_ {
 class IntUniform : public Distribution_ {
   public:
     explicit IntUniform(long long lowerbound, std::optional<long long> upperbound = std::nullopt,
+<<<<<<< HEAD
                         std::string time_unit = {}, Random* randomstream = nullptr)
+=======
+                        std::string time_unit = {}, PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : lb_(lowerbound), ub_(upperbound.value_or(lowerbound)) {
         if (lb_ > ub_) throw SalabimError("lowerbound>upperbound");
         time_unit_ = std::move(time_unit);
@@ -544,13 +736,21 @@ struct ExpRate { double rate; };  // tag to construct Exponential from a rate
 
 class Exponential : public Distribution_ {
   public:
+<<<<<<< HEAD
     explicit Exponential(double mean, std::string time_unit = {}, Random* randomstream = nullptr)
+=======
+    explicit Exponential(double mean, std::string time_unit = {}, PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : mean_(mean) {
         if (mean <= 0) throw SalabimError("mean<=0");
         time_unit_ = std::move(time_unit);
         set_stream(randomstream);
     }
+<<<<<<< HEAD
     explicit Exponential(ExpRate rate, std::string time_unit = {}, Random* randomstream = nullptr)
+=======
+    explicit Exponential(ExpRate rate, std::string time_unit = {}, PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : Exponential(1.0 / rate.rate, std::move(time_unit), randomstream) {
         if (rate.rate <= 0) throw SalabimError("rate<=0");
     }
@@ -565,7 +765,11 @@ struct NormalOpts {
     std::optional<double> coefficient_of_variation{};
     bool use_gauss = false;
     std::string time_unit{};
+<<<<<<< HEAD
     Random* randomstream = nullptr;
+=======
+    PythonRandom* randomstream = nullptr;
+>>>>>>> claude/latest-commit-check-tl51wu
 };
 
 class Normal : public Distribution_ {
@@ -602,7 +806,11 @@ class Triangular : public Distribution_ {
   public:
     explicit Triangular(double low, std::optional<double> high = std::nullopt,
                         std::optional<double> mode = std::nullopt,
+<<<<<<< HEAD
                         std::string time_unit = {}, Random* randomstream = nullptr)
+=======
+                        std::string time_unit = {}, PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : low_(low), high_(high.value_or(low)) {
         mode_ = mode.value_or((high_ + low_) / 2.0);
         if (low_ > high_) throw SalabimError("low>high");
@@ -620,7 +828,11 @@ class Triangular : public Distribution_ {
 
 class Poisson : public Distribution_ {
   public:
+<<<<<<< HEAD
     explicit Poisson(double mean, Random* randomstream = nullptr) : mean_(mean) {
+=======
+    explicit Poisson(double mean, PythonRandom* randomstream = nullptr) : mean_(mean) {
+>>>>>>> claude/latest-commit-check-tl51wu
         if (mean <= 0) throw SalabimError("mean (lambda) should be > 0");
         set_stream(randomstream);
     }
@@ -658,7 +870,11 @@ class Poisson : public Distribution_ {
 class Weibull : public Distribution_ {
   public:
     explicit Weibull(double scale, double shape, std::string time_unit = {},
+<<<<<<< HEAD
                      Random* randomstream = nullptr)
+=======
+                     PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : scale_(scale), shape_(shape) {
         if (scale <= 0) throw SalabimError("scale<=0");
         if (shape <= 0) throw SalabimError("shape<=0");
@@ -676,7 +892,11 @@ class Weibull : public Distribution_ {
 class Gamma : public Distribution_ {
   public:
     explicit Gamma(double shape, double scale, std::string time_unit = {},
+<<<<<<< HEAD
                    Random* randomstream = nullptr)
+=======
+                   PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : shape_(shape), scale_(scale) {
         if (shape <= 0) throw SalabimError("shape<=0");
         if (scale <= 0) throw SalabimError("scale<=0");
@@ -693,7 +913,11 @@ class Gamma : public Distribution_ {
 class Erlang : public Distribution_ {
   public:
     explicit Erlang(long long shape, double rate, std::string time_unit = {},
+<<<<<<< HEAD
                     Random* randomstream = nullptr)
+=======
+                    PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : shape_(shape), scale_(1.0 / rate) {
         if (shape <= 0) throw SalabimError("shape<=0");
         if (rate <= 0) throw SalabimError("rate<=0");
@@ -710,7 +934,11 @@ class Erlang : public Distribution_ {
 
 class Beta : public Distribution_ {
   public:
+<<<<<<< HEAD
     explicit Beta(double alpha, double beta, Random* randomstream = nullptr)
+=======
+    explicit Beta(double alpha, double beta, PythonRandom* randomstream = nullptr)
+>>>>>>> claude/latest-commit-check-tl51wu
         : alpha_(alpha), beta_(beta) {
         if (alpha <= 0) throw SalabimError("alpha<=0");
         if (beta <= 0) throw SalabimError("beta<=0");
@@ -727,7 +955,11 @@ class Beta : public Distribution_ {
 // Pdf({x1, p1, x2, p2, ...}) or Pdf(values, probabilities)
 class Pdf : public Distribution_ {
   public:
+<<<<<<< HEAD
     Pdf(std::initializer_list<double> pairs, Random* randomstream = nullptr) {
+=======
+    Pdf(std::initializer_list<double> pairs, PythonRandom* randomstream = nullptr) {
+>>>>>>> claude/latest-commit-check-tl51wu
         if (pairs.size() % 2 != 0) throw SalabimError("uneven number of parameters specified");
         std::vector<double> xs, ps;
         bool isx = true;
@@ -735,14 +967,22 @@ class Pdf : public Distribution_ {
         init(xs, ps);
         set_stream(randomstream);
     }
+<<<<<<< HEAD
     Pdf(std::vector<double> xs, std::vector<double> ps, Random* randomstream = nullptr) {
+=======
+    Pdf(std::vector<double> xs, std::vector<double> ps, PythonRandom* randomstream = nullptr) {
+>>>>>>> claude/latest-commit-check-tl51wu
         if (xs.size() != ps.size())
             throw SalabimError("length of x-values does not match length of probabilities");
         init(xs, ps);
         set_stream(randomstream);
     }
     // equal probabilities for all values
+<<<<<<< HEAD
     explicit Pdf(std::vector<double> xs, Random* randomstream = nullptr) {
+=======
+    explicit Pdf(std::vector<double> xs, PythonRandom* randomstream = nullptr) {
+>>>>>>> claude/latest-commit-check-tl51wu
         init(xs, std::vector<double>(xs.size(), 1.0));
         set_stream(randomstream);
     }
@@ -788,7 +1028,11 @@ using Pmf = Pdf; // salabim 23+ alias
 // Cdf: cumulative (piecewise linear) distribution: Cdf({x1, c1, x2, c2, ...})
 class Cdf : public Distribution_ {
   public:
+<<<<<<< HEAD
     Cdf(std::initializer_list<double> pairs, Random* randomstream = nullptr) {
+=======
+    Cdf(std::initializer_list<double> pairs, PythonRandom* randomstream = nullptr) {
+>>>>>>> claude/latest-commit-check-tl51wu
         if (pairs.size() % 2 != 0) throw SalabimError("uneven number of parameters specified");
         bool isx = true;
         double lastcum = 0, lastx = -inf;
@@ -813,6 +1057,10 @@ class Cdf : public Distribution_ {
         set_stream(randomstream);
     }
     double sample() override {
+<<<<<<< HEAD
+=======
+        SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
         double r = stream_->random();
         size_t i = 0;
         for (; i < cum_.size(); ++i) {
@@ -2355,6 +2603,10 @@ inline std::pair<std::vector<double>, std::vector<double>> Monitor::xweight(bool
 }
 
 inline double Monitor::mean(bool ex0) const {
+<<<<<<< HEAD
+=======
+    SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
     auto [x, w] = xweight(ex0);
     double sumw = 0, sumxw = 0;
     for (size_t i = 0; i < x.size(); ++i) sumw += w[i];
@@ -2363,6 +2615,10 @@ inline double Monitor::mean(bool ex0) const {
 }
 
 inline double Monitor::std(bool ex0) const {
+<<<<<<< HEAD
+=======
+    SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
     auto [x, w] = xweight(ex0);
     double sumw = 0;
     for (double v : w) sumw += v;
@@ -2386,6 +2642,10 @@ inline double Monitor::maximum(bool ex0) const {
 }
 
 inline double Monitor::percentile(double q, bool ex0) const {
+<<<<<<< HEAD
+=======
+    SALABIM_FP_EXACT
+>>>>>>> claude/latest-commit-check-tl51wu
     q = std::max(0.0, std::min(q, 100.0));
     if (q == 0) return minimum(ex0);
     if (q == 100) return maximum(ex0);
@@ -4597,4 +4857,8 @@ inline std::string Environment::print_info(bool as_str) const {
 
 } // namespace sim
 
+<<<<<<< HEAD
 #endif // SALABIM_HPP
+=======
+#endif // SALABIM_HPP
+>>>>>>> claude/latest-commit-check-tl51wu

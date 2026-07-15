@@ -321,7 +321,10 @@
       "valid_models": [
         "m_widget"
       ],
+<<<<<<< HEAD
       "capacity": "inf",
+=======
+>>>>>>> claude/latest-commit-check-tl51wu
       "buffer_type": "PASSAGE",
       "monitor": {
         "avg_length": true,
@@ -526,7 +529,10 @@
         "m_widgetA",
         "m_widgetB"
       ],
+<<<<<<< HEAD
       "capacity": "inf",
+=======
+>>>>>>> claude/latest-commit-check-tl51wu
       "buffer_type": "EXIT",
       "monitor": {
         "avg_length": false,
@@ -555,7 +561,10 @@
         "m_widgetA",
         "m_widgetB"
       ],
+<<<<<<< HEAD
       "capacity": "inf",
+=======
+>>>>>>> claude/latest-commit-check-tl51wu
       "buffer_type": "SCRAP",
       "monitor": {
         "avg_length": false,
