@@ -192,10 +192,14 @@ class Parser:
 
     def make_models_configs(self, json_models_configs: dict) -> dict[Model, ModelConfig]:
         models_configs: dict[Model, ModelConfig] = {}
+        durations: dict[str, Distribution] = {}
 
         for model_config in json_models_configs:
             model = self.models[model_config['model']]
-            duration = make_distribution(model_config['duration'])
+            key = json.dumps(model_config['duration'], sort_keys=True)
+            if key not in durations:
+                durations[key] = make_distribution(model_config['duration'])
+            duration = durations[key]
             resources = [(self.resources[r['resource']], r['value']) for r in model_config['resources']]
             models_configs[model] = ModelConfig(
                 duration=duration,
