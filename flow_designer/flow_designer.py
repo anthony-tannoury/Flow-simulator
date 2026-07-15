@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any, List, Tuple
 
-from Qt import QtCore, QtWidgets
+from Qt import QtCore, QtGui, QtWidgets
 from NodeGraphQt import BaseNode, NodeGraph, PropertiesBinWidget
 
 try:
@@ -2351,6 +2351,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.properties_dock)
 
         self._build_menus()
+        self._install_context_menus()
         self._connect_signals()
         self.statusBar().showMessage("Ready. Use the Create menu to add nodes.")
 
@@ -2374,6 +2375,13 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         simulation_menu.addAction("Settings...").triggered.connect(self.edit_simulation_settings)
 
         edit_menu = self.menuBar().addMenu("Edit")
+        copy_action = edit_menu.addAction("Copy cards")
+        copy_action.setShortcut(QtGui.QKeySequence.Copy)  # Ctrl+C / Cmd+C on macOS
+        copy_action.triggered.connect(lambda: self.copy_selected_cards())
+        paste_action = edit_menu.addAction("Paste cards")
+        paste_action.setShortcut(QtGui.QKeySequence.Paste)  # Ctrl+V / Cmd+V on macOS
+        paste_action.triggered.connect(self.paste_cards)
+        edit_menu.addSeparator()
         delete_action = edit_menu.addAction("Delete selected")
         delete_action.setShortcut("Delete")
         delete_action.triggered.connect(self.delete_selected_nodes)
@@ -2397,6 +2405,23 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         ]:
             action = create_menu.addAction(label)
             action.triggered.connect(lambda checked=False, t=cls_name: self.create_node(t))
+
+    def _install_context_menus(self):
+        """Right-click menus: copy/paste on the canvas, copy on every card type.
+        Cosmetic next to the Edit-menu shortcuts, so failures are non-fatal."""
+        try:
+            graph_menu = self.graph.get_context_menu("graph")
+            graph_menu.add_command("Copy cards", lambda graph: self.copy_selected_cards())
+            graph_menu.add_command("Paste cards", lambda graph: self.paste_cards())
+            nodes_menu = self.graph.get_context_menu("nodes")
+            for cls in (ShutdownsNode, BufferNode, RouterNode, PieceGeneratorNode,
+                        TaskNode, ResourceTaskNode, BreakdownNode):
+                nodes_menu.add_command(
+                    "Copy cards",
+                    func=lambda graph, node: self.copy_selected_cards(context_node=node),
+                    node_type=f"{cls.__identifier__}.{cls.__name__}")
+        except Exception as error:
+            print(f"[WARNING] Could not install context menus: {error}")
 
     def frame_all(self):
         nodes = self.all_nodes()
@@ -2965,6 +2990,85 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         for node in selected_nodes:
             self.graph.delete_node(node)
 
+    # ------------------------------------------------------------------
+    # Copy / paste of cards. The clipboard carries the same clean-JSON shape
+    # as the export (cards + the connections between them) as plain text, so
+    # a paste is a mini-import: ids re-minted, positions offset, new nodes
+    # selected. Works across two running designers too.
+    # ------------------------------------------------------------------
+
+    CARD_CLIPBOARD_FORMAT = "flow-designer-cards"
+
+    @staticmethod
+    def _text_widget_with_focus():
+        """The focused text-editing widget, if any — Ctrl+C/Ctrl+V must keep
+        their native meaning while typing in a field (properties bin etc.)."""
+        w = QtWidgets.QApplication.focusWidget()
+        if isinstance(w, (QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit)):
+            return w
+        if isinstance(w, QtWidgets.QAbstractSpinBox):
+            return w.lineEdit()
+        return None
+
+    def copy_selected_cards(self, context_node=None):
+        w = self._text_widget_with_focus()
+        if w is not None:
+            w.copy()
+            return
+        nodes = [n for n in self.graph.selected_nodes() if hasattr(n, "to_clean_json")]
+        if context_node is not None and context_node not in nodes:
+            nodes = [context_node]  # right-clicked an unselected card: copy just it
+        cards = [c for c in (n.to_clean_json() for n in nodes) if c and c.get("kind")]
+        if not cards:
+            self.statusBar().showMessage("Nothing selected to copy.")
+            return
+        uids = {c["id"] for c in cards if c.get("id")}
+        conns = [c for c in self.connections_clean()
+                 if c.get("from_node") in uids and c.get("to_node") in uids]
+        payload = {"format": self.CARD_CLIPBOARD_FORMAT, "nodes": cards, "connections": conns}
+        QtWidgets.QApplication.clipboard().setText(json.dumps(payload, indent=2, ensure_ascii=False))
+        self.statusBar().showMessage(f"Copied {len(cards)} card(s).")
+
+    def paste_cards(self):
+        w = self._text_widget_with_focus()
+        if w is not None:
+            w.paste()
+            return
+        text = QtWidgets.QApplication.clipboard().text()
+        try:
+            payload = json.loads(text or "")
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict) or payload.get("format") != self.CARD_CLIPBOARD_FORMAT:
+            self.statusBar().showMessage("Clipboard holds no copied cards.")
+            return
+        data = self._remap_ids(payload)  # fresh uids for the new cards + their wires
+        # pasting the same clipboard again lands one step further each time
+        if getattr(self, "_last_paste_text", None) == text:
+            self._paste_serial += 1
+        else:
+            self._last_paste_text = text
+            self._paste_serial = 1
+        delta = 40.0 * self._paste_serial
+        for card in data.get("nodes", []):
+            pos = card.get("position")
+            if isinstance(pos, list) and len(pos) >= 2:
+                card["position"] = [pos[0] + delta, pos[1] + delta]
+        created = self._instantiate_cards(data)
+        if not created:
+            self.statusBar().showMessage("Clipboard holds no pasteable cards.")
+            return
+        try:
+            self.graph.clear_selection()
+        except Exception:
+            pass
+        for node in created.values():
+            try:
+                node.set_selected(True)
+            except Exception:
+                pass
+        self.statusBar().showMessage(f"Pasted {len(created)} card(s).")
+
     def set_node_position_safe(self, node, x: float, y: float):
         try:
             node.set_pos(x, y)
@@ -3234,27 +3338,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.closing_day_registry.sort(
             key=lambda e: (parse_date(e.get("date")) or datetime.max, e.get("date", "")))
 
-    def import_clean_json(self, data: dict):
-        data = self._resolve_ref_ids_to_names(data)
-        data = self._remap_ids(data)
-        data = self._offset_imported_positions(data)
-        self._merge_models(data.get("models", []))
-        self._merge_named_registry("resource_registry", data.get("resources", []))
-        self._merge_named_registry("operator_registry", data.get("operators", []))
-        self._merge_named_registry("closing_day_registry", data.get("closing_days", []), key="date")
-        self._merge_named_registry("shift_registry", data.get("shifts", []))
-        self._adopt_orphan_days_off()
-        ensure_ids(self.model_registry, "model")
-        ensure_ids(self.resource_registry, "resource")
-        ensure_ids(self.operator_registry, "operator")
-        ensure_ids(self.shift_registry, "shift")
-        ensure_ids(self.closing_day_registry, "closingday", key="date")
-        if not self.stopping_criterion and data.get("stopping_criterion"):
-            self.stopping_criterion = data["stopping_criterion"]
-        if data.get("start_date"):
-            # the imported file's dates were authored against its own anchor: adopt it
-            self.start_date = data["start_date"]
-
+    def _instantiate_cards(self, data: dict) -> dict:
+        """Create nodes from clean-JSON cards and rewire the connections between
+        them. Returns {card id: node}. Shared by import and paste."""
         id_to_node = {}
         for card in data.get("nodes", []):
             if not isinstance(card, dict):
@@ -3283,6 +3369,30 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 print("[WARNING] Could not reconnect "
                       f"{connection.get('from_node')}.{connection.get('from_port')} -> "
                       f"{connection.get('to_node')}.{connection.get('to_port')}: {error}")
+        return id_to_node
+
+    def import_clean_json(self, data: dict):
+        data = self._resolve_ref_ids_to_names(data)
+        data = self._remap_ids(data)
+        data = self._offset_imported_positions(data)
+        self._merge_models(data.get("models", []))
+        self._merge_named_registry("resource_registry", data.get("resources", []))
+        self._merge_named_registry("operator_registry", data.get("operators", []))
+        self._merge_named_registry("closing_day_registry", data.get("closing_days", []), key="date")
+        self._merge_named_registry("shift_registry", data.get("shifts", []))
+        self._adopt_orphan_days_off()
+        ensure_ids(self.model_registry, "model")
+        ensure_ids(self.resource_registry, "resource")
+        ensure_ids(self.operator_registry, "operator")
+        ensure_ids(self.shift_registry, "shift")
+        ensure_ids(self.closing_day_registry, "closingday", key="date")
+        if not self.stopping_criterion and data.get("stopping_criterion"):
+            self.stopping_criterion = data["stopping_criterion"]
+        if data.get("start_date"):
+            # the imported file's dates were authored against its own anchor: adopt it
+            self.start_date = data["start_date"]
+
+        id_to_node = self._instantiate_cards(data)
 
         imported_backdrops = data.get("backdrops", [])
         if imported_backdrops:
