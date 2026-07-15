@@ -52,6 +52,14 @@ class Parser:
             raise NotImplementedError()
 
         return Distribution(Parser.DISTR_TYPE_TO_CLASS[distribution['dist_type']], *params)
+    
+    def discriminate(self) -> None:
+        self.per_kind = {}
+
+        for node in self.data['nodes']:
+            if node['kind'] not in self.per_kind:
+                self.per_kind[node['kind']] = []
+            self.per_kind[node['kind']] = node
         
     def load_models(self) -> None:
         self.models: dict[str, Model] = {}
