@@ -868,35 +868,39 @@ class DateWidget(QtWidgets.QDateEdit):
         return self.date().toString(DATE_FORMAT)
 
 
-class DateListWidget(QtWidgets.QWidget):
-    """A vertical list of date-only pickers with an add button (e.g. days off)."""
+def closing_day_label(entry: dict) -> str:
+    """Display text for a closing-day registry entry: the date, plus the optional label."""
+    date = entry.get("date", "?")
+    name = (entry.get("name") or "").strip()
+    return f"{date} — {name}" if name else date
 
-    def __init__(self, dates=None, add_label="+ date", parent=None):
+
+class ClosingDayPickerWidget(QtWidgets.QListWidget):
+    """Multi-select over the closing-days registry; the value is the chosen dates."""
+
+    def __init__(self, closing_days, chosen=None, parent=None):
         super().__init__(parent)
-        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
-        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self._host)
-        add = QtWidgets.QPushButton(add_label); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
-        self._rows = []
-        for d in (dates or []):
-            self._add(d)
-
-    def _add(self, value=None):
-        row = QtWidgets.QWidget()
-        rl = QtWidgets.QHBoxLayout(row); rl.setContentsMargins(0, 0, 0, 0)
-        picker = DateWidget(value or "01-01-2026")
-        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
-        rl.addWidget(picker); rl.addWidget(rm); rl.addStretch(1)
-        rec = (row, picker)
-        rm.clicked.connect(lambda: self._remove(rec))
-        self._rows.append(rec); self._vl.addWidget(row)
-
-    def _remove(self, rec):
-        if rec in self._rows:
-            self._rows.remove(rec); rec[0].setParent(None); rec[0].deleteLater()
+        chosen = set(chosen or [])
+        known = set()
+        for entry in (closing_days or []):
+            it = QtWidgets.QListWidgetItem(closing_day_label(entry))
+            it.setData(QtCore.Qt.UserRole, entry.get("date"))
+            it.setFlags(it.flags() | QtCore.Qt.ItemIsUserCheckable)
+            it.setCheckState(QtCore.Qt.Checked if entry.get("date") in chosen else QtCore.Qt.Unchecked)
+            self.addItem(it)
+            known.add(entry.get("date"))
+        # a day the shift still references but the registry no longer holds: keep it
+        # visible (checked) so unchecking it is a deliberate act, not a silent loss
+        for date in sorted(chosen - known):
+            it = QtWidgets.QListWidgetItem(f"{date} (not in registry)")
+            it.setData(QtCore.Qt.UserRole, date)
+            it.setFlags(it.flags() | QtCore.Qt.ItemIsUserCheckable)
+            it.setCheckState(QtCore.Qt.Checked)
+            self.addItem(it)
 
     def value(self):
-        return [picker.get_value() for _, picker in self._rows]
+        return [self.item(i).data(QtCore.Qt.UserRole) for i in range(self.count())
+                if self.item(i).checkState() == QtCore.Qt.Checked]
 
 
 class _IntervalRow(QtWidgets.QWidget):
@@ -1007,11 +1011,12 @@ class ShiftEditorDialog(QtWidgets.QDialog):
     """A shift definition is either 'weekly' (the recurring weekday creator) or
     'custom' (an explicit list of absolute date intervals). A type dropdown picks
     the mode and the matching parameters appear below it; both configurations are
-    kept in the entry. Days off are shared: one list of whole days, either mode."""
+    kept in the entry. Days off are shared: one list of whole days, either mode,
+    picked from the closing-days registry (Registries > Edit closing days...)."""
 
     SHIFT_MODES = [("Weekly", "weekly"), ("Custom", "custom")]
 
-    def __init__(self, parent=None, entry=None):
+    def __init__(self, parent=None, entry=None, closing_days=None):
         super().__init__(parent)
         self.setWindowTitle("Shift definition")
         entry = entry or {}
@@ -1066,9 +1071,15 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.mode.setCurrentIndex(mi if mi >= 0 else 0)
         self._stack.setCurrentIndex(self.mode.currentIndex())
 
-        # --- Days off: shared by both modes (whole days, date-only) ---
-        lay.addWidget(QtWidgets.QLabel("days off (whole days; applies in either mode):"))
-        self.days_off = DateListWidget(entry.get("days_off", []), add_label="+ day off")
+        # --- Days off: shared by both modes, chosen from the closing-days registry ---
+        closing_days = closing_days or []
+        if closing_days:
+            lay.addWidget(QtWidgets.QLabel("days off (check closing days; applies in either mode):"))
+        else:
+            lay.addWidget(QtWidgets.QLabel("days off: the closing-days registry is empty\n"
+                                           "(add days in Registries > Edit closing days...)."))
+        self.days_off = ClosingDayPickerWidget(closing_days, chosen=entry.get("days_off", []))
+        self.days_off.setMaximumHeight(140)
         lay.addWidget(self.days_off)
 
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -1240,8 +1251,69 @@ class ResourceRegistryDialog(_RegistryDialog):
 class ShiftRegistryDialog(_RegistryDialog):
     reg_title = "Shifts"
 
+    def __init__(self, parent=None, entries=None, closing_days=None):
+        self._closing_days = closing_days or []
+        super().__init__(parent, entries)
+
     def _make_editor(self, entry):
-        return ShiftEditorDialog(self, entry)
+        return ShiftEditorDialog(self, entry, closing_days=self._closing_days)
+
+
+class ClosingDaysRegistryDialog(QtWidgets.QDialog):
+    """The closing-days registry: whole days the factory is closed, defined once and
+    picked (multi-select) inside every shift definition. Edited in place — a row per
+    day: date picker + optional label — so adding many days stays cheap."""
+
+    def __init__(self, parent=None, entries=None):
+        super().__init__(parent)
+        self.setWindowTitle("Closing days")
+        self.resize(480, 420)
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.addWidget(QtWidgets.QLabel("Days the factory is closed. Shifts pick their days off from this list."))
+        scroll = QtWidgets.QScrollArea(); scroll.setWidgetResizable(True)
+        self._host = QtWidgets.QWidget()
+        self._vl = QtWidgets.QVBoxLayout(self._host)
+        self._vl.setContentsMargins(0, 0, 0, 0)
+        self._vl.addStretch(1)
+        scroll.setWidget(self._host)
+        lay.addWidget(scroll)
+        add = QtWidgets.QPushButton("+ closing day")
+        add.clicked.connect(lambda: self._add())
+        lay.addWidget(add)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+        self._rows = []
+        for e in (entries or []):
+            self._add(e)
+
+    def _add(self, entry=None):
+        entry = dict(entry or {})
+        row = QtWidgets.QWidget()
+        rl = QtWidgets.QHBoxLayout(row); rl.setContentsMargins(0, 0, 0, 0)
+        picker = DateWidget(entry.get("date") or "01-01-2026")
+        label = QtWidgets.QLineEdit(entry.get("name", ""))
+        label.setPlaceholderText("label (optional)")
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
+        rl.addWidget(picker); rl.addWidget(label, 1); rl.addWidget(rm)
+        rec = (row, picker, label, entry)  # entry kept so an existing id survives edits
+        rm.clicked.connect(lambda: self._remove(rec))
+        self._rows.append(rec)
+        self._vl.insertWidget(self._vl.count() - 1, row)
+
+    def _remove(self, rec):
+        if rec in self._rows:
+            self._rows.remove(rec); rec[0].setParent(None); rec[0].deleteLater()
+
+    def entries(self):
+        out = []
+        for _, picker, label, entry in self._rows:
+            e = dict(entry)
+            e["date"] = picker.get_value()
+            e["name"] = label.text().strip()
+            out.append(e)
+        out.sort(key=lambda e: (parse_date(e.get("date")) or datetime.max, e.get("date", "")))
+        return out
 
 
 class OperatorRegistryDialog(_RegistryDialog):
@@ -1546,17 +1618,18 @@ def _takers_disjoint(a: set, b: set, parents: dict) -> bool:
 # Names <-> ids are translated only at the export/import boundary.
 # ------------------------------------------------------------------
 
-def ensure_ids(entries: list, prefix: str, old_by_name: dict | None = None) -> list:
+def ensure_ids(entries: list, prefix: str, old_by_name: dict | None = None, key: str = "name") -> list:
     """Give every registry entry a unique id. An entry without one reuses its prior
-    id (matched by name against old_by_name) so ids survive edits, unless that id is
-    already taken by a sibling — then it mints a fresh one. The id, never the name, is
-    the identity, so two entries that happen to share a name still get distinct ids."""
+    id (matched by `key` against old_by_name) so ids survive edits, unless that id is
+    already taken by a sibling — then it mints a fresh one. The id, never the key, is
+    the identity, so two entries that happen to share a key still get distinct ids.
+    `key` is "name" for models/resources/operators/shifts, "date" for closing days."""
     old_by_name = old_by_name or {}
     used = {e["id"] for e in entries if e.get("id")}
     for e in entries:
         if e.get("id"):
             continue
-        candidate = old_by_name.get(e.get("name"))
+        candidate = old_by_name.get(e.get(key))
         e["id"] = candidate if (candidate and candidate not in used) else new_uid(prefix)
         used.add(e["id"])
     return entries
@@ -1576,15 +1649,19 @@ def _shift_export_shape(s: dict) -> dict:
     return out
 
 
-def _apply_ref_map(nodes, models, resources, operators, resolve) -> None:
-    """Translate every registry reference (model/resource/operator/shift) in place,
-    via resolve(kind, value) -> value. Node-to-node wires (node uids) are untouched."""
+def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None) -> None:
+    """Translate every registry reference (model/resource/operator/shift/closing day)
+    in place, via resolve(kind, value) -> value. Node-to-node wires (node uids) are
+    untouched. Shifts reference closing days: internally by date, exported by id."""
     for m in models:
         if m.get("parent"):
             m["parent"] = resolve("model", m["parent"])
     for o in operators:
         if o.get("shifts"):
             o["shifts"] = [resolve("shift", s) for s in o["shifts"]]
+    for s in (shifts or []):
+        if s.get("days_off"):
+            s["days_off"] = [resolve("closing_day", d) for d in s["days_off"]]
     for n in nodes:
         k = n.get("kind")
         if k == "Buffer":
@@ -2252,6 +2329,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.resource_registry = []
         self.operator_registry = []
         self.shift_registry = []
+        self.closing_day_registry = []  # [{"id", "date": "dd-mm-yyyy", "name": label}]
         self.stopping_criterion = {}  # {} | {"type": "ByTime"|"ByPiecesProduced", ...}
         self.start_date = "01-01-2026 00:00"  # always set; the calendar anchor of t=0
 
@@ -2289,6 +2367,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         registries_menu.addAction("Edit models...").triggered.connect(self.edit_models)
         registries_menu.addAction("Edit resources...").triggered.connect(self.edit_resources)
         registries_menu.addAction("Edit operators...").triggered.connect(self.edit_operators)
+        registries_menu.addAction("Edit closing days...").triggered.connect(self.edit_closing_days)
         registries_menu.addAction("Edit shifts...").triggered.connect(self.edit_shifts)
 
         simulation_menu = self.menuBar().addMenu("Simulation")
@@ -2400,6 +2479,10 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def new_graph(self):
         self.graph.clear_session()
         self.model_registry = []
+        self.resource_registry = []
+        self.operator_registry = []
+        self.shift_registry = []
+        self.closing_day_registry = []
         self.stopping_criterion = {}
         self.start_date = "01-01-2026 00:00"
 
@@ -2429,8 +2512,15 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             self.operator_registry = ensure_ids(dlg.entries(), "operator", self._ids_by_name(self.operator_registry))
             self.statusBar().showMessage(f"{len(self.operator_registry)} operator groups defined.")
 
+    def edit_closing_days(self):
+        dlg = ClosingDaysRegistryDialog(self, self.closing_day_registry)
+        if dlg.exec():
+            old_by_date = {e.get("date"): e.get("id") for e in self.closing_day_registry if e.get("id")}
+            self.closing_day_registry = ensure_ids(dlg.entries(), "closingday", old_by_date, key="date")
+            self.statusBar().showMessage(f"{len(self.closing_day_registry)} closing days defined.")
+
     def edit_shifts(self):
-        dlg = ShiftRegistryDialog(self, self.shift_registry)
+        dlg = ShiftRegistryDialog(self, self.shift_registry, closing_days=self.closing_day_registry)
         if dlg.exec():
             self.shift_registry = ensure_ids(dlg.entries(), "shift", self._ids_by_name(self.shift_registry))
             self.statusBar().showMessage(f"{len(self.shift_registry)} shift definitions.")
@@ -2562,23 +2652,27 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         ensure_ids(self.resource_registry, "resource")
         ensure_ids(self.operator_registry, "operator")
         ensure_ids(self.shift_registry, "shift")
+        ensure_ids(self.closing_day_registry, "closingday", key="date")
         models = copy.deepcopy(self.model_registry)
         resources = copy.deepcopy(self.resource_registry)
         operators = copy.deepcopy(self.operator_registry)
+        closing_days = copy.deepcopy(self.closing_day_registry)
         shifts = [_shift_export_shape(copy.deepcopy(s)) for s in self.shift_registry]
         name_to_id = {
             "model": {m["name"]: m["id"] for m in models if m.get("name") and m.get("id")},
             "resource": {r["name"]: r["id"] for r in resources if r.get("name") and r.get("id")},
             "operator": {o["name"]: o["id"] for o in operators if o.get("name") and o.get("id")},
             "shift": {s["name"]: s["id"] for s in shifts if s.get("name") and s.get("id")},
+            "closing_day": {c["date"]: c["id"] for c in closing_days if c.get("date") and c.get("id")},
         }
         _apply_ref_map(nodes, models, resources, operators,
-                       lambda kind, v: name_to_id[kind].get(v, v))
+                       lambda kind, v: name_to_id[kind].get(v, v), shifts=shifts)
         return {
             "editor": {"name": APP_NAME, "version": EDITOR_VERSION, "format": "clean-json"},
             "models": models,
             "resources": resources,
             "operators": operators,
+            "closing_days": closing_days,
             "shifts": shifts,
             "stopping_criterion": self.stopping_criterion,
             "start_date": self.start_date,
@@ -2790,6 +2884,14 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 problems.append(f"Two or more {label} registry entries are named '{n}'; "
                                 f"names must be unique so cards can reference them.")
 
+        # Closing days: shifts pick them by date, so each date must parse and be unique.
+        cd_dates = [e.get("date") for e in self.closing_day_registry]
+        for d in cd_dates:
+            if parse_date(d) is None:
+                problems.append(f"Closing day '{d}': date must be 'dd-mm-yyyy'.")
+        for d in sorted({d for d in cd_dates if d and cd_dates.count(d) > 1}):
+            problems.append(f"Closing day '{d}' appears more than once in the registry.")
+
         buffer_types = [node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
                         for node in self.all_nodes() if node_kind(node) == "Buffer"]
         exit_count = buffer_types.count("EXIT")
@@ -2823,13 +2925,18 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             elif start_dt is not None and stop_dt <= start_dt:
                 problems.append("Stopping date must be after the simulation start date.")
 
-        # Shifts: days off (shared by both modes) must be dates; custom mode = absolute
+        # Shifts: days off come from the closing-days registry; custom mode = absolute
         # date intervals; weekly mode = date horizon containing the days off.
+        known_closing = {e.get("date") for e in self.closing_day_registry if e.get("date")}
         for s in self.shift_registry:
             sname = s.get("name", "?")
             offs = [parse_date(x) for x in s.get("days_off", [])]
             if any(o is None for o in offs):
                 problems.append(f"Shift '{sname}': days off must be 'dd-mm-yyyy'.")
+            for x in s.get("days_off", []):
+                if x not in known_closing:
+                    problems.append(f"Shift '{sname}': day off '{x}' is not in the closing-days "
+                                    f"registry (Registries > Edit closing days...).")
             if s.get("mode") == "custom":
                 ivs = s.get("custom_intervals", [])
                 if not ivs:
@@ -3073,8 +3180,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 "operator": data.get("operators", []), "shift": data.get("shifts", [])}
         id_to_name = {k: {e["id"]: e["name"] for e in v if e.get("id") and e.get("name")}
                       for k, v in regs.items()}
+        # closing days are keyed by date, not name
+        id_to_name["closing_day"] = {e["id"]: e["date"] for e in data.get("closing_days", [])
+                                     if e.get("id") and e.get("date")}
         _apply_ref_map(data.get("nodes", []), regs["model"], regs["resource"], regs["operator"],
-                       lambda kind, v: id_to_name[kind].get(v, v))
+                       lambda kind, v: id_to_name[kind].get(v, v), shifts=regs["shift"])
         return data
 
     def _merge_models(self, imported_models: list) -> None:
@@ -3098,17 +3208,31 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                      "These imported models already exist with a different parent and were kept as-is:\n- "
                      + "\n- ".join(conflicts), QtWidgets.QMessageBox.Warning)
 
-    def _merge_named_registry(self, attr: str, imported: list) -> None:
-        """Merge imported registry entries (resources/operators/shifts) by name; existing
-        entries win on a name clash (models are handled separately, with conflict warnings)."""
+    def _merge_named_registry(self, attr: str, imported: list, key: str = "name") -> None:
+        """Merge imported registry entries (resources/operators/shifts by name, closing
+        days by date); existing entries win on a clash (models are handled separately,
+        with conflict warnings)."""
         reg = getattr(self, attr, None) or []
-        existing = {e.get("name") for e in reg if e.get("name")}
+        existing = {e.get(key) for e in reg if e.get(key)}
         for entry in imported or []:
-            name = entry.get("name")
-            if name and name not in existing:
+            value = entry.get(key)
+            if value and value not in existing:
                 reg.append(dict(entry))
-                existing.add(name)
+                existing.add(value)
         setattr(self, attr, reg)
+
+    def _adopt_orphan_days_off(self) -> None:
+        """Every day off referenced by a shift must exist in the closing-days registry.
+        Old files carried raw dates on each shift; adopt any date the registry doesn't
+        know yet so those shifts stay valid after import."""
+        known = {e.get("date") for e in self.closing_day_registry if e.get("date")}
+        for s in self.shift_registry:
+            for d in s.get("days_off", []):
+                if d not in known and parse_date(d) is not None:
+                    self.closing_day_registry.append({"date": d, "name": ""})
+                    known.add(d)
+        self.closing_day_registry.sort(
+            key=lambda e: (parse_date(e.get("date")) or datetime.max, e.get("date", "")))
 
     def import_clean_json(self, data: dict):
         data = self._resolve_ref_ids_to_names(data)
@@ -3117,11 +3241,14 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self._merge_models(data.get("models", []))
         self._merge_named_registry("resource_registry", data.get("resources", []))
         self._merge_named_registry("operator_registry", data.get("operators", []))
+        self._merge_named_registry("closing_day_registry", data.get("closing_days", []), key="date")
         self._merge_named_registry("shift_registry", data.get("shifts", []))
+        self._adopt_orphan_days_off()
         ensure_ids(self.model_registry, "model")
         ensure_ids(self.resource_registry, "resource")
         ensure_ids(self.operator_registry, "operator")
         ensure_ids(self.shift_registry, "shift")
+        ensure_ids(self.closing_day_registry, "closingday", key="date")
         if not self.stopping_criterion and data.get("stopping_criterion"):
             self.stopping_criterion = data["stopping_criterion"]
         if data.get("start_date"):
