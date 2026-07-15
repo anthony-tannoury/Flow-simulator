@@ -47,7 +47,7 @@ class Breakdown(Component, ABC):
             self.task.is_in_breakdown.set(False)
 
 
-class Shutdowns(ABC, IntervalWaiter):
+class Shutdowns(IntervalWaiter, ABC):
     def setup(self, task: Task, intervals: list[Interval]):
         super().setup(intervals=intervals)
         self.task = task

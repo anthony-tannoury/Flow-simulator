@@ -24,7 +24,9 @@ from typing import Callable
 def to_date(date_str: str) -> date:
     return datetime.strptime(date_str, '%d-%m-%Y').date()
 
-def to_minutes(time_str: str) -> float:
+def to_minutes(time_str: str | float) -> float:
+    if isinstance(time_str, (int, float)):   # legacy exports carry raw minutes
+        return float(time_str)
     hour, minute = time_str.split(':')
     return 60 * int(hour) + int(minute)
 

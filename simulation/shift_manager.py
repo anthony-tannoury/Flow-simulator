@@ -75,12 +75,17 @@ class ShiftManager(IntervalWaiter):
     def generate_custom_shifts(sim_start: datetime, shifts: list[tuple[datetime, datetime]], days_off: set[date]) -> list[Interval]:
         datetime_ranges = []
         for start, end in shifts:
+            pieces = [(start, end)]
             for day_off in days_off:
                 d_start = datetime.combine(day_off, time.min)
                 d_end = d_start + timedelta(days=1)
-                if start < d_start:
-                    datetime_ranges.append((start, min(end, d_end)))
-                if d_end < end:
-                    datetime_ranges.append((max(start, d_end), end))
+                new_pieces = []
+                for s, e in pieces:
+                    if s < d_start:
+                        new_pieces.append((s, min(e, d_start)))
+                    if d_end < e:
+                        new_pieces.append((max(s, d_end), e))
+                pieces = new_pieces
+            datetime_ranges.extend(pieces)
 
         return [Interval(ShiftManager.minutes_between(sim_start, start), ShiftManager.minutes_between(sim_start, end)) for start, end in datetime_ranges]
