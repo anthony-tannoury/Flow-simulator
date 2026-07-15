@@ -247,6 +247,20 @@ inline void check_disjoint_sorted_intervals(const Intervals& intervals) {
             throw std::invalid_argument("Intervals must be pairwise disjoint");
 }
 
+// Intervals that touch exactly on the border become one (a night shift crossing
+// midnight, an operator's back-to-back schedules). Untouched entries keep their
+// identity; merged ones are fresh objects. Strict overlaps still fail the check.
+inline Intervals merge_touching_sorted_intervals(const Intervals& intervals) {
+    Intervals merged;
+    for (const IntervalPtr& iv : intervals) {
+        if (!merged.empty() && iv->start == merged.back()->end)
+            merged.back() = interval(merged.back()->start, iv->end);
+        else
+            merged.push_back(iv);
+    }
+    return merged;
+}
+
 inline void check_probabilities(const std::vector<double>& probs) {
     for (double p : probs)
         if (!(0 <= p && p <= 1)) throw std::invalid_argument("Probabilities must be in [0,1]");
@@ -269,6 +283,7 @@ class IntervalWaiter : public Component {
     explicit IntervalWaiter(Intervals intervals_) {
         std::sort(intervals_.begin(), intervals_.end(),
                   [](const IntervalPtr& a, const IntervalPtr& b) { return a->start < b->start; });
+        intervals_ = merge_touching_sorted_intervals(intervals_);
         check_disjoint_sorted_intervals(intervals_);
         intervals = std::move(intervals_);
     }
@@ -438,6 +453,7 @@ struct HasShifts {
     explicit HasShifts(Intervals shifts_) {
         std::sort(shifts_.begin(), shifts_.end(),
                   [](const IntervalPtr& a, const IntervalPtr& b) { return a->start < b->start; });
+        shifts_ = merge_touching_sorted_intervals(shifts_);
         check_disjoint_sorted_intervals(shifts_);
         shifts = std::move(shifts_);
     }

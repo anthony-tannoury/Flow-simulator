@@ -2,7 +2,7 @@ import salabim as sim
 from simulation import env
 from datetime import datetime, date, time, timedelta
 
-from .helpers import check_disjoint_sorted_intervals
+from .helpers import check_disjoint_sorted_intervals, merge_touching_sorted_intervals
 from .interval import Interval, IntervalWaiter
 
 from typing import override
@@ -10,8 +10,9 @@ from typing import override
 
 class HasShifts:
     def __init__(self, shifts: list[Interval]) -> None:
-        self.shifts = sorted(shifts, key=lambda shift: shift.start)
+        self.shifts = merge_touching_sorted_intervals(sorted(shifts, key=lambda shift: shift.start))
         check_disjoint_sorted_intervals(self.shifts)
+
         self.is_in_downtime = sim.State(value=True)
 
     def current_or_last_shift(self) -> Interval | None:
@@ -47,7 +48,7 @@ class ShiftManager(IntervalWaiter):
         return int(delta.total_seconds() // 60)
     
     @staticmethod
-    def generate_weekly_shifts(sim_start: datetime, shifts_per_day: list[list[tuple[time, time]]], working_days: list[bool], days_off: set[date], start: date, end: date) -> list[Interval]:
+    def generate_weekly_shifts(sim_start: datetime, shifts_per_day: list[list[tuple[float, float]]], working_days: list[bool], days_off: set[date], start: date, end: date) -> list[Interval]:
         if len(shifts_per_day) != 7:
             raise ValueError("There must be 7 lists of shifts per week, one for each day")
 
@@ -58,7 +59,7 @@ class ShiftManager(IntervalWaiter):
         time_offset = 60 * sim_start.hour + sim_start.minute
         days_off_rel = {(day_off - sim_start.date()).days for day_off in days_off}
 
-        intervals_per_day = [[Interval(60*s.hour + s.minute, 60*e.hour + e.minute) for s, e in shift] for shift in shifts_per_day]
+        intervals_per_day = [[Interval(s, e) for s, e in shift] for shift in shifts_per_day]
 
         all_shifts = []
         for i in range((start - sim_start.date()).days, (end - sim_start.date()).days + 1):
