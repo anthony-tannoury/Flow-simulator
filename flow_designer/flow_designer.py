@@ -2378,9 +2378,15 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         copy_action = edit_menu.addAction("Copy cards")
         copy_action.setShortcut(QtGui.QKeySequence.Copy)  # Ctrl+C / Cmd+C on macOS
         copy_action.triggered.connect(lambda: self.copy_selected_cards())
+        cut_action = edit_menu.addAction("Cut cards")
+        cut_action.setShortcut(QtGui.QKeySequence.Cut)  # Ctrl+X / Cmd+X on macOS
+        cut_action.triggered.connect(lambda: self.cut_selected_cards())
         paste_action = edit_menu.addAction("Paste cards")
         paste_action.setShortcut(QtGui.QKeySequence.Paste)  # Ctrl+V / Cmd+V on macOS
         paste_action.triggered.connect(self.paste_cards)
+        dup_action = edit_menu.addAction("Duplicate cards")
+        dup_action.setShortcut("Ctrl+D")  # Qt maps Ctrl to Cmd on macOS
+        dup_action.triggered.connect(lambda: self.duplicate_selected_cards())
         edit_menu.addSeparator()
         delete_action = edit_menu.addAction("Delete selected")
         delete_action.setShortcut("Delete")
@@ -2412,14 +2418,25 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         try:
             graph_menu = self.graph.get_context_menu("graph")
             graph_menu.add_command("Copy cards", lambda graph: self.copy_selected_cards())
+            graph_menu.add_command("Cut cards", lambda graph: self.cut_selected_cards())
             graph_menu.add_command("Paste cards", lambda graph: self.paste_cards())
+            graph_menu.add_command("Duplicate cards", lambda graph: self.duplicate_selected_cards())
             nodes_menu = self.graph.get_context_menu("nodes")
             for cls in (ShutdownsNode, BufferNode, RouterNode, PieceGeneratorNode,
                         TaskNode, ResourceTaskNode, BreakdownNode):
+                node_type = f"{cls.__identifier__}.{cls.__name__}"
                 nodes_menu.add_command(
                     "Copy cards",
                     func=lambda graph, node: self.copy_selected_cards(context_node=node),
-                    node_type=f"{cls.__identifier__}.{cls.__name__}")
+                    node_type=node_type)
+                nodes_menu.add_command(
+                    "Cut cards",
+                    func=lambda graph, node: self.cut_selected_cards(context_node=node),
+                    node_type=node_type)
+                nodes_menu.add_command(
+                    "Duplicate cards",
+                    func=lambda graph, node: self.duplicate_selected_cards(context_node=node),
+                    node_type=node_type)
         except Exception as error:
             print(f"[WARNING] Could not install context menus: {error}")
 
@@ -3010,24 +3027,79 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             return w.lineEdit()
         return None
 
+    def _selected_cards(self, context_node=None):
+        nodes = [n for n in self.graph.selected_nodes() if hasattr(n, "to_clean_json")]
+        if context_node is not None and context_node not in nodes:
+            nodes = [context_node]  # right-clicked an unselected card: act on just it
+        return nodes
+
+    def _cards_payload(self, nodes):
+        """Clean-JSON clipboard payload for these cards: the cards plus the wires
+        between them (wires leaving the set are dropped). None if nothing usable."""
+        cards = [c for c in (n.to_clean_json() for n in nodes) if c and c.get("kind")]
+        if not cards:
+            return None
+        uids = {c["id"] for c in cards if c.get("id")}
+        conns = [c for c in self.connections_clean()
+                 if c.get("from_node") in uids and c.get("to_node") in uids]
+        return {"format": self.CARD_CLIPBOARD_FORMAT, "nodes": cards, "connections": conns}
+
+    def _materialize_cards(self, payload, delta):
+        """Instantiate a payload's cards with fresh uids, offset by delta, and leave
+        the new cards selected. Returns the created nodes."""
+        data = self._remap_ids(payload)
+        for card in data.get("nodes", []):
+            pos = card.get("position")
+            if isinstance(pos, list) and len(pos) >= 2:
+                card["position"] = [pos[0] + delta, pos[1] + delta]
+        created = self._instantiate_cards(data)
+        if created:
+            try:
+                self.graph.clear_selection()
+            except Exception:
+                pass
+            for node in created.values():
+                try:
+                    node.set_selected(True)
+                except Exception:
+                    pass
+        return created
+
     def copy_selected_cards(self, context_node=None):
         w = self._text_widget_with_focus()
         if w is not None:
             w.copy()
             return
-        nodes = [n for n in self.graph.selected_nodes() if hasattr(n, "to_clean_json")]
-        if context_node is not None and context_node not in nodes:
-            nodes = [context_node]  # right-clicked an unselected card: copy just it
-        cards = [c for c in (n.to_clean_json() for n in nodes) if c and c.get("kind")]
-        if not cards:
+        payload = self._cards_payload(self._selected_cards(context_node))
+        if payload is None:
             self.statusBar().showMessage("Nothing selected to copy.")
             return
-        uids = {c["id"] for c in cards if c.get("id")}
-        conns = [c for c in self.connections_clean()
-                 if c.get("from_node") in uids and c.get("to_node") in uids]
-        payload = {"format": self.CARD_CLIPBOARD_FORMAT, "nodes": cards, "connections": conns}
         QtWidgets.QApplication.clipboard().setText(json.dumps(payload, indent=2, ensure_ascii=False))
-        self.statusBar().showMessage(f"Copied {len(cards)} card(s).")
+        self.statusBar().showMessage(f"Copied {len(payload['nodes'])} card(s).")
+
+    def cut_selected_cards(self, context_node=None):
+        w = self._text_widget_with_focus()
+        if w is not None:
+            w.cut()
+            return
+        nodes = self._selected_cards(context_node)
+        payload = self._cards_payload(nodes)
+        if payload is None:
+            self.statusBar().showMessage("Nothing selected to cut.")
+            return
+        QtWidgets.QApplication.clipboard().setText(json.dumps(payload, indent=2, ensure_ascii=False))
+        for node in nodes:
+            self.graph.delete_node(node)
+        self.statusBar().showMessage(f"Cut {len(payload['nodes'])} card(s).")
+
+    def duplicate_selected_cards(self, context_node=None):
+        """Copy + paste in one step, without touching the clipboard."""
+        payload = self._cards_payload(self._selected_cards(context_node))
+        if payload is None:
+            self.statusBar().showMessage("Nothing selected to duplicate.")
+            return
+        created = self._materialize_cards(payload, 40.0)
+        self.statusBar().showMessage(f"Duplicated {len(created)} card(s).")
 
     def paste_cards(self):
         w = self._text_widget_with_focus()
@@ -3042,31 +3114,16 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         if not isinstance(payload, dict) or payload.get("format") != self.CARD_CLIPBOARD_FORMAT:
             self.statusBar().showMessage("Clipboard holds no copied cards.")
             return
-        data = self._remap_ids(payload)  # fresh uids for the new cards + their wires
         # pasting the same clipboard again lands one step further each time
         if getattr(self, "_last_paste_text", None) == text:
             self._paste_serial += 1
         else:
             self._last_paste_text = text
             self._paste_serial = 1
-        delta = 40.0 * self._paste_serial
-        for card in data.get("nodes", []):
-            pos = card.get("position")
-            if isinstance(pos, list) and len(pos) >= 2:
-                card["position"] = [pos[0] + delta, pos[1] + delta]
-        created = self._instantiate_cards(data)
+        created = self._materialize_cards(payload, 40.0 * self._paste_serial)
         if not created:
             self.statusBar().showMessage("Clipboard holds no pasteable cards.")
             return
-        try:
-            self.graph.clear_selection()
-        except Exception:
-            pass
-        for node in created.values():
-            try:
-                node.set_selected(True)
-            except Exception:
-                pass
         self.statusBar().showMessage(f"Pasted {len(created)} card(s).")
 
     def set_node_position_safe(self, node, x: float, y: float):
