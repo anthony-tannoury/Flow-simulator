@@ -693,7 +693,7 @@
   "start_date": "01-01-2026 00:00",
   "nodes": [
     {
-      "id": "piecegenerator_52b1c01e",
+      "id": "piecegenerator_cb61007c",
       "kind": "PieceGenerator",
       "name": "Piece Generator",
       "models_goals": [
@@ -736,16 +736,16 @@
         "shift_43a68d28"
       ],
       "outlets": [
-        "buffer_9166f5ab",
-        "buffer_f51b7a1a"
+        "buffer_2a22dcd0",
+        "buffer_3101e81d"
       ],
       "position": [
-        271.34534068445913,
-        398.65414835828165
+        279.37959625996973,
+        398.65414835828176
       ]
     },
     {
-      "id": "task_d4b4cdd0",
+      "id": "task_0d84b6fc",
       "kind": "Task",
       "name": "PREP_NOY_01",
       "models_configs": [
@@ -879,20 +879,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_9166f5ab"
+        "buffer_2a22dcd0"
       ],
       "bufs_out": [
-        "buffer_22712c6a"
+        "buffer_9bd1d82a"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        1124.6503601633,
-        -2.960128339699203
+        1132.6846157388109,
+        -2.9601283396991676
       ]
     },
     {
-      "id": "buffer_9166f5ab",
+      "id": "buffer_2a22dcd0",
       "kind": "Buffer",
       "name": "Entrée M88 ET Retouche / Prep noyaux",
       "valid_models": [
@@ -904,19 +904,19 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "piecegenerator_52b1c01e"
+        "piecegenerator_cb61007c"
       ],
       "outputs_to": [
-        "task_d4b4cdd0",
-        "task_60ad5660"
+        "task_0d84b6fc",
+        "task_24bdff41"
       ],
       "position": [
-        687.857952853282,
+        695.8922084287924,
         104.09014868485383
       ]
     },
     {
-      "id": "task_60ad5660",
+      "id": "task_24bdff41",
       "kind": "Task",
       "name": "PREP_NOY_02",
       "models_configs": [
@@ -1044,20 +1044,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_9166f5ab"
+        "buffer_2a22dcd0"
       ],
       "bufs_out": [
-        "buffer_22712c6a"
+        "buffer_9bd1d82a"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        1134.209497407077,
-        212.69240567652952
+        1142.2437529825875,
+        212.69240567652957
       ]
     },
     {
-      "id": "buffer_22712c6a",
+      "id": "buffer_9bd1d82a",
       "kind": "Buffer",
       "name": "Prep noyaux / Injection manuelle",
       "valid_models": [
@@ -1069,23 +1069,23 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "task_d4b4cdd0",
-        "task_60ad5660",
-        "task_c7e904db",
-        "task_c972464b",
-        "task_e2c54f39"
+        "task_0d84b6fc",
+        "task_24bdff41",
+        "task_8f098599",
+        "task_965706d8",
+        "task_59a50244"
       ],
       "outputs_to": [
-        "task_e7dc5cde",
-        "task_67bfba9f"
+        "task_847957e4",
+        "task_a51456cd"
       ],
       "position": [
-        1427.884048299756,
-        104.31410979039963
+        1435.9183038752662,
+        104.31410979039958
       ]
     },
     {
-      "id": "task_67bfba9f",
+      "id": "task_a51456cd",
       "kind": "Task",
       "name": "PRSINJM88_02",
       "models_configs": [
@@ -1219,20 +1219,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_22712c6a"
+        "buffer_9bd1d82a"
       ],
       "bufs_out": [
-        "router_460e0acc"
+        "router_ece9db99"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        1825.5716981487205,
+        1833.6059537242309,
         187.25529907088276
       ]
     },
     {
-      "id": "task_e7dc5cde",
+      "id": "task_847957e4",
       "kind": "Task",
       "name": "PRSINJM88_01",
       "models_configs": [
@@ -1366,20 +1366,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_22712c6a"
+        "buffer_9bd1d82a"
       ],
       "bufs_out": [
-        "router_460e0acc"
+        "router_ece9db99"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        1821.4438960387965,
-        -30.787596121532633
+        1829.4781516143075,
+        -30.7875961215326
       ]
     },
     {
-      "id": "buffer_f51b7a1a",
+      "id": "buffer_3101e81d",
       "kind": "Buffer",
       "name": "Entrée LEAP / Injection cire moule",
       "valid_models": [
@@ -1391,19 +1391,19 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "piecegenerator_52b1c01e"
+        "piecegenerator_cb61007c"
       ],
       "outputs_to": [
-        "task_32638b4f",
-        "task_f22da540"
+        "task_01f4f56b",
+        "task_eb2ae4f8"
       ],
       "position": [
-        718.3895042300152,
-        737.4877937085225
+        726.4237598055261,
+        737.4877937085224
       ]
     },
     {
-      "id": "task_32638b4f",
+      "id": "task_01f4f56b",
       "kind": "Task",
       "name": "PRSINJLEAP_01",
       "models_configs": [
@@ -1537,20 +1537,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_f51b7a1a"
+        "buffer_3101e81d"
       ],
       "bufs_out": [
-        "buffer_57f06418"
+        "buffer_ef7aebe0"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        1131.5125444732323,
+        1139.5468000487426,
         607.5755897728653
       ]
     },
     {
-      "id": "task_f22da540",
+      "id": "task_eb2ae4f8",
       "kind": "Task",
       "name": "PRSINJLEAP_02",
       "models_configs": [
@@ -1684,20 +1684,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_f51b7a1a"
+        "buffer_3101e81d"
       ],
       "bufs_out": [
-        "buffer_57f06418"
+        "buffer_ef7aebe0"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        1126.8056733089095,
-        820.6579953830105
+        1134.8399288844203,
+        820.6579953830104
       ]
     },
     {
-      "id": "buffer_e25d0c41",
+      "id": "buffer_45acfa6f",
       "kind": "Buffer",
       "name": "Injection cire noyaux / Prison 1",
       "valid_models": [
@@ -1709,18 +1709,18 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "router_1d341f42"
+        "router_be6db024"
       ],
       "outputs_to": [
-        "task_949fcd0f"
+        "task_865f5575"
       ],
       "position": [
-        2855.0245559291484,
+        2863.0588115046585,
         -199.27886824248804
       ]
     },
     {
-      "id": "task_949fcd0f",
+      "id": "task_865f5575",
       "kind": "Task",
       "name": "Prison 1",
       "models_configs": [
@@ -1824,20 +1824,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_e25d0c41"
+        "buffer_45acfa6f"
       ],
       "bufs_out": [
-        "router_3c64a483"
+        "router_8dac98f0"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        3160.269194095718,
-        -233.92743365650645
+        3168.303449671229,
+        -233.92743365650642
       ]
     },
     {
-      "id": "buffer_57f06418",
+      "id": "buffer_ef7aebe0",
       "kind": "Buffer",
       "name": "Injection cire / Attente 4h",
       "valid_models": [
@@ -1854,20 +1854,20 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "task_32638b4f",
-        "task_f22da540",
-        "router_1d341f42"
+        "task_01f4f56b",
+        "task_eb2ae4f8",
+        "router_be6db024"
       ],
       "outputs_to": [
-        "task_715c624f"
+        "task_6101af99"
       ],
       "position": [
-        4160.388171597086,
-        189.82052188192512
+        4168.422427172597,
+        189.82052188192517
       ]
     },
     {
-      "id": "task_715c624f",
+      "id": "task_6101af99",
       "kind": "Task",
       "name": "Attente de 4h",
       "models_configs": [
@@ -1986,20 +1986,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_57f06418"
+        "buffer_ef7aebe0"
       ],
       "bufs_out": [
-        "buffer_75ddad78"
+        "buffer_bf0f516c"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        4560.138684568385,
-        161.74444872400449
+        4568.172940143896,
+        161.74444872400443
       ]
     },
     {
-      "id": "buffer_75ddad78",
+      "id": "buffer_bf0f516c",
       "kind": "Buffer",
       "name": "Attente 4h / Marquage laser",
       "valid_models": [
@@ -2016,18 +2016,18 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "task_715c624f"
+        "task_6101af99"
       ],
       "outputs_to": [
-        "task_b87201ac"
+        "task_4cb80475"
       ],
       "position": [
-        4871.282618781259,
-        168.61006791030997
+        4879.3168743567685,
+        168.61006791031002
       ]
     },
     {
-      "id": "task_b87201ac",
+      "id": "task_4cb80475",
       "kind": "Task",
       "name": "MACHINEMARQUAGELASER",
       "models_configs": [
@@ -2171,21 +2171,21 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_75ddad78"
+        "buffer_bf0f516c"
       ],
       "bufs_out": [
-        "buffer_04497abc",
-        "buffer_2101a44d"
+        "buffer_9cb8d027",
+        "buffer_8fc81ecb"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        5210.472171313223,
-        138.34353870775644
+        5218.506426888734,
+        138.34353870775647
       ]
     },
     {
-      "id": "buffer_2101a44d",
+      "id": "buffer_8fc81ecb",
       "kind": "Buffer",
       "name": "Marquage laser / Stockage",
       "valid_models": [
@@ -2197,18 +2197,18 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "task_b87201ac"
+        "task_4cb80475"
       ],
       "outputs_to": [
-        "task_d73b5384"
+        "task_e1229d2b"
       ],
       "position": [
-        7735.350280459644,
+        7743.384536035154,
         643.3203512291246
       ]
     },
     {
-      "id": "buffer_04497abc",
+      "id": "buffer_9cb8d027",
       "kind": "Buffer",
       "name": "Marquage laser / Contrôle US",
       "valid_models": [
@@ -2220,18 +2220,18 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "task_b87201ac"
+        "task_4cb80475"
       ],
       "outputs_to": [
-        "task_c122edfe"
+        "task_7ac47d77"
       ],
       "position": [
-        5703.679606457507,
-        -163.84316596674896
+        5711.713862033018,
+        -163.84316596674898
       ]
     },
     {
-      "id": "task_c122edfe",
+      "id": "task_7ac47d77",
       "kind": "Task",
       "name": "EQUIPEMENTCABINEUS",
       "models_configs": [
@@ -2385,20 +2385,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_04497abc"
+        "buffer_9cb8d027"
       ],
       "bufs_out": [
-        "router_ca740311"
+        "router_0e6a616d"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        6160.469179847673,
-        -199.38826363540372
+        6168.503435423184,
+        -199.38826363540375
       ]
     },
     {
-      "id": "buffer_a297c4b1",
+      "id": "buffer_bca7fa89",
       "kind": "Buffer",
       "name": "Contrôle US / Contrôle RX",
       "valid_models": [
@@ -2410,18 +2410,18 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "router_ca740311"
+        "router_0e6a616d"
       ],
       "outputs_to": [
-        "task_94ac9b64"
+        "task_7fa9ea54"
       ],
       "position": [
-        6880.492178284414,
-        39.562923347672324
+        6888.526433859925,
+        39.56292334767227
       ]
     },
     {
-      "id": "buffer_8c988067",
+      "id": "buffer_735ceff0",
       "kind": "Buffer",
       "name": "Contrôle RX / Expertise cire",
       "valid_models": [
@@ -2433,45 +2433,45 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "task_94ac9b64"
+        "task_7fa9ea54"
       ],
       "outputs_to": [
-        "task_a2e76008",
-        "task_fe084560"
+        "task_d25e024a",
+        "task_fed0c2d4"
       ],
       "position": [
-        7833.284881667255,
+        7841.3191372427655,
         104.38684869981466
       ]
     },
     {
-      "id": "router_973087c1",
+      "id": "router_5ed62f3f",
       "kind": "Router",
       "name": "Modèle cire conforme ? 2",
       "inputs_from": [
-        "task_a2e76008",
-        "task_fe084560"
+        "task_d25e024a",
+        "task_fed0c2d4"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_d4873798",
+          "buffer": "buffer_3c687a73",
           "probability": {
             "kind": "constant",
             "value": 0.08
           }
         },
         {
-          "buffer": "buffer_cf233efd",
+          "buffer": "buffer_b66bcf88",
           "probability": null
         }
       ],
       "position": [
-        8505.256493891691,
-        75.41152396439927
+        8513.290749467204,
+        75.4115239643993
       ]
     },
     {
-      "id": "buffer_d4873798",
+      "id": "buffer_3c687a73",
       "kind": "Buffer",
       "name": "Expertise cire / Prison 3",
       "valid_models": [
@@ -2483,18 +2483,18 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "router_973087c1"
+        "router_5ed62f3f"
       ],
       "outputs_to": [
-        "task_68784285"
+        "task_f464175f"
       ],
       "position": [
-        8881.695641950797,
-        12.128192855475675
+        8889.729897526307,
+        12.128192855475618
       ]
     },
     {
-      "id": "buffer_cf233efd",
+      "id": "buffer_b66bcf88",
       "kind": "Buffer",
       "name": "Expertise cire / Stockage",
       "valid_models": [
@@ -2506,44 +2506,44 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "router_973087c1"
+        "router_5ed62f3f"
       ],
       "outputs_to": [
-        "task_d73b5384"
+        "task_e1229d2b"
       ],
       "position": [
-        8884.599739571997,
+        8892.63399514751,
         208.88544216518574
       ]
     },
     {
-      "id": "router_460e0acc",
+      "id": "router_ece9db99",
       "kind": "Router",
       "name": "Rebut direct ?",
       "inputs_from": [
-        "task_67bfba9f",
-        "task_e7dc5cde"
+        "task_a51456cd",
+        "task_847957e4"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_f3bf3113",
+          "buffer": "buffer_6ec51143",
           "probability": {
             "kind": "constant",
             "value": 0.02
           }
         },
         {
-          "buffer": "router_1d341f42",
+          "buffer": "router_be6db024",
           "probability": null
         }
       ],
       "position": [
-        2099.5506432953944,
-        46.979822599044525
+        2107.584898870905,
+        46.979822599044496
       ]
     },
     {
-      "id": "buffer_f3bf3113",
+      "id": "buffer_6ec51143",
       "kind": "Buffer",
       "name": "Rebuts 1",
       "valid_models": [
@@ -2555,66 +2555,66 @@
       ],
       "buffer_type": "SCRAP",
       "inputs_from": [
-        "router_460e0acc"
+        "router_ece9db99"
       ],
       "outputs_to": [],
       "position": [
-        2408.2751918034,
+        2416.3094473789106,
         -256.151889885266
       ]
     },
     {
-      "id": "router_1d341f42",
+      "id": "router_be6db024",
       "kind": "Router",
       "name": "Prison ?",
       "inputs_from": [
-        "router_460e0acc"
+        "router_ece9db99"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_e25d0c41",
+          "buffer": "buffer_45acfa6f",
           "probability": {
             "kind": "constant",
             "value": 0.05
           }
         },
         {
-          "buffer": "buffer_57f06418",
+          "buffer": "buffer_ef7aebe0",
           "probability": null
         }
       ],
       "position": [
-        2496.6420009777817,
-        13.422806456869793
+        2504.6762565532927,
+        13.422806456869807
       ]
     },
     {
-      "id": "router_3c64a483",
+      "id": "router_8dac98f0",
       "kind": "Router",
       "name": "Rework ? 1",
       "inputs_from": [
-        "task_949fcd0f"
+        "task_865f5575"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_ea1c851b",
+          "buffer": "buffer_51b736b3",
           "probability": {
             "kind": "constant",
             "value": 0.6
           }
         },
         {
-          "buffer": "buffer_cff68f6f",
+          "buffer": "buffer_51e3cd3f",
           "probability": null
         }
       ],
       "position": [
-        3450.779826620251,
+        3458.8140821957613,
         -241.61051622365454
       ]
     },
     {
-      "id": "task_c7e904db",
+      "id": "task_8f098599",
       "kind": "Task",
       "name": "Rework 1",
       "models_configs": [
@@ -2743,20 +2743,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_ea1c851b"
+        "buffer_51b736b3"
       ],
       "bufs_out": [
-        "buffer_22712c6a"
+        "buffer_9bd1d82a"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        3937.452496562529,
+        3945.4867521380393,
         -369.06982011155316
       ]
     },
     {
-      "id": "buffer_cff68f6f",
+      "id": "buffer_51e3cd3f",
       "kind": "Buffer",
       "name": "Rebuts 2",
       "valid_models": [
@@ -2768,16 +2768,16 @@
       ],
       "buffer_type": "SCRAP",
       "inputs_from": [
-        "router_3c64a483"
+        "router_8dac98f0"
       ],
       "outputs_to": [],
       "position": [
-        3714.4160780905377,
+        3722.450333666048,
         -165.4547076837369
       ]
     },
     {
-      "id": "buffer_ea1c851b",
+      "id": "buffer_51b736b3",
       "kind": "Buffer",
       "name": "Prison 1 / Rework",
       "valid_models": [
@@ -2789,18 +2789,18 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "router_3c64a483"
+        "router_8dac98f0"
       ],
       "outputs_to": [
-        "task_c7e904db"
+        "task_8f098599"
       ],
       "position": [
-        3709.950541459977,
+        3717.9847970354886,
         -359.56413819233103
       ]
     },
     {
-      "id": "buffer_abcae6e8",
+      "id": "buffer_745a4a28",
       "kind": "Buffer",
       "name": "Sorties",
       "valid_models": [
@@ -2817,16 +2817,16 @@
       ],
       "buffer_type": "EXIT",
       "inputs_from": [
-        "task_d73b5384"
+        "task_e1229d2b"
       ],
       "outputs_to": [],
       "position": [
-        9669.8011240698,
-        527.7282345639496
+        9677.835379645312,
+        527.7282345639495
       ]
     },
     {
-      "id": "task_94ac9b64",
+      "id": "task_7fa9ea54",
       "kind": "Task",
       "name": "EQUIPEMENTCABINERX",
       "models_configs": [
@@ -2980,20 +2980,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_a297c4b1"
+        "buffer_bca7fa89"
       ],
       "bufs_out": [
-        "buffer_8c988067"
+        "buffer_735ceff0"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        7405.574417315589,
+        7413.608672891099,
         75.51766848258853
       ]
     },
     {
-      "id": "task_a2e76008",
+      "id": "task_d25e024a",
       "kind": "Task",
       "name": "PCEXPCIRE_01",
       "models_configs": [
@@ -3147,20 +3147,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_8c988067"
+        "buffer_735ceff0"
       ],
       "bufs_out": [
-        "router_973087c1"
+        "router_5ed62f3f"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        8153.356067027368,
-        27.831784103793908
+        8161.390322602879,
+        27.831784103793893
       ]
     },
     {
-      "id": "task_fe084560",
+      "id": "task_fed0c2d4",
       "kind": "Task",
       "name": "PCEXPCIRE_02",
       "models_configs": [
@@ -3314,20 +3314,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_8c988067"
+        "buffer_735ceff0"
       ],
       "bufs_out": [
-        "router_973087c1"
+        "router_5ed62f3f"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        8148.712224416083,
-        177.59570831768536
+        8156.746479991593,
+        177.5957083176853
       ]
     },
     {
-      "id": "task_68784285",
+      "id": "task_f464175f",
       "kind": "Task",
       "name": "Prison 3",
       "models_configs": [
@@ -3431,20 +3431,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_d4873798"
+        "buffer_3c687a73"
       ],
       "bufs_out": [
-        "router_acc8c1aa"
+        "router_6d3128a2"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        9175.326696049273,
-        -8.046280891221542
+        9183.360951624785,
+        -8.0462808912215
       ]
     },
     {
-      "id": "buffer_9f781978",
+      "id": "buffer_dacd9525",
       "kind": "Buffer",
       "name": "Prison 3 / Rework 3",
       "valid_models": [
@@ -3456,43 +3456,43 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "router_acc8c1aa"
+        "router_6d3128a2"
       ],
       "outputs_to": [
-        "task_c972464b"
+        "task_965706d8"
       ],
       "position": [
-        9759.515588112674,
-        -83.60750423791482
+        9767.549843688186,
+        -83.60750423791478
       ]
     },
     {
-      "id": "router_acc8c1aa",
+      "id": "router_6d3128a2",
       "kind": "Router",
       "name": "Rework ? 3",
       "inputs_from": [
-        "task_68784285"
+        "task_f464175f"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_9f781978",
+          "buffer": "buffer_dacd9525",
           "probability": {
             "kind": "constant",
             "value": 0.7
           }
         },
         {
-          "buffer": "buffer_a9609404",
+          "buffer": "buffer_fa5f5e30",
           "probability": null
         }
       ],
       "position": [
-        9456.340344913624,
-        1.8984101903786978
+        9464.374600489136,
+        1.8984101903787405
       ]
     },
     {
-      "id": "buffer_a9609404",
+      "id": "buffer_fa5f5e30",
       "kind": "Buffer",
       "name": "Rebuts 4",
       "valid_models": [
@@ -3504,16 +3504,16 @@
       ],
       "buffer_type": "SCRAP",
       "inputs_from": [
-        "router_acc8c1aa"
+        "router_6d3128a2"
       ],
       "outputs_to": [],
       "position": [
-        9762.039797861009,
-        97.67786269224672
+        9770.074053436521,
+        97.67786269224666
       ]
     },
     {
-      "id": "task_c972464b",
+      "id": "task_965706d8",
       "kind": "Task",
       "name": "Rework 3",
       "models_configs": [
@@ -3642,20 +3642,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_9f781978"
+        "buffer_dacd9525"
       ],
       "bufs_out": [
-        "buffer_22712c6a"
+        "buffer_9bd1d82a"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        10038.508560073351,
-        -98.71292705367391
+        10046.542815648863,
+        -98.71292705367387
       ]
     },
     {
-      "id": "buffer_1eef3481",
+      "id": "buffer_8d6c3873",
       "kind": "Buffer",
       "name": "Prison 3 / Rework 2",
       "valid_models": [
@@ -3667,43 +3667,43 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "router_9bb7553d"
+        "router_66b6b539"
       ],
       "outputs_to": [
-        "task_e2c54f39"
+        "task_59a50244"
       ],
       "position": [
-        7696.0880289759825,
+        7704.122284551492,
         -416.7216066457279
       ]
     },
     {
-      "id": "router_9bb7553d",
+      "id": "router_66b6b539",
       "kind": "Router",
       "name": "Rework ? 2",
       "inputs_from": [
-        "task_4d534a25"
+        "task_0ab114e8"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_1eef3481",
+          "buffer": "buffer_8d6c3873",
           "probability": {
             "kind": "constant",
             "value": 0.7
           }
         },
         {
-          "buffer": "buffer_6f53b899",
+          "buffer": "buffer_c82750b1",
           "probability": null
         }
       ],
       "position": [
-        7392.912785776933,
+        7400.947041352442,
         -331.2156922174345
       ]
     },
     {
-      "id": "task_e2c54f39",
+      "id": "task_59a50244",
       "kind": "Task",
       "name": "Rework 2",
       "models_configs": [
@@ -3832,20 +3832,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_1eef3481"
+        "buffer_8d6c3873"
       ],
       "bufs_out": [
-        "buffer_22712c6a"
+        "buffer_9bd1d82a"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        7974.16764741871,
+        7982.201902994219,
         -431.827029461487
       ]
     },
     {
-      "id": "buffer_6f53b899",
+      "id": "buffer_c82750b1",
       "kind": "Buffer",
       "name": "Rebuts 3",
       "valid_models": [
@@ -3857,28 +3857,28 @@
       ],
       "buffer_type": "SCRAP",
       "inputs_from": [
-        "router_9bb7553d"
+        "router_66b6b539"
       ],
       "outputs_to": [],
       "position": [
-        7708.478232098457,
-        -234.6261192411553
+        7716.512487673967,
+        -234.62611924115527
       ]
     },
     {
-      "id": "router_ca740311",
+      "id": "router_0e6a616d",
       "kind": "Router",
       "name": "Modèle cire conforme ? 1",
       "inputs_from": [
-        "task_c122edfe"
+        "task_7ac47d77"
       ],
       "buffer_probs": [
         {
-          "buffer": "buffer_a297c4b1",
+          "buffer": "buffer_bca7fa89",
           "probability": null
         },
         {
-          "buffer": "buffer_ca766b17",
+          "buffer": "buffer_359f84e2",
           "probability": {
             "kind": "constant",
             "value": 0.0
@@ -3886,12 +3886,12 @@
         }
       ],
       "position": [
-        6436.285840399139,
+        6444.320095974649,
         -184.19512887243894
       ]
     },
     {
-      "id": "buffer_ca766b17",
+      "id": "buffer_359f84e2",
       "kind": "Buffer",
       "name": "Contrôle US / Prison 2",
       "valid_models": [
@@ -3903,18 +3903,18 @@
       ],
       "buffer_type": "PASSAGE",
       "inputs_from": [
-        "router_ca740311"
+        "router_0e6a616d"
       ],
       "outputs_to": [
-        "task_4d534a25"
+        "task_0ab114e8"
       ],
       "position": [
-        6828.057921977772,
+        6836.092177553283,
         -306.2935175700597
       ]
     },
     {
-      "id": "task_4d534a25",
+      "id": "task_0ab114e8",
       "kind": "Task",
       "name": "Prison 2",
       "models_configs": [
@@ -4018,20 +4018,20 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_ca766b17"
+        "buffer_359f84e2"
       ],
       "bufs_out": [
-        "router_9bb7553d"
+        "router_66b6b539"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        7118.964173475384,
+        7126.998429050894,
         -335.8413749248625
       ]
     },
     {
-      "id": "task_d73b5384",
+      "id": "task_e1229d2b",
       "kind": "Task",
       "name": "Stockage",
       "models_configs": [
@@ -4150,466 +4150,466 @@
       "priority": 10,
       "collector_type": "NON_DISCRIMINATING_GREEDY",
       "bufs_in": [
-        "buffer_2101a44d",
-        "buffer_cf233efd"
+        "buffer_8fc81ecb",
+        "buffer_b66bcf88"
       ],
       "bufs_out": [
-        "buffer_abcae6e8"
+        "buffer_745a4a28"
       ],
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        9273.992640115852,
+        9282.026895691364,
         484.00586262665513
       ]
     }
   ],
   "connections": [
     {
-      "from_node": "piecegenerator_52b1c01e",
+      "from_node": "piecegenerator_cb61007c",
       "from_kind": "PieceGenerator",
       "from_port": "bufs_out",
-      "to_node": "buffer_9166f5ab",
+      "to_node": "buffer_2a22dcd0",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "piecegenerator_52b1c01e",
+      "from_node": "piecegenerator_cb61007c",
       "from_kind": "PieceGenerator",
       "from_port": "bufs_out",
-      "to_node": "buffer_f51b7a1a",
+      "to_node": "buffer_3101e81d",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_d4b4cdd0",
+      "from_node": "task_0d84b6fc",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_22712c6a",
+      "to_node": "buffer_9bd1d82a",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_9166f5ab",
+      "from_node": "buffer_2a22dcd0",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_d4b4cdd0",
+      "to_node": "task_0d84b6fc",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_9166f5ab",
+      "from_node": "buffer_2a22dcd0",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_60ad5660",
+      "to_node": "task_24bdff41",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_60ad5660",
+      "from_node": "task_24bdff41",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_22712c6a",
+      "to_node": "buffer_9bd1d82a",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_22712c6a",
+      "from_node": "buffer_9bd1d82a",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_e7dc5cde",
+      "to_node": "task_847957e4",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_22712c6a",
+      "from_node": "buffer_9bd1d82a",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_67bfba9f",
+      "to_node": "task_a51456cd",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_67bfba9f",
+      "from_node": "task_a51456cd",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_460e0acc",
+      "to_node": "router_ece9db99",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_e7dc5cde",
+      "from_node": "task_847957e4",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_460e0acc",
+      "to_node": "router_ece9db99",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_f51b7a1a",
+      "from_node": "buffer_3101e81d",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_32638b4f",
+      "to_node": "task_01f4f56b",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_f51b7a1a",
+      "from_node": "buffer_3101e81d",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_f22da540",
+      "to_node": "task_eb2ae4f8",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_32638b4f",
+      "from_node": "task_01f4f56b",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_57f06418",
+      "to_node": "buffer_ef7aebe0",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_f22da540",
+      "from_node": "task_eb2ae4f8",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_57f06418",
+      "to_node": "buffer_ef7aebe0",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_e25d0c41",
+      "from_node": "buffer_45acfa6f",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_949fcd0f",
+      "to_node": "task_865f5575",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_949fcd0f",
+      "from_node": "task_865f5575",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_3c64a483",
+      "to_node": "router_8dac98f0",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_57f06418",
+      "from_node": "buffer_ef7aebe0",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_715c624f",
+      "to_node": "task_6101af99",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_715c624f",
+      "from_node": "task_6101af99",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_75ddad78",
+      "to_node": "buffer_bf0f516c",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_75ddad78",
+      "from_node": "buffer_bf0f516c",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_b87201ac",
+      "to_node": "task_4cb80475",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_b87201ac",
+      "from_node": "task_4cb80475",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_04497abc",
+      "to_node": "buffer_9cb8d027",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_b87201ac",
+      "from_node": "task_4cb80475",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_2101a44d",
+      "to_node": "buffer_8fc81ecb",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_2101a44d",
+      "from_node": "buffer_8fc81ecb",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_d73b5384",
+      "to_node": "task_e1229d2b",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_04497abc",
+      "from_node": "buffer_9cb8d027",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_c122edfe",
+      "to_node": "task_7ac47d77",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_c122edfe",
+      "from_node": "task_7ac47d77",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_ca740311",
+      "to_node": "router_0e6a616d",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_a297c4b1",
+      "from_node": "buffer_bca7fa89",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_94ac9b64",
+      "to_node": "task_7fa9ea54",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_8c988067",
+      "from_node": "buffer_735ceff0",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_a2e76008",
+      "to_node": "task_d25e024a",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_8c988067",
+      "from_node": "buffer_735ceff0",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_fe084560",
+      "to_node": "task_fed0c2d4",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "router_973087c1",
+      "from_node": "router_5ed62f3f",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_d4873798",
+      "to_node": "buffer_3c687a73",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_973087c1",
+      "from_node": "router_5ed62f3f",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_cf233efd",
+      "to_node": "buffer_b66bcf88",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_d4873798",
+      "from_node": "buffer_3c687a73",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_68784285",
+      "to_node": "task_f464175f",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "buffer_cf233efd",
+      "from_node": "buffer_b66bcf88",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_d73b5384",
+      "to_node": "task_e1229d2b",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "router_460e0acc",
+      "from_node": "router_ece9db99",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_f3bf3113",
+      "to_node": "buffer_6ec51143",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_460e0acc",
+      "from_node": "router_ece9db99",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "router_1d341f42",
+      "to_node": "router_be6db024",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_1d341f42",
+      "from_node": "router_be6db024",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_e25d0c41",
+      "to_node": "buffer_45acfa6f",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_1d341f42",
+      "from_node": "router_be6db024",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_57f06418",
+      "to_node": "buffer_ef7aebe0",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_3c64a483",
+      "from_node": "router_8dac98f0",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_ea1c851b",
+      "to_node": "buffer_51b736b3",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_3c64a483",
+      "from_node": "router_8dac98f0",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_cff68f6f",
+      "to_node": "buffer_51e3cd3f",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_c7e904db",
+      "from_node": "task_8f098599",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_22712c6a",
+      "to_node": "buffer_9bd1d82a",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_ea1c851b",
+      "from_node": "buffer_51b736b3",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_c7e904db",
+      "to_node": "task_8f098599",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_94ac9b64",
+      "from_node": "task_7fa9ea54",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_8c988067",
+      "to_node": "buffer_735ceff0",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_a2e76008",
+      "from_node": "task_d25e024a",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_973087c1",
+      "to_node": "router_5ed62f3f",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_fe084560",
+      "from_node": "task_fed0c2d4",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_973087c1",
+      "to_node": "router_5ed62f3f",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_68784285",
+      "from_node": "task_f464175f",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_acc8c1aa",
+      "to_node": "router_6d3128a2",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_9f781978",
+      "from_node": "buffer_dacd9525",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_c972464b",
+      "to_node": "task_965706d8",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "router_acc8c1aa",
+      "from_node": "router_6d3128a2",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_9f781978",
+      "to_node": "buffer_dacd9525",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_acc8c1aa",
+      "from_node": "router_6d3128a2",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_a9609404",
+      "to_node": "buffer_fa5f5e30",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_c972464b",
+      "from_node": "task_965706d8",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_22712c6a",
+      "to_node": "buffer_9bd1d82a",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_1eef3481",
+      "from_node": "buffer_8d6c3873",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_e2c54f39",
+      "to_node": "task_59a50244",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "router_9bb7553d",
+      "from_node": "router_66b6b539",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_1eef3481",
+      "to_node": "buffer_8d6c3873",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_9bb7553d",
+      "from_node": "router_66b6b539",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_6f53b899",
+      "to_node": "buffer_c82750b1",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_e2c54f39",
+      "from_node": "task_59a50244",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_22712c6a",
+      "to_node": "buffer_9bd1d82a",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_ca740311",
+      "from_node": "router_0e6a616d",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_a297c4b1",
+      "to_node": "buffer_bca7fa89",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "router_ca740311",
+      "from_node": "router_0e6a616d",
       "from_kind": "Router",
       "from_port": "to_buffers",
-      "to_node": "buffer_ca766b17",
+      "to_node": "buffer_359f84e2",
       "to_kind": "Buffer",
       "to_port": "from_task"
     },
     {
-      "from_node": "buffer_ca766b17",
+      "from_node": "buffer_359f84e2",
       "from_kind": "Buffer",
       "from_port": "to_task",
-      "to_node": "task_4d534a25",
+      "to_node": "task_0ab114e8",
       "to_kind": "Task",
       "to_port": "bufs_in"
     },
     {
-      "from_node": "task_4d534a25",
+      "from_node": "task_0ab114e8",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "router_9bb7553d",
+      "to_node": "router_66b6b539",
       "to_kind": "Router",
       "to_port": "from_task"
     },
     {
-      "from_node": "task_d73b5384",
+      "from_node": "task_e1229d2b",
       "from_kind": "Task",
       "from_port": "bufs_out",
-      "to_node": "buffer_abcae6e8",
+      "to_node": "buffer_745a4a28",
       "to_kind": "Buffer",
       "to_port": "from_task"
     }

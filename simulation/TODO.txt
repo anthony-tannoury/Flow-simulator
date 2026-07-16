@@ -22,5 +22,9 @@ Parameters that cannot be changed in from the excel inputs :
 
 
 
+TODO :
+- why no LEAP pieces produced ?
+- kpi per model
+- stress test performance (45 000 piece per year)
 
-120,127,133, 194, 232
+
