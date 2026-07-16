@@ -376,7 +376,7 @@ class TaskNode(SimNode):
         self.create_property("loading_operators", "[]")
         self.create_property("startup_operators", "[]")
         self.create_property("task_shifts", "[]")      # [shift_name]
-        self.create_property("policies", "{}")
+        self.create_property("policies", json.dumps(default_policies(PIECE_POLICY_OPTIONS)))
         self.create_property("operator_scope", "PER_BATCH")   # PER_BATCH | PER_TASK
         self.create_property("resource_scope", "PER_BATCH")   # PER_UNIT | PER_BATCH
         self.create_property("min_carriers", 1)
@@ -439,7 +439,7 @@ class ResourceTaskNode(SimNode):
         self.create_property("loading_operators", "[]")
         self.create_property("startup_operators", "[]")
         self.create_property("task_shifts", "[]")
-        self.create_property("policies", "{}")
+        self.create_property("policies", json.dumps(default_policies(POLICY_OPTIONS)))
         self.create_property("resource_scope", "PER_BATCH")
         self.create_property("operator_scope", "PER_BATCH")
         self.create_property("resource_collector_type", "GREEDY")
@@ -781,8 +781,7 @@ WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 class HourMinuteWidget(QtWidgets.QWidget):
     """A time of day entered as hours + minutes; the stored/returned value is an
-    "hh:mm" string (e.g. "08:30"). Raw minutes are still accepted on load, so
-    older files keep working."""
+    "hh:mm" string (e.g. "08:30")."""
 
     def __init__(self, value="00:00", parent=None):
         super().__init__(parent)
@@ -796,15 +795,8 @@ class HourMinuteWidget(QtWidgets.QWidget):
         self.set_value(value)
 
     def set_value(self, value):
-        if isinstance(value, str) and ":" in value:
-            hh, _, mm = value.partition(":")
-            h, m = as_int(hh), as_int(mm)
-        else:  # legacy: raw minutes from midnight
-            minutes = as_float(value)
-            if minutes != minutes or minutes in (float("inf"), float("-inf")):
-                minutes = 0.0
-            h, m = int(minutes // 60), int(minutes % 60)
-        self.h.setText(str(h)); self.m.setText(str(m))
+        hh, _, mm = str(value).partition(":")
+        self.h.setText(str(as_int(hh))); self.m.setText(str(as_int(mm)))
 
     def get_value(self):
         return f"{as_int(self.h.text()):02d}:{as_int(self.m.text()):02d}"
@@ -1346,11 +1338,22 @@ POLICY_OPTIONS = {
     "operators_self_conscious": (["Conscious", "Unconscious"], "Conscious"),
 }
 
+# Piece tasks add two collection policies on top of the shared five.
+PIECE_POLICY_OPTIONS = {
+    **POLICY_OPTIONS,
+    "piece_exit_order": (["FirstInFirstOut", "FirstCreatedFirstOut"], "FirstInFirstOut"),
+    "batch_model_choice": (["MostPresent", "FastestTaskDuration", "SmallestGapToMinCarrierCapacity"], "MostPresent"),
+}
+
 # Protocol types that carry a numeric parameter: type -> (json key, field label, default).
 POLICY_TYPE_PARAMS = {
     "AbortOrWaitForCarriers": ("tolerance_fraction", "tolerance fraction", 0.5),
     "PartiallyConstrainedByShift": ("tolerance", "tolerance (time)", 0.0),
 }
+
+
+def default_policies(options) -> dict:
+    return {name: {"type": default} for name, (_, default) in options.items()}
 
 
 class ModelTreeWidget(QtWidgets.QTreeWidget):
@@ -1532,18 +1535,19 @@ class AlternativesWidget(QtWidgets.QWidget):
 
 
 class PoliciesWidget(QtWidgets.QWidget):
-    """The five task protocols with their defaults. Types listed in POLICY_TYPE_PARAMS
+    """The task protocols with their defaults (POLICY_OPTIONS for resource tasks,
+    PIECE_POLICY_OPTIONS for piece tasks). Types listed in POLICY_TYPE_PARAMS
     expose their numeric parameter (AbortOrWaitForCarriers' tolerance_fraction,
     PartiallyConstrainedByShift's tolerance in time units past the shift end).
     Value: {protocol_name: {"type", ...param}}."""
 
-    def __init__(self, value=None, parent=None):
+    def __init__(self, value=None, parent=None, policy_options=None):
         super().__init__(parent)
         value = value or {}
         form = QtWidgets.QFormLayout(self)
         self._combos = {}
         self._params = {}
-        for name, (options, default) in POLICY_OPTIONS.items():
+        for name, (options, default) in (policy_options or POLICY_OPTIONS).items():
             row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
             saved = value.get(name, {})
             combo = QtWidgets.QComboBox(); combo.addItems(options)
@@ -2128,7 +2132,7 @@ class ModelConfigsWidget(QtWidgets.QWidget):
         return out
 
 
-def _carrier_common_tab(node, operator_names, shift_names, collector_types, extra=None):
+def _carrier_common_tab(node, operator_names, shift_names, collector_types, extra=None, policy_options=None):
     """Build the shared task-config tabs, one concept per tab (durations, operators,
     carriers, scopes, protocols, shifts). `extra` injects caller-owned rows into a tab:
     {"durations": [(label, widget)], "carriers": [...], "scopes": [...]}; those widgets
@@ -2181,7 +2185,8 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
 
     # protocols (stored under the "policies" property/JSON key)
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
-    acc["policies"] = PoliciesWidget(get_property_json(node, "policies", {})); f.addWidget(acc["policies"]); f.addStretch(1)
+    acc["policies"] = PoliciesWidget(get_property_json(node, "policies", {}), policy_options=policy_options)
+    f.addWidget(acc["policies"]); f.addStretch(1)
     tabs.append(("Protocols", _scroll(t)))
 
     # shifts
@@ -2228,7 +2233,8 @@ class PieceTaskMenuDialog(QtWidgets.QDialog):
                                          get_property_json(node, "models_configs", []))
         f0.addWidget(self.models)
         tabs.addTab(_scroll(t0), "Models")
-        common, self.acc = _carrier_common_tab(node, _names(win.operator_registry), _names(win.shift_registry), COLLECTOR_TYPES)
+        common, self.acc = _carrier_common_tab(node, _names(win.operator_registry), _names(win.shift_registry), COLLECTOR_TYPES,
+                                               policy_options=PIECE_POLICY_OPTIONS)
         for label, wdg in common:
             tabs.addTab(wdg, label)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -2855,8 +2861,16 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             kind = node_kind(node)
             name = node.name()
             if kind in ("Task", "ResourceTask"):
-                # the simulation rejects this protocol combination at load time
+                # every protocol must be present with a type the simulation knows
                 pol = get_property_json(node, "policies", {})
+                expected = PIECE_POLICY_OPTIONS if kind == "Task" else POLICY_OPTIONS
+                for pname, (options, _default) in expected.items():
+                    ptype = pol.get(pname, {}).get("type")
+                    if ptype is None:
+                        problems.append(f"'{name}': missing protocol '{pname}'.")
+                    elif ptype not in options:
+                        problems.append(f"'{name}': protocol '{pname}' has unknown type '{ptype}'.")
+                # the simulation rejects this protocol combination at load time
                 if (pol.get("task_shift_constraint", {}).get("type") == "ConstrainedByShift"
                         and pol.get("pending_carrier_pre_task_shift_end", {}).get("type") == "WaitForCarriers"):
                     problems.append(f"'{name}': ConstrainedByShift cannot be combined with "
@@ -2875,6 +2889,28 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                             problems.append(f"'{name}': operators in one alternative of '{field}' "
                                             f"must share the same productivity.")
                             break
+            if kind == "Router":
+                # the simulation samples branch probabilities at run time; catch what is
+                # statically checkable (all-constant branches) at design time
+                if not connected_nodes_from_port(node, "to_buffers", "output"):
+                    problems.append(f"Router '{name}' has no outlets.")
+                branches = list(get_property_json(node, "buffer_probs", {}).values())
+                freeloaders = [p for p in branches if p is None]
+                if len(freeloaders) > 1:
+                    problems.append(f"Router '{name}': at most one freeloader branch is allowed.")
+                consts = [p.get("value", 0.0) for p in branches
+                          if isinstance(p, dict) and p.get("kind") == "constant"]
+                if any(not 0 <= v <= 1 for v in consts):
+                    problems.append(f"Router '{name}': branch probabilities must be in [0, 1].")
+                if branches and all(p is None or (isinstance(p, dict) and p.get("kind") == "constant")
+                                    for p in branches):
+                    s = sum(consts)
+                    if not freeloaders and abs(s - 1.0) > 1e-6:
+                        problems.append(f"Router '{name}': branch probabilities sum to {s:g} "
+                                        f"(must sum to 1, or mark one branch as the freeloader).")
+                    elif freeloaders and s > 1 + 1e-6:
+                        problems.append(f"Router '{name}': branch probabilities sum to {s:g} "
+                                        f"(must be <= 1 so the freeloader can take the rest).")
             if kind == "Task":
                 if not connected_refs_from_port(node, "bufs_in", "input"):
                     problems.append(f"Piece Task '{name}' has no input buffers.")

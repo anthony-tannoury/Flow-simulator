@@ -242,8 +242,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -251,8 +251,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -260,8 +260,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -269,8 +269,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -278,8 +278,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -311,8 +311,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -320,8 +320,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -329,8 +329,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -338,8 +338,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -347,8 +347,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 1320.0
+              "start": "06:00",
+              "end": "22:00"
             }
           ]
         },
@@ -356,8 +356,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 480.0,
-              "end": 960.0
+              "start": "08:00",
+              "end": "16:00"
             }
           ]
         },
@@ -409,8 +409,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 840.0
+              "start": "06:00",
+              "end": "14:00"
             }
           ]
         },
@@ -418,8 +418,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 840.0
+              "start": "06:00",
+              "end": "14:00"
             }
           ]
         },
@@ -427,8 +427,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 840.0
+              "start": "06:00",
+              "end": "14:00"
             }
           ]
         },
@@ -436,8 +436,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 840.0
+              "start": "06:00",
+              "end": "14:00"
             }
           ]
         },
@@ -445,8 +445,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 360.0,
-              "end": 840.0
+              "start": "06:00",
+              "end": "14:00"
             }
           ]
         },
@@ -484,8 +484,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 840.0,
-              "end": 1320.0
+              "start": "14:00",
+              "end": "22:00"
             }
           ]
         },
@@ -493,8 +493,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 840.0,
-              "end": 1320.0
+              "start": "14:00",
+              "end": "22:00"
             }
           ]
         },
@@ -502,8 +502,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 840.0,
-              "end": 1320.0
+              "start": "14:00",
+              "end": "22:00"
             }
           ]
         },
@@ -511,8 +511,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 840.0,
-              "end": 1320.0
+              "start": "14:00",
+              "end": "22:00"
             }
           ]
         },
@@ -520,8 +520,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 840.0,
-              "end": 1320.0
+              "start": "14:00",
+              "end": "22:00"
             }
           ]
         },
@@ -559,8 +559,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 1320.0,
-              "end": 1440.0
+              "start": "22:00",
+              "end": "24:00"
             }
           ]
         },
@@ -568,12 +568,12 @@
           "working": true,
           "intervals": [
             {
-              "start": 0.0,
-              "end": 360.0
+              "start": "00:00",
+              "end": "06:00"
             },
             {
-              "start": 1320.0,
-              "end": 1440.0
+              "start": "22:00",
+              "end": "24:00"
             }
           ]
         },
@@ -581,12 +581,12 @@
           "working": true,
           "intervals": [
             {
-              "start": 0.0,
-              "end": 360.0
+              "start": "00:00",
+              "end": "06:00"
             },
             {
-              "start": 1320.0,
-              "end": 1440.0
+              "start": "22:00",
+              "end": "24:00"
             }
           ]
         },
@@ -594,12 +594,12 @@
           "working": true,
           "intervals": [
             {
-              "start": 0.0,
-              "end": 360.0
+              "start": "00:00",
+              "end": "06:00"
             },
             {
-              "start": 1320.0,
-              "end": 1440.0
+              "start": "22:00",
+              "end": "24:00"
             }
           ]
         },
@@ -607,12 +607,12 @@
           "working": true,
           "intervals": [
             {
-              "start": 0.0,
-              "end": 360.0
+              "start": "00:00",
+              "end": "06:00"
             },
             {
-              "start": 1320.0,
-              "end": 1440.0
+              "start": "22:00",
+              "end": "24:00"
             }
           ]
         },
@@ -670,8 +670,8 @@
           "working": true,
           "intervals": [
             {
-              "start": 480.0,
-              "end": 960.0
+              "start": "08:00",
+              "end": "16:00"
             }
           ]
         },
@@ -861,6 +861,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -1030,6 +1036,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_TASK",
@@ -1209,6 +1221,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -1350,6 +1368,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -1525,6 +1549,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -1666,6 +1696,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -1810,6 +1846,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -1976,6 +2018,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -2165,6 +2213,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -2393,6 +2447,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -2795,6 +2855,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -3056,6 +3122,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -3217,6 +3289,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -3378,6 +3456,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -3489,6 +3573,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -3714,6 +3804,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -3908,6 +4004,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -3973,10 +4075,7 @@
       "buffer_probs": [
         {
           "buffer": "buffer_a297c4b1",
-          "probability": {
-            "kind": "constant",
-            "value": 0.0
-          }
+          "probability": null
         },
         {
           "buffer": "buffer_ca766b17",
@@ -4111,6 +4210,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -4237,6 +4342,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
