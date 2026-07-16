@@ -1,5 +1,8 @@
 import json
+import os
 import salabim as sim
+
+from simulation import kpis
 
 from datetime import date, time, datetime
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
@@ -184,11 +187,25 @@ PIECE_DEFAULT_POLICIES = {
 
 class Parser:
     def __init__(self, filename: str) -> None:
+        self.filename = filename
         with open(filename, 'r') as file:
             self.data = json.load(file)
         self.sim_start = to_datetime(self.data['start_date'])
         self.discriminate()
         self.by_id = {n['id']: n for n in self.data['nodes']}
+
+    def report(self, directory: str | None = None) -> str:
+        if directory is None:
+            stem = os.path.splitext(os.path.basename(self.filename))[0]
+            directory = os.path.join('runs', f"{datetime.now():%Y-%m-%d_%H%M%S}_{stem}")
+        buffers = [o for o in self.outlets.values() if isinstance(o, Buffer)]
+        return kpis.write_report(
+            directory,
+            tasks=list(self.tasks.values()),
+            buffers=buffers,
+            piece_generator=self.piece_generator,
+            run_info={'fichier': self.filename, 'debut': self.data['start_date']}
+        )
 
     def load_all(self) -> None:
         self.load_models()
@@ -345,6 +362,7 @@ class Parser:
                 continue
 
             self.outlets[buffer['id']] = Buffer(
+                name=buffer['name'],
                 valid_models=[self.models[m] for m in buffer['valid_models']],
                 buffer_type=STR_TO_BUFFER_TYPE[buffer['buffer_type']],
             )
@@ -382,6 +400,7 @@ class Parser:
         for id_ in self.scrap_buffers_ids:
             buffer = self.by_id[id_]
             self.outlets[buffer['id']] = Buffer(
+                name=buffer['name'],
                 valid_models=[self.models[m] for m in buffer['valid_models']],
                 buffer_type=BufferType.SCRAP,
                 piece_generator=self.piece_generator,

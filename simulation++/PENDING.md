@@ -55,6 +55,57 @@ by the entries below.
   `t`, `.mean()`; `Distribution.mean_now()` = `mean(env.now())`.
   (salabim++ distributions already expose `mean()`.)
 
+## 4. KPI instrumentation (`kpis.py` + hooks across the simulation)
+
+New module `simulation/kpis.py`: post-run collectors + CSV writer
+(`write_report(directory, tasks, buffers, piece_generator, run_info)` →
+run/postes/postes_modeles/buffers/flux/flux_modeles/temps_traversee/
+series_temporelles CSVs, utf-8-sig). Mirror it once salabim++'s Monitor gains
+whatever is missing of: `value_duration`, `xt`, `percentile`,
+`number_of_entries` (level + non-level) — most already exist.
+
+Hooks to mirror (behavior-neutral, verified identical results under the same
+seed in Python):
+
+* `task.py`
+  - `Task.setup`: `all_carriers` list (finished carriers stay readable) +
+    monitors `batch_sizes`, `cycle_times`, `startup_times`.
+  - `Task.process`: append every new carrier to `all_carriers`.
+  - `handle_startup`: tally elapsed startup time on success; `set_mode("")`
+    after the PER_TASK operator request.
+  - `Carrier.process`: `mode="wait_dispatch"` on the allow_dispatch wait.
+  - `handle_batch_operators(..., work_mode)`: hold tagged `"loading"` /
+    `"processing"` (parameter added; both call sites updated);
+    `handle_task_operators` hold tagged `"processing"`.
+* `piece_task.py`
+  - `pick_piece`: default `mode="wait_pieces"` on the from_store.
+  - every `vacant_slots` request (collect_until, ensure_one, top_up,
+    block_remainder, altruistic paths): `mode="wait_slot"`.
+  - altruistic trigger waits + discriminating present-models wait:
+    `mode="wait_pieces"`.
+  - collectors reset `set_mode("")` before `done.set(True)`; carriers and
+    collectors reset mode in `abort` and `successfully_end_process`
+    (a cancelled component's mode would otherwise accrue forever).
+  - `PieceCarrier.wait_for_collector`: `mode="collecting"`;
+    `request_resources`: `mode="wait_materials"`.
+  - `PieceCarrier.successfully_end_process`: tally batch size + cycle time
+    (now − carrier creation), count `task.deposited[model]` and — for pieces
+    that landed in a SCRAP buffer via the immediate router —
+    `task.scrapped[model]`.
+  - `PieceTask.setup`: `deposited` / `scrapped` Counters.
+* `resource_task.py`: same pattern (slot requests wait_slot, input gathering
+  wait_pieces, non-transformed request wait_materials, collecting tag, mode
+  resets, batch/cycle tallies with `requested_quantity`).
+* `operator.py`: `Alternative.request` tags all demander requests/waits
+  `mode="wait_operators"`.
+* `resource.py`: `RestockableResource.restock` order hold tagged
+  `mode="wait_materials"`.
+* `piece.py`: global WIP level monitor (`kpis.WIP`): +1 in `Piece.setup`,
+  −1 when entering an EXIT or SCRAP buffer.
+* `parser` equivalent: object names passed to constructors; `report()` after
+  the run (C++ side: same CSV format, same file names, same column names so
+  the downstream tooling is shared).
+
 ## Not needed in C++
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON

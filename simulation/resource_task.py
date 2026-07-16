@@ -64,7 +64,7 @@ class ResourceCollector(Component, Dispatchable, Donnable):
             additional_slots_to_request = additional_request
         else:
             additional_slots_to_request = self.task.config.max_carrier_capacity - self.task.config.min_carrier_capacity
-        self.request((self.task.vacant_slots, additional_slots_to_request), request_priority=self.task.request_priority)
+        self.request((self.task.vacant_slots, additional_slots_to_request), request_priority=self.task.request_priority, mode="wait_slot")
 
 
 class GreedyResourceCollector(ResourceCollector):
@@ -77,14 +77,14 @@ class GreedyResourceCollector(ResourceCollector):
         while sum(self.requested_quantities) < self.task.config.min_carrier_capacity:
             for i, (r, p, _) in enumerate(self.task.config.transformed_resources_salvageable):
                 requested_quantity_per_resource = min(p*self.task.config.min_carrier_capacity - self.requested_quantities[i], r.available_quantity())
-                self.request((self.task.vacant_slots, requested_quantity_per_resource), request_priority=self.task.request_priority)
+                self.request((self.task.vacant_slots, requested_quantity_per_resource), request_priority=self.task.request_priority, mode="wait_slot")
                 self.request((r, requested_quantity_per_resource), request_priority=self.task.request_priority)
                 self.requested_quantities[i] += requested_quantity_per_resource
 
             if sum(self.requested_quantities) >= self.task.config.min_carrier_capacity:
                 break
 
-            self.wait(*self.triggers, fail_at=deadline)
+            self.wait(*self.triggers, fail_at=deadline, mode="wait_pieces")
             if self.failed():
                 timed_out = True
                 break
@@ -95,6 +95,7 @@ class GreedyResourceCollector(ResourceCollector):
             self.requested_quantity = sum(self.requested_quantities)
             self.top_up()
 
+        self.set_mode("")
         self.done.set(True)
         self.passivate()
 
@@ -105,11 +106,11 @@ class AltruisticResourceCollector(ResourceCollector):
         self.wait(self.allow_dispatch)
         deadline = env.now() + self.task.config.timeout
 
-        self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity), request_priority=self.task.request_priority, fail_at=deadline)
+        self.request((self.task.vacant_slots, self.task.config.min_carrier_capacity), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
         timed_out = self.failed()
 
         if not timed_out:
-            self.request(*[(r, p*self.task.config.min_carrier_capacity) for r, p, _ in self.task.config.transformed_resources_salvageable], request_priority=self.task.request_priority, fail_at=deadline)
+            self.request(*[(r, p*self.task.config.min_carrier_capacity) for r, p, _ in self.task.config.transformed_resources_salvageable], request_priority=self.task.request_priority, fail_at=deadline, mode="wait_pieces")
             if self.failed():
                 timed_out = True
                 self.release((self.task.vacant_slots, self.task.config.min_carrier_capacity))
@@ -120,6 +121,7 @@ class AltruisticResourceCollector(ResourceCollector):
             self.requested_quantity = self.task.config.min_carrier_capacity
             self.top_up()
 
+        self.set_mode("")
         self.done.set(True)
         self.passivate()
 
@@ -164,9 +166,11 @@ class ResourceCarrier(Carrier):
             if s:
                 r.replenish(demander=self, quantity=self.resource_collector.requested_quantities[i])
 
+        self.resource_collector.set_mode("")
         self.resource_collector.done.set(True)
         self.resource_collector.cancel()
 
+        self.set_mode("")
         self.loaded.set(True)
         self.done.set(True)
 
@@ -187,9 +191,9 @@ class ResourceCarrier(Carrier):
         if env.now() >= fail_at:
             self.freeze_abort_if(True)
             return
-    
+
         self.resource_collector.allow_dispatch.set(True)
-        self.wait(self.resource_collector.done, fail_at=fail_at, cap_now=True)
+        self.wait(self.resource_collector.done, fail_at=fail_at, cap_now=True, mode="collecting")
 
     @override
     def get_ideal_loading_duration(self) -> float:
@@ -205,7 +209,7 @@ class ResourceCarrier(Carrier):
         assert isinstance(self.task.config, ResourceTaskConfig)
         mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else self.resource_collector.requested_quantity
         resources = [(r, q*mult) for r, q in self.task.config.non_transformed_resources]
-        self.request(*resources, fail_at=fail_at, cap_now=True)
+        self.request(*resources, fail_at=fail_at, cap_now=True, mode="wait_materials")
         self.freeze_abort_if(self.failed())
 
     @override
@@ -214,7 +218,12 @@ class ResourceCarrier(Carrier):
         for resource_out, distr in self.task.config.resources_out_distr:
             resource_out.replenish(demander=self, quantity=distr.sample()*self.resource_collector.requested_quantity)
 
+        self.task.batch_sizes.tally(self.resource_collector.requested_quantity)
+        self.task.cycle_times.tally(env.now() - self.creation_time())
+
+        self.resource_collector.set_mode("")
         self.resource_collector.cancel()
+        self.set_mode("")
         self.done.set(True)
         self.task.pending_carriers.remove(self)
         self.task.active_carriers.remove(self)
