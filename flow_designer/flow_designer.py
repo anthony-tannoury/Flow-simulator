@@ -66,18 +66,6 @@ PORT_COLORS = {
     "breakdown": (220, 90, 110),
 }
 
-# Buffer statistics that can be monitored (toggled in the buffer's Monitor tab).
-MONITOR_STATS = [
-    ("avg_length", "avg length", True),
-    ("max_length", "max length", True),
-    ("length_std", "length std-dev", False),
-    ("current_length", "final length", False),
-    ("avg_stay", "avg stay time", True),
-    ("max_stay", "max stay time", False),
-    ("avg_time_before_arrival", "avg time before arrival", True),
-    ("throughput", "throughput", True),
-]
-
 
 # ============================================================
 # Helpers
@@ -284,7 +272,6 @@ class BufferNode(SimNode):
         self.add_output("to_task", multi_output=True, color=PORT_COLORS["buffer"])
         self.create_property("valid_models", "[]")
         self.create_property("buffer_type", "PASSAGE")  # PASSAGE | SCRAP | EXIT
-        self.create_property("monitor", "{}")  # {stat: bool}; monitored iff any stat is true
 
     def to_clean_json(self) -> dict:
         return {
@@ -293,8 +280,6 @@ class BufferNode(SimNode):
             "name": self.name(),
             "valid_models": get_property_json(self, "valid_models", []),
             "buffer_type": self.get_property("buffer_type") if self.has_property("buffer_type") else "PASSAGE",
-            "monitor": {key: bool(get_property_json(self, "monitor", {}).get(key, False))
-                        for key, _, _ in MONITOR_STATS},
             "inputs_from": connected_refs_from_port(self, "from_task", "input"),
             "outputs_to": connected_refs_from_port(self, "to_task", "output"),
             "position": [self.x_pos(), self.y_pos()],
@@ -1866,27 +1851,12 @@ class BufferMenuDialog(QtWidgets.QDialog):
         bl.addLayout(form)
         tabs.addTab(buf_tab, "Buffer")
 
-        # --- Monitor tab: which statistics to track on this buffer ---
-        mon_tab = QtWidgets.QWidget()
-        ml = QtWidgets.QVBoxLayout(mon_tab)
-        ml.addWidget(QtWidgets.QLabel("statistics to monitor (unchecked everywhere = buffer not monitored):"))
-        current = get_property_json(node, "monitor", {})
-        self._monitor = {}
-        for key, label, _default in MONITOR_STATS:
-            cb = QtWidgets.QCheckBox(label)
-            cb.setChecked(bool(current.get(key, False)))
-            ml.addWidget(cb)
-            self._monitor[key] = cb
-        ml.addStretch(1)
-        tabs.addTab(mon_tab, "Monitor")
-
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
 
     def apply(self):
         set_property_json(self.node, "valid_models", self.models.checked_models())
         self.node.set_property("buffer_type", self.buffer_type.currentData())
-        set_property_json(self.node, "monitor", {k: cb.isChecked() for k, cb in self._monitor.items()})
 
 
 class RouterMenuDialog(QtWidgets.QDialog):
@@ -3419,7 +3389,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     # from the same-named keys. Structured (JSON) properties vs plain scalars:
     _IMPORT_JSON_PROPS = {
         "Shutdowns": ["intervals", "generator"],
-        "Buffer": ["valid_models", "monitor"],
+        "Buffer": ["valid_models"],
         "PieceGenerator": ["models_goals", "shifts"],
         "Task": ["models_configs", "startup_duration", "loading_duration", "operators",
                  "loading_operators", "startup_operators", "task_shifts", "policies"],

@@ -903,16 +903,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "piecegenerator_52b1c01e"
       ],
@@ -1078,16 +1068,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "task_d4b4cdd0",
         "task_60ad5660",
@@ -1410,16 +1390,6 @@
         "model_256d4101"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "piecegenerator_52b1c01e"
       ],
@@ -1738,16 +1708,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_1d341f42"
       ],
@@ -1893,16 +1853,6 @@
         "model_256d4101"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "task_32638b4f",
         "task_f22da540",
@@ -2065,16 +2015,6 @@
         "model_256d4101"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "task_715c624f"
       ],
@@ -2256,16 +2196,6 @@
         "model_256d4101"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "task_b87201ac"
       ],
@@ -2289,16 +2219,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "task_b87201ac"
       ],
@@ -2489,16 +2409,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_ca740311"
       ],
@@ -2522,16 +2432,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "task_94ac9b64"
       ],
@@ -2582,16 +2482,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_973087c1"
       ],
@@ -2615,16 +2505,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_973087c1"
       ],
@@ -2674,16 +2554,6 @@
         "model_742fd366"
       ],
       "buffer_type": "SCRAP",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_460e0acc"
       ],
@@ -2897,16 +2767,6 @@
         "model_742fd366"
       ],
       "buffer_type": "SCRAP",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_3c64a483"
       ],
@@ -2928,16 +2788,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_3c64a483"
       ],
@@ -2966,16 +2816,6 @@
         "model_256d4101"
       ],
       "buffer_type": "EXIT",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "task_d73b5384"
       ],
@@ -3615,16 +3455,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_acc8c1aa"
       ],
@@ -3673,16 +3503,6 @@
         "model_742fd366"
       ],
       "buffer_type": "SCRAP",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_acc8c1aa"
       ],
@@ -3846,16 +3666,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_9bb7553d"
       ],
@@ -4046,16 +3856,6 @@
         "model_742fd366"
       ],
       "buffer_type": "SCRAP",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_9bb7553d"
       ],
@@ -4102,16 +3902,6 @@
         "model_742fd366"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router_ca740311"
       ],
