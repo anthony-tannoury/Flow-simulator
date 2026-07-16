@@ -59,7 +59,7 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
         self.freeze_abort_if(operator_shift_constraint_decision is Action.ABORT or task_shift_constraint_decision is Action.ABORT)
         return duration
 
-    def handle_batch_operators(self, operators: Alternative, earliest_deadline: float, ideal_duration: float, fail_before: float, handle_restock: bool) -> None:
+    def handle_batch_operators(self, operators: Alternative, earliest_deadline: float, ideal_duration: float, fail_before: float, handle_restock: bool, work_mode: str) -> None:
         recuperated = operators.request(demander=self, fail_at=earliest_deadline - fail_before, cap_now=True)
         self.freeze_abort_if(self.failed())
         assert recuperated is not None
@@ -69,15 +69,15 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
         if handle_restock:
             self.handle_restock()
             self.request_resources(fail_at=earliest_deadline - duration - (fail_before - ideal_duration))
-        
-        self.hold(duration)
+
+        self.hold(duration, mode=work_mode)
         self.release(*recuperated)
 
     def handle_task_operators(self, earliest_deadline: float, ideal_duration: float) -> None:
         duration = self.handle_operators(self.task.task_operators, ideal_duration)
         self.handle_restock()
         self.request_resources(fail_at=earliest_deadline - duration)
-        self.hold(duration)
+        self.hold(duration, mode="processing")
 
     @abstractmethod
     def wait_for_collector(self, fail_at: float) -> None:
@@ -120,16 +120,17 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
                 self.task.skip_downtime_check = False
 
         self.freeze_abort_if(env.now() > earliest_deadline - (ideal_duration + ideal_loading_duration))
-        self.wait(self.allow_dispatch, fail_at=earliest_deadline - (ideal_duration + ideal_loading_duration), cap_now=True)
+        self.wait(self.allow_dispatch, fail_at=earliest_deadline - (ideal_duration + ideal_loading_duration), cap_now=True, mode="wait_dispatch")
         self.freeze_abort_if(self.failed())
 
         delegate_restock_to_loading = not self.task.config.operators
         self.handle_batch_operators(self.task.config.loading_operators, earliest_deadline,
                                     ideal_loading_duration, ideal_duration + ideal_loading_duration,
-                                    delegate_restock_to_loading)
+                                    delegate_restock_to_loading, work_mode="loading")
         if self.task.config.operator_scope is Scope.PER_BATCH:
             self.handle_batch_operators(self.task.config.operators, earliest_deadline,
-                                        ideal_duration, ideal_duration, not delegate_restock_to_loading)
+                                        ideal_duration, ideal_duration, not delegate_restock_to_loading,
+                                        work_mode="processing")
         else:
             self.handle_task_operators(earliest_deadline, ideal_duration)
 
@@ -273,6 +274,12 @@ class Task(Component, HasShifts, ABC):
         self.pending_carriers = CarrierTracker()
         self.active_carriers = CarrierTracker()
 
+        # KPI instrumentation: finished carriers stay readable, tallies fill on deposit
+        self.all_carriers: list[Carrier] = []
+        self.batch_sizes = sim.Monitor("batch_sizes")
+        self.cycle_times = sim.Monitor("cycle_times")
+        self.startup_times = sim.Monitor("startup_times")
+
         self.skip_frozen_check = False
         self.skip_downtime_check = False
 
@@ -295,16 +302,19 @@ class Task(Component, HasShifts, ABC):
         return earliest_shutdown.start if earliest_shutdown is not None else float('inf')
 
     def handle_startup(self) -> None:
+        startup_begin = env.now()
         task_starter = TaskStarter(task=self)
         self.wait(task_starter.done)
         if self.is_frozen():
             return
-        
+
         self.started_up = True
-        
+        self.startup_times.tally(env.now() - startup_begin)
+
         if self.config.operator_scope is Scope.PER_TASK:
             deadline = min(self.non_flexible_shutdowns.get_deadline(), self.flexible_shutdowns.get_deadline())
             self.task_operators = self.config.operators.request(demander=self, fail_at=deadline)
+            self.set_mode("")
             if self.failed():
                 self.is_frozen.set(True)
 
@@ -325,6 +335,7 @@ class Task(Component, HasShifts, ABC):
 
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
+            self.all_carriers.append(new_carrier)
             self.wait(new_carrier.loaded)
 
             if len(self.pending_carriers) >= self.config.min_carriers:

@@ -29,17 +29,22 @@ class Piece(sim.Component):
     ID = 0
 
     def setup(self, model: Model) -> None:
+        from .kpis import WIP
         self.model = model
         self.id = str(Piece.ID).zfill(6)
         Piece.ID += 1
+        WIP.tally(WIP() + 1)
 
     def enter(self, q, priority = None):
-        from .outlet import Buffer
+        from .outlet import Buffer, BufferType
+        from .kpis import WIP
         assert isinstance(q, Buffer)
         q.trigger.trigger()
         if q.piece_generator is not None:
             idx = q.piece_generator.models.index(self.model)
             q.piece_generator.generated[idx] -= 1
+        if q.buffer_type in (BufferType.EXIT, BufferType.SCRAP):
+            WIP.tally(WIP() - 1)
         return super().enter(q, priority)
 
 

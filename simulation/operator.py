@@ -70,18 +70,18 @@ class Alternative:
         cap_now = kwargs.get("cap_now", False)
 
         if len(self.alternatives) == 1:
-            demander.request(*self.alternatives[0], fail_at=fail_at, cap_now=cap_now)
+            demander.request(*self.alternatives[0], fail_at=fail_at, cap_now=cap_now, mode="wait_operators")
             if not demander.failed():
                 return self.alternatives[0]
             return None
 
         while True:
             for alt in self.alternatives:
-                demander.request(*alt, fail_delay=0)
+                demander.request(*alt, fail_delay=0, mode="wait_operators")
                 if not demander.failed():
                     return alt
 
-            demander.wait(*self.triggers, fail_at=fail_at, cap_now=cap_now)
+            demander.wait(*self.triggers, fail_at=fail_at, cap_now=cap_now, mode="wait_operators")
             if demander.failed():
                 return None
             

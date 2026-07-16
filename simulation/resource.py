@@ -75,5 +75,5 @@ class RestockableResource(Resource):
     def restock(self, demander: Component):
         if not self.active_order and self.available_quantity() < self.threshold:
             self.active_order = True
-            demander.hold(self.order_duration.sample_now())
+            demander.hold(self.order_duration.sample_now(), mode="wait_materials")
             Delivery(stock=self, delivery_duration=self.delivery_duration)

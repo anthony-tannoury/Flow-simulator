@@ -12,7 +12,7 @@ from .sampler import Distribution
 from .task import TaskConfig, Task, Carrier, Scope, Protocols
 from .piece import Model, Piece, PickyPieceTaker
 from .helpers import check_outlet_validity, place
-from .outlet import Outlet, Buffer
+from .outlet import Outlet, Buffer, BufferType
 from .protocols import *
 from .component import Component
 from .ables import Dispatchable, Donnable
@@ -51,11 +51,12 @@ class PieceCollector(Component, Dispatchable, Donnable):
                     target = min(pieces, key=lambda pb: pb[0].creation_time())[0]
             kwargs['filter'] = lambda piece: piece is target
 
+        kwargs.setdefault('mode', 'wait_pieces')
         return self.from_store(**kwargs)
 
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
         while len(self.collected_pieces) < target:
-            self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, fail_at=deadline)
+            self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
             if self.failed():
                 return True
             piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
@@ -68,7 +69,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
 
     def ensure_one(self) -> None:
         if not self.collected_pieces:
-            self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority)
+            self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
             piece = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
@@ -79,14 +80,14 @@ class PieceCollector(Component, Dispatchable, Donnable):
             if self.failed():
                 break
 
-            self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority)
+            self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
 
     def block_remainder(self, max_carrier_capacity: int) -> None:
         if not self.task.config.contiguous_carriers:
             remainder = max_carrier_capacity - len(self.collected_pieces)
-            self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority)
+            self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority, mode="wait_slot")
 
     def get_focus_model(self, present_models: list[Model]) -> Model:
         assert isinstance(self.task.config.protocols, PieceProtocols)
@@ -114,6 +115,7 @@ class NonDiscriminatingGreedyPieceCollector(PieceCollector):
             self.top_up(model_config.max_carrier_capacity, self.task.can_take)
 
         self.block_remainder(model_config.max_carrier_capacity)
+        self.set_mode("")
         self.done.set(True)
         self.passivate()
 
@@ -142,6 +144,7 @@ class DiscriminatingGreedyPieceCollector(PieceCollector):
             self.top_up(model_config.max_carrier_capacity, focus_filter)
 
         self.block_remainder(model_config.max_carrier_capacity)
+        self.set_mode("")
         self.done.set(True)
         self.passivate()
 
@@ -151,7 +154,7 @@ class AltruisticMixin:
         assert isinstance(self, PieceCollector)
         assert isinstance(self.task.config.protocols, PieceProtocols)
 
-        self.request((self.task.vacant_slots, min_carrier_capacity), request_priority=self.task.request_priority, fail_at=deadline)
+        self.request((self.task.vacant_slots, min_carrier_capacity), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
         if self.failed():
             return True
 
@@ -170,7 +173,7 @@ class AltruisticMixin:
             if len(valid_pieces) >= min_carrier_capacity:
                 additional = len(valid_pieces) - min_carrier_capacity
                 if additional > 0:
-                    self.request((self.task.vacant_slots, additional), fail_delay=0, request_priority=self.task.request_priority)
+                    self.request((self.task.vacant_slots, additional), fail_delay=0, request_priority=self.task.request_priority, mode="wait_slot")
                     if self.failed():
                         additional = 0
                         valid_pieces = valid_pieces[:min_carrier_capacity]
@@ -190,9 +193,9 @@ class AltruisticMixin:
                     self.collected_pieces.append(piece)
 
                 if not self.task.config.contiguous_carriers:
-                    self.request((self.task.vacant_slots, max_carrier_capacity - len(valid_pieces)), request_priority=self.task.request_priority)
+                    self.request((self.task.vacant_slots, max_carrier_capacity - len(valid_pieces)), request_priority=self.task.request_priority, mode="wait_slot")
             else:
-                self.wait(*[inlet.trigger for inlet in self.task.inlets], fail_at=deadline)
+                self.wait(*[inlet.trigger for inlet in self.task.inlets], fail_at=deadline, mode="wait_pieces")
                 if self.failed():
                     self.release((self.task.vacant_slots, min_carrier_capacity))
                     return True
@@ -211,6 +214,7 @@ class NonDiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin)
         if self.collect_batch(deadline, model_config.min_carrier_capacity, model_config.max_carrier_capacity, self.task.can_take):
             self.ensure_one()
 
+        self.set_mode("")
         self.done.set(True)
         self.passivate()
 
@@ -223,7 +227,7 @@ class DiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
         timed_out = False
 
         while not (present_models := [piece.model for inlet in self.task.inlets for piece in inlet if self.task.can_take(piece)]):
-            self.wait(*[inlet.trigger for inlet in self.task.inlets], fail_at=deadline)
+            self.wait(*[inlet.trigger for inlet in self.task.inlets], fail_at=deadline, mode="wait_pieces")
             if self.failed():
                 timed_out = True
                 break
@@ -237,6 +241,7 @@ class DiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
         if timed_out:
             self.ensure_one()
 
+        self.set_mode("")
         self.done.set(True)
         self.passivate()
 
@@ -296,9 +301,11 @@ class PieceCarrier(Carrier):
         assert isinstance(self.task, PieceTask)
         outlets = args[0] if args else self.task.inlets
         place(self.piece_collector.collected_pieces, outlets)
+        self.piece_collector.set_mode("")
         self.piece_collector.done.set(True)
         self.piece_collector.cancel()
 
+        self.set_mode("")
         self.loaded.set(True)
         self.done.set(True)
 
@@ -316,7 +323,7 @@ class PieceCarrier(Carrier):
     @override
     def wait_for_collector(self, fail_at: float) -> None:
         self.piece_collector.allow_dispatch.set(True)
-        self.wait(self.piece_collector.done, fail_at=fail_at)
+        self.wait(self.piece_collector.done, fail_at=fail_at, mode="collecting")
 
     @override
     def get_ideal_loading_duration(self):
@@ -335,14 +342,25 @@ class PieceCarrier(Carrier):
         model = self.piece_collector.collected_pieces[0].model
         mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else len(self.piece_collector.collected_pieces)
         resources = [(r, q*mult) for r, q in self.task.config.get_model_config(model).resources]
-        self.request(*resources, fail_at=fail_at, cap_now=True)
+        self.request(*resources, fail_at=fail_at, cap_now=True, mode="wait_materials")
         self.freeze_abort_if(self.failed())
 
     @override
     def successfully_end_process(self):
         assert isinstance(self.task, PieceTask)
+        self.piece_collector.set_mode("")
         self.piece_collector.cancel()
-        place(self.piece_collector.collected_pieces, self.task.outlets)
+
+        pieces = self.piece_collector.collected_pieces
+        self.task.batch_sizes.tally(len(pieces))
+        self.task.cycle_times.tally(env.now() - self.creation_time())
+        place(pieces, self.task.outlets)
+        for piece in pieces:
+            self.task.deposited[piece.model] += 1
+            if any(isinstance(q, Buffer) and q.buffer_type is BufferType.SCRAP for q in piece.queues()):
+                self.task.scrapped[piece.model] += 1
+
+        self.set_mode("")
         self.done.set(True)
 
         self.task.pending_carriers.remove(self)
@@ -368,6 +386,8 @@ class PieceTask(Task, PickyPieceTaker):
         super().setup(config=config, carrier_type=PieceCarrier)
         self.inlets = inlets
         self.outlets = outlets
+        self.deposited: Counter[Model] = Counter()
+        self.scrapped: Counter[Model] = Counter()
 
     @override
     def abort(self, *args):
