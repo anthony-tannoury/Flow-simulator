@@ -1,4 +1,5 @@
 from __future__ import annotations
+import salabim as sim
 
 from dataclasses import dataclass
 from typing import override
@@ -37,8 +38,23 @@ class PieceCollector(Component, Dispatchable, Donnable):
 
     def pick_piece(self, **kwargs) -> Piece:
         assert isinstance(self.task.config.protocols, PieceProtocols)
-        if self.task.config.protocols.piece_exit_order.decide() is ExitOrder.FIRST_CREATED_FIRST_OUT:
-            kwargs['key'] = lambda piece: piece.creation_time()
+
+        if isinstance(kwargs['store'], sim.Store):
+            kwargs['store'] = [kwargs['store']]
+        if 'filter' not in kwargs:
+            kwargs['filter'] = lambda _: True
+
+        while not (pieces := [piece for buffer in kwargs['store'] for piece in buffer if kwargs['filter'](piece)]):
+            self.wait(*[buffer.trigger for buffer in kwargs['store']])
+        
+        match self.task.config.protocols.piece_exit_order.decide():
+            case ExitOrder.FIRST_IN_FIRST_OUT:
+                min_enter_time = min(piece.enter_time(piece.queues()[0]) for piece in pieces)
+                kwargs['filter'] = lambda piece: piece.enter_time(piece.queues()[0]) == min_enter_time and piece in pieces
+            case ExitOrder.FIRST_CREATED_FIRST_OUT:
+                min_creation_time = min(piece.creation_time() for piece in pieces)
+                kwargs['filter'] = lambda piece: piece.creation_time() == min_creation_time and piece in pieces
+        
         return self.from_store(**kwargs)
 
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
@@ -124,13 +140,23 @@ class DiscriminatingGreedyPieceCollector(PieceCollector):
 
 
 class AltruisticMixin:
-    def collect_batch(self: PieceCollector, deadline: float, min_carrier_capacity: int, max_carrier_capacity: int, piece_filter) -> bool:
+    def collect_batch(self, deadline: float, min_carrier_capacity: int, max_carrier_capacity: int, piece_filter) -> bool:
+        assert isinstance(self, PieceCollector)
+        assert isinstance(self.task.config.protocols, PieceProtocols)
+
         self.request((self.task.vacant_slots, min_carrier_capacity), request_priority=self.task.request_priority, fail_at=deadline)
         if self.failed():
             return True
 
         while not self.collected_pieces:
-            valid_pieces = [(piece, buffer) for buffer in self.task.inlets for piece in buffer if piece_filter(piece)]
+            valid_pieces = [piece for buffer in self.task.inlets for piece in buffer if piece_filter(piece)]
+
+            match self.task.config.protocols.piece_exit_order.decide():
+                case ExitOrder.FIRST_IN_FIRST_OUT:
+                    valid_pieces.sort(key=lambda piece: piece.enter_time(piece.queues()[0]))
+                case ExitOrder.FIRST_CREATED_FIRST_OUT:
+                    valid_pieces.sort(key=lambda piece: piece.creation_time())
+            
             truncate = min(max_carrier_capacity, self.task.vacant_slots.available_quantity() + min_carrier_capacity)
             valid_pieces = valid_pieces[:truncate]
 
