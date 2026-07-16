@@ -26,5 +26,7 @@ TODO :
 - why no LEAP pieces produced ?
 - kpi per model
 - stress test performance (45 000 piece per year)
-
-
+- convert time from minutes to hours
+- convert ratios to percentages
+- ask about what some files do
+- ask how claude got the scraps directly after each task
