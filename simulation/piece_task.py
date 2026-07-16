@@ -46,9 +46,9 @@ class PieceCollector(Component, Dispatchable, Donnable):
         if pieces:
             match self.task.config.protocols.piece_exit_order.decide():
                 case ExitOrder.FIRST_IN_FIRST_OUT:
-                    target = min(pieces, key=lambda pb: pb[0].enter_time(pb[1]))
+                    target = min(pieces, key=lambda pb: pb[0].enter_time(pb[1]))[0]
                 case ExitOrder.FIRST_CREATED_FIRST_OUT:
-                    target = min(pieces, key=lambda pb: pb[0].creation_time())
+                    target = min(pieces, key=lambda pb: pb[0].creation_time())[0]
             kwargs['filter'] = lambda piece: piece is target
 
         return self.from_store(**kwargs)
