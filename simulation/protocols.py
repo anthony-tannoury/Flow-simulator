@@ -21,6 +21,11 @@ class ExitOrder(Enum):
     FIRST_CREATED_FIRST_OUT = auto()
 
 
+class ModelChoice(Enum):
+    MOST_PRESENT = auto()
+    FASTEST_TASK_DURATION = auto()
+    SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY = auto()
+
 
 class PendingCarriers(Protocol):
     def decide(self, min_carriers: int, pending_carriers: int) -> Action: ...
@@ -106,3 +111,21 @@ class FirstInFirstOut:
 class FirstCreatedFirstOut:
     def decide(self) -> ExitOrder:
         return ExitOrder.FIRST_CREATED_FIRST_OUT
+    
+
+class ModelChoiceCriteria(Protocol):
+    def decide(self) -> ModelChoice: ...
+
+
+class MostPresent:
+    def decide(self) -> ModelChoice:
+        return ModelChoice.MOST_PRESENT
+    
+class FastestTaskDuration:
+    def decide(self) -> ModelChoice:
+        return ModelChoice.FASTEST_TASK_DURATION
+    
+class SmallestGapToMinCarrierCapacity:
+    def decide(self) -> ModelChoice:
+        return ModelChoice.SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY
+    

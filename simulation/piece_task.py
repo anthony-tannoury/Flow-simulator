@@ -39,22 +39,18 @@ class PieceCollector(Component, Dispatchable, Donnable):
     def pick_piece(self, **kwargs) -> Piece:
         assert isinstance(self.task.config.protocols, PieceProtocols)
 
-        if isinstance(kwargs['store'], sim.Store):
-            kwargs['store'] = [kwargs['store']]
-        if 'filter' not in kwargs:
-            kwargs['filter'] = lambda _: True
+        stores = kwargs['store'] if isinstance(kwargs['store'], list) else [kwargs['store']]
+        piece_filter = kwargs.get('filter', lambda _: True)
 
-        while not (pieces := [piece for buffer in kwargs['store'] for piece in buffer if kwargs['filter'](piece)]):
-            self.wait(*[buffer.trigger for buffer in kwargs['store']])
-        
-        match self.task.config.protocols.piece_exit_order.decide():
-            case ExitOrder.FIRST_IN_FIRST_OUT:
-                min_enter_time = min(piece.enter_time(piece.queues()[0]) for piece in pieces)
-                kwargs['filter'] = lambda piece: piece.enter_time(piece.queues()[0]) == min_enter_time and piece in pieces
-            case ExitOrder.FIRST_CREATED_FIRST_OUT:
-                min_creation_time = min(piece.creation_time() for piece in pieces)
-                kwargs['filter'] = lambda piece: piece.creation_time() == min_creation_time and piece in pieces
-        
+        pieces = [piece for buffer in stores for piece in buffer if piece_filter(piece)]
+        if pieces:
+            match self.task.config.protocols.piece_exit_order.decide():
+                case ExitOrder.FIRST_IN_FIRST_OUT:
+                    target = min(pieces, key=lambda piece: piece.enter_time(piece.queues()[0]))
+                case ExitOrder.FIRST_CREATED_FIRST_OUT:
+                    target = min(pieces, key=lambda piece: piece.creation_time())
+            kwargs['filter'] = lambda piece: piece is target
+
         return self.from_store(**kwargs)
 
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
@@ -92,6 +88,17 @@ class PieceCollector(Component, Dispatchable, Donnable):
             remainder = max_carrier_capacity - len(self.collected_pieces)
             self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority)
 
+    def get_focus_model(self, present_models: list[Model]) -> Model:
+        assert isinstance(self.task.config.protocols, PieceProtocols)
+        assert isinstance(self.task.config, PieceTaskConfig)
+        match self.task.config.protocols.batch_model_choice.decide():
+            case ModelChoice.MOST_PRESENT:
+                return Counter(present_models).most_common(1)[0][0]
+            case ModelChoice.FASTEST_TASK_DURATION:
+                return min(present_models, key=lambda model: self.task.config.get_model_config(model).duration.sample_now())
+            case ModelChoice.SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY:
+                counter = Counter(present_models)
+                return min(present_models, key=lambda model: self.task.config.get_model_config(model).min_carrier_capacity - counter[model])
 
 class NonDiscriminatingGreedyPieceCollector(PieceCollector):
     def process(self):
@@ -119,7 +126,7 @@ class DiscriminatingGreedyPieceCollector(PieceCollector):
 
         present_models = [piece.model for inlet in self.task.inlets for piece in inlet if self.task.can_take(piece)]
         if present_models:
-            focus_on = Counter(present_models).most_common(1)[0][0]
+            focus_on = self.get_focus_model(present_models)
         else:
             if self.collect_until(deadline, 1, self.task.can_take):
                 self.ensure_one()
@@ -149,13 +156,13 @@ class AltruisticMixin:
             return True
 
         while not self.collected_pieces:
-            valid_pieces = [piece for buffer in self.task.inlets for piece in buffer if piece_filter(piece)]
+            valid_pieces = [(piece, buffer) for buffer in self.task.inlets for piece in buffer if piece_filter(piece)]
 
             match self.task.config.protocols.piece_exit_order.decide():
                 case ExitOrder.FIRST_IN_FIRST_OUT:
-                    valid_pieces.sort(key=lambda piece: piece.enter_time(piece.queues()[0]))
+                    valid_pieces.sort(key=lambda pb: pb[0].enter_time(pb[1]))
                 case ExitOrder.FIRST_CREATED_FIRST_OUT:
-                    valid_pieces.sort(key=lambda piece: piece.creation_time())
+                    valid_pieces.sort(key=lambda pb: pb[0].creation_time())
             
             truncate = min(max_carrier_capacity, self.task.vacant_slots.available_quantity() + min_carrier_capacity)
             valid_pieces = valid_pieces[:truncate]
@@ -222,7 +229,7 @@ class DiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
                 break
 
         if not timed_out:
-            focus_on = Counter(present_models).most_common(1)[0][0]
+            focus_on = self.get_focus_model(present_models)
             model_config = self.task.config.get_model_config(focus_on)
             timed_out = self.collect_batch(deadline, model_config.min_carrier_capacity, model_config.max_carrier_capacity,
                                            lambda p: self.task.can_take(p) and p.model is focus_on)
@@ -245,6 +252,7 @@ class ModelConfig:
 @dataclass
 class PieceProtocols(Protocols):
     piece_exit_order: PieceExitOrder
+    batch_model_choice: ModelChoiceCriteria
 
 @dataclass
 class PieceTaskConfig(TaskConfig):
