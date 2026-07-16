@@ -8,7 +8,7 @@ from collections import Counter
 from simulation import env
 from .resource import Resource, RestockableResource
 from .sampler import Distribution
-from .task import TaskConfig, Task, Carrier, Scope
+from .task import TaskConfig, Task, Carrier, Scope, Protocols
 from .piece import Model, Piece, PickyPieceTaker
 from .helpers import check_outlet_validity, place
 from .outlet import Outlet, Buffer
@@ -35,12 +35,18 @@ class PieceCollector(Component, Dispatchable, Donnable):
         self.task = task
         self.collected_pieces: list[Piece] = []
 
+    def pick_piece(self, **kwargs) -> Piece:
+        assert isinstance(self.task.config.protocols, PieceProtocols)
+        if self.task.config.protocols.piece_exit_order.decide() is ExitOrder.FIRST_CREATED_FIRST_OUT:
+            kwargs['key'] = lambda piece: piece.creation_time()
+        return self.from_store(**kwargs)
+
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
         while len(self.collected_pieces) < target:
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, fail_at=deadline)
             if self.failed():
                 return True
-            piece = self.from_store(self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
+            piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
             if self.failed():
                 self.release((self.task.vacant_slots, 1))
                 return True
@@ -51,13 +57,13 @@ class PieceCollector(Component, Dispatchable, Donnable):
     def ensure_one(self) -> None:
         if not self.collected_pieces:
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority)
-            piece = self.from_store(self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
+            piece = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
 
     def top_up(self, limit: int, piece_filter) -> None:
         while self.task.vacant_slots.available_quantity() > 0 and len(self.collected_pieces) < limit:
-            piece = self.from_store(self.task.inlets, filter=piece_filter, fail_delay=0, request_priority=self.task.request_priority)
+            piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_delay=0, request_priority=self.task.request_priority)
             if self.failed():
                 break
 
@@ -209,6 +215,10 @@ class ModelConfig:
     min_carrier_capacity: int
     max_carrier_capacity: int
 
+
+@dataclass
+class PieceProtocols(Protocols):
+    piece_exit_order: PieceExitOrder
 
 @dataclass
 class PieceTaskConfig(TaskConfig):

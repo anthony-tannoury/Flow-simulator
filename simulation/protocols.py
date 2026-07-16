@@ -16,6 +16,12 @@ class ConsciousnessState(Enum):
     UNCONSCIOUS = auto()
 
 
+class ExitOrder(Enum):
+    FIRST_IN_FIRST_OUT = auto()
+    FIRST_CREATED_FIRST_OUT = auto()
+
+
+
 class PendingCarriers(Protocol):
     def decide(self, min_carriers: int, pending_carriers: int) -> Action: ...
 
@@ -86,3 +92,17 @@ class Conscious:
 class Unconscious:
     def decide(self) -> ConsciousnessState:
         return ConsciousnessState.UNCONSCIOUS
+    
+
+class PieceExitOrder(Protocol):
+    def decide(self) -> ExitOrder: ...
+
+
+class FirstInFirstOut:
+    def decide(self) -> ExitOrder:
+        return ExitOrder.FIRST_IN_FIRST_OUT
+    
+
+class FirstCreatedFirstOut:
+    def decide(self) -> ExitOrder:
+        return ExitOrder.FIRST_CREATED_FIRST_OUT
