@@ -461,6 +461,12 @@
         },
         "operators_self_conscious": {
           "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
         }
       },
       "operator_scope": "PER_BATCH",
@@ -652,7 +658,23 @@
         "s_day",
         "s_night"
       ],
-      "policies": {},
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        }
+      },
       "resource_scope": "PER_BATCH",
       "operator_scope": "PER_BATCH",
       "resource_collector_type": "ALTRUISTIC",

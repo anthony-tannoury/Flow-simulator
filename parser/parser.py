@@ -2,7 +2,7 @@ import json
 import salabim as sim
 
 from datetime import date, time, datetime
-from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType
+from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
 from simulation.resource_task import ResourceTask, ResourceTaskConfig, ResourceCollectorType
 from simulation.piece import Model, PieceGenerator
 from simulation.task import Task, Scope, Protocols
@@ -17,16 +17,16 @@ from simulation.operator import Alternative, OperatorGroup
 from simulation.interrupters import Breakdown, Shutdowns, FlexibleShutdowns, NonFlexibleShutdowns
 from simulation.protocols import (AbortPendingCarriers, WaitForCarriers, AbortOrWaitForCarriers,
                                   ConstrainedByShift, NotConstrainedByShift, PartiallyConstrainedByShift,
-                                  Conscious, Unconscious)
+                                  Conscious, Unconscious,
+                                  FirstInFirstOut, FirstCreatedFirstOut,
+                                  MostPresent, FastestTaskDuration, SmallestGapToMinCarrierCapacity)
 from typing import Callable
 
 
 def to_date(date_str: str) -> date:
     return datetime.strptime(date_str, '%d-%m-%Y').date()
 
-def to_minutes(time_str: str | float) -> float:
-    if isinstance(time_str, (int, float)):   # legacy exports carry raw minutes
-        return float(time_str)
+def to_minutes(time_str: str) -> float:
     hour, minute = time_str.split(':')
     return 60 * int(hour) + int(minute)
 
@@ -107,6 +107,16 @@ def make_protocol(policy: dict):
             return Conscious()
         case 'Unconscious':
             return Unconscious()
+        case 'FirstInFirstOut':
+            return FirstInFirstOut()
+        case 'FirstCreatedFirstOut':
+            return FirstCreatedFirstOut()
+        case 'MostPresent':
+            return MostPresent()
+        case 'FastestTaskDuration':
+            return FastestTaskDuration()
+        case 'SmallestGapToMinCarrierCapacity':
+            return SmallestGapToMinCarrierCapacity()
         case _:
             raise NotImplementedError()
 
@@ -115,6 +125,13 @@ def make_protocols(policies: dict) -> Protocols:
     return Protocols(**{
         field: make_protocol(policies.get(field, default))
         for field, default in DEFAULT_POLICIES.items()
+    })
+
+
+def make_piece_protocols(policies: dict) -> PieceProtocols:
+    return PieceProtocols(**{
+        field: make_protocol(policies.get(field, default))
+        for field, default in PIECE_DEFAULT_POLICIES.items()
     })
 
 
@@ -156,6 +173,12 @@ DEFAULT_POLICIES = {
     'operator_shift_constraint': {'type': 'ConstrainedByShift'},
     'task_shift_constraint': {'type': 'ConstrainedByShift'},
     'operators_self_conscious': {'type': 'Conscious'}
+}
+
+PIECE_DEFAULT_POLICIES = {
+    **DEFAULT_POLICIES,
+    'piece_exit_order': {'type': 'FirstInFirstOut'},
+    'batch_model_choice': {'type': 'MostPresent'}
 }
 
 
@@ -383,7 +406,7 @@ class Parser:
                 priority=pt['priority'],
                 contiguous_carriers=pt['contiguous_carriers'],
                 independent_carriers=pt['independent_carriers'],
-                protocols=make_protocols(pt['policies']),
+                protocols=make_piece_protocols(pt['policies']),
                 models_configs=self.make_models_configs(pt['models_configs']),
                 piece_collector_type=STR_TO_PIECE_COLLECTOR_TYPE[pt['collector_type']]
             )
