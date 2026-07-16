@@ -23,6 +23,12 @@ class Distribution(Sampler):
     def sample(self, t: float) -> float:
         return self.distr_type(*self.sample_params_at(t)).sample()
     
+    def mean(self, t: float) -> float:
+        return self.distr_type(*self.sample_params_at(t)).mean()
+    
+    def mean_now(self) -> float:
+        return self.mean(env.now())
+    
 
 class FailureRate(Sampler):
     def __init__(self, failure_rate: Callable[[float], float], tolerance: float = 60, max_iters: int = 10000) -> None:

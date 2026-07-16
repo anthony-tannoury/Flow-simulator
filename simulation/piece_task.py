@@ -42,13 +42,13 @@ class PieceCollector(Component, Dispatchable, Donnable):
         stores = kwargs['store'] if isinstance(kwargs['store'], list) else [kwargs['store']]
         piece_filter = kwargs.get('filter', lambda _: True)
 
-        pieces = [piece for buffer in stores for piece in buffer if piece_filter(piece)]
+        pieces = [(piece, buffer) for buffer in stores for piece in buffer if piece_filter(piece)]
         if pieces:
             match self.task.config.protocols.piece_exit_order.decide():
                 case ExitOrder.FIRST_IN_FIRST_OUT:
-                    target = min(pieces, key=lambda piece: piece.enter_time(piece.queues()[0]))
+                    target = min(pieces, key=lambda pb: pb[0].enter_time(pb[1]))
                 case ExitOrder.FIRST_CREATED_FIRST_OUT:
-                    target = min(pieces, key=lambda piece: piece.creation_time())
+                    target = min(pieces, key=lambda pb: pb[0].creation_time())
             kwargs['filter'] = lambda piece: piece is target
 
         return self.from_store(**kwargs)
@@ -95,7 +95,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
             case ModelChoice.MOST_PRESENT:
                 return Counter(present_models).most_common(1)[0][0]
             case ModelChoice.FASTEST_TASK_DURATION:
-                return min(present_models, key=lambda model: self.task.config.get_model_config(model).duration.sample_now())
+                return min(present_models, key=lambda model: self.task.config.get_model_config(model).duration.mean_now())
             case ModelChoice.SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY:
                 counter = Counter(present_models)
                 return min(present_models, key=lambda model: self.task.config.get_model_config(model).min_carrier_capacity - counter[model])
