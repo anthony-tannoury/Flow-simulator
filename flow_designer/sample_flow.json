@@ -322,16 +322,6 @@
         "m_widget"
       ],
       "buffer_type": "PASSAGE",
-      "monitor": {
-        "avg_length": true,
-        "max_length": true,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": true,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": true
-      },
       "inputs_from": [
         "gen"
       ],
@@ -532,16 +522,6 @@
         "m_widgetB"
       ],
       "buffer_type": "EXIT",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router"
       ],
@@ -560,16 +540,6 @@
         "m_widgetB"
       ],
       "buffer_type": "SCRAP",
-      "monitor": {
-        "avg_length": false,
-        "max_length": false,
-        "length_std": false,
-        "current_length": false,
-        "avg_stay": false,
-        "max_stay": false,
-        "avg_time_before_arrival": false,
-        "throughput": false
-      },
       "inputs_from": [
         "router",
         "jam"
