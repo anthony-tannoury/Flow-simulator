@@ -138,7 +138,7 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
             self.task.is_frozen.set(True)
 
         if self.task.is_frozen() and not self.task.skip_frozen_check and not self.task.skip_downtime_check:
-            self.task.release()
+            self.task.release_task_operators()
 
         self.successfully_end_process()
 
@@ -282,6 +282,7 @@ class Task(Component, HasShifts, ABC):
                 group.dependent_tasks.append(self)
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
         self.started_up = False
+        self.requested_per_task_operators = False  # whether the PER_TASK crew is currently held
         self.pending_carriers = CarrierTracker()
         self.active_carriers = CarrierTracker()
 
@@ -321,16 +322,24 @@ class Task(Component, HasShifts, ABC):
 
         self.started_up = True
 
-        if self.config.operator_scope is Scope.PER_TASK:
-            # started_up resets at every shift end, so this runs once per shift. Drop
-            # the crew held from the previous shift before re-acquiring, otherwise the
-            # claims accumulate every shift and the task hoards its operator pools.
-            self.release()
-            deadline = min(self.non_flexible_shutdowns.get_deadline(), self.flexible_shutdowns.get_deadline())
-            self.task_operators = self.config.operators.request(demander=self, fail_at=deadline)
-            self.set_mode("")
-            if self.failed():
-                self.is_frozen.set(True)
+    def request_task_operators(self) -> None:
+        # PER_TASK: one crew supervises every carrier. It is requested once and
+        # reused across carriers, and only re-requested after being released (when
+        # it goes off shift). Tracked by requested_per_task_operators so it is never
+        # claimed twice without a release in between (which used to hoard the pools).
+        deadline = min(self.non_flexible_shutdowns.get_deadline(), self.flexible_shutdowns.get_deadline())
+        self.task_operators = self.config.operators.request(demander=self, fail_at=deadline) or []
+        self.set_mode("")
+        if self.failed():
+            self.is_frozen.set(True)
+        else:
+            self.requested_per_task_operators = True
+
+    def release_task_operators(self) -> None:
+        if self.task_operators:
+            self.release(*self.task_operators)
+        self.task_operators = []
+        self.requested_per_task_operators = False
 
     def process(self):
         while True:
@@ -341,9 +350,21 @@ class Task(Component, HasShifts, ABC):
                 states.append(self.is_in_downtime)
             self.wait(*[(state, False) for state in states], all=True)
 
+            # PER_TASK crew hands off at operator-shift boundaries: once no carrier is
+            # mid-run, drop a crew that has gone off shift so the next round re-picks
+            # whichever group is on shift now (instead of holding it for the whole run).
+            if (self.config.operator_scope is Scope.PER_TASK and self.requested_per_task_operators
+                    and not self.active_carriers
+                    and any(group.is_in_downtime() for group, _ in self.task_operators)):
+                self.release_task_operators()
+
             if not self.started_up:
                 self.handle_startup()
-    
+
+            if (self.config.operator_scope is Scope.PER_TASK and self.started_up
+                    and not self.is_frozen() and not self.requested_per_task_operators):
+                self.request_task_operators()
+
             if (self.is_frozen() and not self.skip_frozen_check) or (not self.started_up):
                 continue
 
