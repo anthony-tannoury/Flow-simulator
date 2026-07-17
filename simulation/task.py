@@ -209,6 +209,12 @@ class TaskShiftManager(ShiftManager):
         self.entity.is_frozen.set(False)
         super().on_enter(*args)
 
+    @override
+    def on_leave(self, *args):
+        assert isinstance(self.entity, Task)
+        self.entity.started_up = False  # the machine warms up again at the next shift
+        super().on_leave(*args)
+
 
 @dataclass
 class Protocols:
@@ -270,6 +276,10 @@ class Task(Component, HasShifts, ABC):
 
         self.task_operators: list[tuple[OperatorGroup, int]] = []
         self.carrier_type = carrier_type
+        # so each operator group can unfreeze this task when it comes back on shift
+        for alternative in (config.operators, config.loading_operators, config.startup_operators):
+            for group in {g for alt in alternative.alternatives for g, _ in alt}:
+                group.dependent_tasks.append(self)
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
         self.started_up = False
         self.pending_carriers = CarrierTracker()

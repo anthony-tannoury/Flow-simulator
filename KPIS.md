@@ -82,16 +82,19 @@ durée et sa taille de lot, donc **son** tc idéal : c'est la colonne
   panne peut chevaucher une période hors horaire, donc `pannes` peut dépasser
   ce que la cascade laisse imaginer. Le MTBF n'est affiché qu'à partir de deux
   pannes observées.
-* `gel` — temps passé « figé » **pendant les heures d'ouverture** : le poste a
-  fini ou évacué ses lots et attend (un arrêt imminent, une condition de
-  redémarrage). Un poste qui se fige juste avant la fin d'un shift n'est
-  décongelé qu'au shift suivant ; la nuit qui suit n'est pas du gel, c'est de
-  la fermeture, et elle n'est donc pas comptée ici.
+* `gel` — temps passé « figé » **pendant les heures d'ouverture** : le poste
+  s'est figé (il ne pouvait pas finir un lot avant qu'une équipe ne quitte son
+  poste, ou avant un arrêt). Il redémarre dès que l'équipe concernée revient
+  (pas seulement au prochain shift du poste), donc le gel reste borné même si
+  le shift du poste dure plusieurs jours. La fermeture (nuits, week-ends) n'est
+  pas du gel et n'est pas comptée ici.
 * `mise_en_route`, `nb_mises_en_route` — temps total et nombre de démarrages
   (chauffe, réglages) ; le poste redémarre après chaque interruption (panne,
-  arrêt, fin de shift). C'est le temps de réglage lui-même (la durée
-  configurée), **pas** l'attente de l'équipe de démarrage : cette attente est
-  une perte de disponibilité, comptée dans le TF plus bas, pas ici.
+  arrêt) **et à chaque nouveau shift**. C'est le temps de réglage lui-même (la
+  durée configurée), **pas** l'attente de l'équipe de démarrage : cette attente
+  est une perte de disponibilité, comptée dans le TF plus bas, pas ici. Note :
+  un poste qui redémarre à chaque shift et attend son équipe de démarrage
+  produit moins — c'est voulu, et visible dans le débit.
 * `temps_fonctionnement` — le temps avec au moins un lot actif sur le poste.
   C'est le TF de la cascade.
 
