@@ -313,8 +313,9 @@ class RouterNode(SimNode):
 
 
 class PieceGeneratorNode(SimNode):
-    """PieceGenerator: per-model integer goals over chosen shifts -> outlets.
-    Only childless (leaf) models can be generated."""
+    """PieceGenerator: the single source of pieces, wired to its outlets. What it
+    generates (models, goals or per-model rates, shifts) lives in the stopping
+    criterion under Simulation Settings, so this node has no menu of its own."""
     NODE_NAME = "Piece Generator"
     kind = "PieceGenerator"
     color = (145, 80, 80)
@@ -322,16 +323,12 @@ class PieceGeneratorNode(SimNode):
     def __init__(self):
         super().__init__()
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
-        self.create_property("models_goals", "[]")  # [{model, goal}]
-        self.create_property("shifts", "[]")         # [shift_name]
 
     def to_clean_json(self) -> dict:
         return {
             "id": node_uid(self),
             "kind": self.kind,
             "name": self.name(),
-            "models_goals": get_property_json(self, "models_goals", []),
-            "shifts": get_property_json(self, "shifts", []),
             "outlets": get_output_refs(self, "bufs_out"),
             "position": [self.x_pos(), self.y_pos()],
         }
@@ -1645,10 +1642,11 @@ def _shift_export_shape(s: dict) -> dict:
     return out
 
 
-def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None) -> None:
+def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None, criterion=None) -> None:
     """Translate every registry reference (model/resource/operator/shift/closing day)
     in place, via resolve(kind, value) -> value. Node-to-node wires (node uids) are
-    untouched. Shifts reference closing days: internally by date, exported by id."""
+    untouched. Shifts reference closing days: internally by date, exported by id.
+    The stopping criterion carries the generator's shifts and per-model goals/probs."""
     for m in models:
         if m.get("parent"):
             m["parent"] = resolve("model", m["parent"])
@@ -1662,11 +1660,6 @@ def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None) ->
         k = n.get("kind")
         if k == "Buffer":
             n["valid_models"] = [resolve("model", x) for x in n.get("valid_models", [])]
-        elif k == "PieceGenerator":
-            for g in n.get("models_goals", []):
-                if "model" in g:
-                    g["model"] = resolve("model", g["model"])
-            n["shifts"] = [resolve("shift", s) for s in n.get("shifts", [])]
         elif k in ("Task", "ResourceTask"):
             if k == "Task":
                 for mc in n.get("models_configs", []):
@@ -1686,6 +1679,15 @@ def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None) ->
                         if "operator" in mem:
                             mem["operator"] = resolve("operator", mem["operator"])
             n["task_shifts"] = [resolve("shift", s) for s in n.get("task_shifts", [])]
+
+    if criterion is not None:
+        criterion["shifts"] = [resolve("shift", s) for s in criterion.get("shifts", [])]
+        for g in criterion.get("models_goals", []):
+            if "model" in g:
+                g["model"] = resolve("model", g["model"])
+        for mp in criterion.get("models_probs", []):
+            if "model" in mp:
+                mp["model"] = resolve("model", mp["model"])
 
 
 def _check_date_intervals(label, intervals, start_dt, problems):
@@ -1907,38 +1909,79 @@ class RouterMenuDialog(QtWidgets.QDialog):
                            for bid, w in self._widgets.items()})
 
 
-class GeneratorMenuDialog(QtWidgets.QDialog):
-    def __init__(self, parent, node, model_registry, shift_names):
-        super().__init__(parent)
-        self.node = node
-        self.setWindowTitle("Piece generator")
-        lay = QtWidgets.QVBoxLayout(self)
-        lay.addWidget(QtWidgets.QLabel("model goals (only leaf models can be generated):"))
-        goals = [{"model": e.get("model"), "value": e.get("goal", e.get("value", 1))}
-                 for e in get_property_json(node, "models_goals", [])]
-        self.goals = NameValuePicker(_leaf_model_names(model_registry), "goal", integer=True, entries=goals, key="model")
-        lay.addWidget(self.goals)
-        lay.addWidget(QtWidgets.QLabel("shifts:"))
-        self.shifts = ShiftPickerWidget(shift_names, get_property_json(node, "shifts", []))
-        lay.addWidget(self.shifts)
-        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+class ModelProbsWidget(QtWidgets.QWidget):
+    """Rows of (model-combo, probability time-function), used by the rate generator.
+    Exactly one row may be marked the freeloader: its probability is 1 - sum(others),
+    so its function slot is disabled and it is exported as None. Value:
+    [{"model": name, "probability": <time-function> | None}]."""
 
-    def apply(self):
-        set_property_json(self.node, "models_goals",
-                          [{"model": e["model"], "goal": e["value"]} for e in self.goals.value()])
-        set_property_json(self.node, "shifts", self.shifts.chosen())
+    def __init__(self, model_names, entries=None, parent=None):
+        super().__init__(parent)
+        self._names = list(model_names)
+        self._rows = []  # (row_widget, combo, tf, free_chk)
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self._host = QtWidgets.QWidget()
+        self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._host)
+        add = QtWidgets.QPushButton("+ model"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        for e in (entries or []):
+            self._add(e.get("model"), e.get("probability"))
+
+    def _add(self, name=None, probability=0.0):
+        is_free = probability is None
+        row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
+        combo = QtWidgets.QComboBox(); combo.addItems(self._names)
+        if name in self._names:
+            combo.setCurrentText(name)
+        tf = TimeFunctionWidget(probability if not is_free else {"kind": "constant", "value": 0.0})
+        tf.setDisabled(is_free)
+        free_chk = QtWidgets.QCheckBox("freeloader"); free_chk.setChecked(is_free)
+        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
+        h.addWidget(combo); h.addWidget(tf); h.addWidget(free_chk); h.addWidget(rm); h.addStretch(1)
+        entry = (row, combo, tf, free_chk)
+        free_chk.toggled.connect(lambda checked, e=entry: self._on_free_toggled(e, checked))
+        rm.clicked.connect(lambda: self._remove(entry))
+        self._rows.append(entry); self._vl.addWidget(row)
+
+    def _on_free_toggled(self, entry, checked):
+        if checked:  # freeloader is exclusive: clear any other, re-enable its slot
+            for e in self._rows:
+                if e is not entry and e[3].isChecked():
+                    blocked = e[3].blockSignals(True); e[3].setChecked(False); e[3].blockSignals(blocked)
+                    e[2].setDisabled(False)
+        entry[2].setDisabled(checked)
+
+    def _remove(self, entry):
+        if entry in self._rows:
+            self._rows.remove(entry); entry[0].setParent(None); entry[0].deleteLater()
+
+    def value(self):
+        out = []
+        for _, combo, tf, free_chk in self._rows:
+            if combo.currentText():
+                out.append({"model": combo.currentText(),
+                            "probability": None if free_chk.isChecked() else tf.get_value()})
+        return out
 
 
 class SimulationSettingsDialog(QtWidgets.QDialog):
     """Simulation settings: the start date (the calendar anchor every absolute date
-    is converted against — always set) and the stopping criterion. Criterion
-    parameter slots appear dynamically per type: Time -> an absolute stop date;
-    Pieces produced -> a timeout in minutes only."""
+    is converted against, always set) and the stopping criterion, which now also
+    carries the piece generator's schedule and mix. Each criterion type has its own
+    section:
+      - Pieces produced: shifts, per-model integer goals (only leaf models), and a
+        timeout in minutes. The run ends when every goal is met (or the timeout
+        elapses first); pieces are paced to hit the goals over the shifts.
+      - Time: an explicit stop date, shifts, a gap (constant or a function of time)
+        and a per-model probability mix (each constant or a function of time), with
+        one model optionally left as the freeloader (probability 1 - sum(others))."""
 
-    def __init__(self, parent, start_date, criterion):
+    def __init__(self, parent, start_date, criterion, model_registry, shift_names):
         super().__init__(parent)
         self.setWindowTitle("Simulation settings")
+        self._leaf_models = _leaf_model_names(model_registry)
+        self._shift_names = list(shift_names)
+        self._pending = criterion or {}
         lay = QtWidgets.QVBoxLayout(self)
 
         start_box = QtWidgets.QGroupBox("start date (calendar anchor of t=0)")
@@ -1947,7 +1990,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         sl.addWidget(self.start_date); sl.addStretch(1)
         lay.addWidget(start_box)
 
-        crit_box = QtWidgets.QGroupBox("stopping criterion")
+        crit_box = QtWidgets.QGroupBox("stopping criterion and piece generation")
         cl = QtWidgets.QVBoxLayout(crit_box)
         top = QtWidgets.QFormLayout()
         self.type = QtWidgets.QComboBox()
@@ -1956,54 +1999,81 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         top.addRow("stop on", self.type)
         cl.addLayout(top)
         self._host = QtWidgets.QWidget()
-        self._form = QtWidgets.QFormLayout(self._host)
-        self._form.setContentsMargins(12, 4, 0, 0)
-        cl.addWidget(self._host)
-        lay.addWidget(crit_box)
+        self._host_lay = QtWidgets.QVBoxLayout(self._host)
+        self._host_lay.setContentsMargins(12, 4, 0, 0)
+        scroll = QtWidgets.QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(self._host)
+        cl.addWidget(scroll)
+        lay.addWidget(crit_box, 1)
         self._widgets = {}
         self.type.currentIndexChanged.connect(self._rebuild)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
 
-        criterion = criterion or {}
-        ci = self.type.findData(criterion.get("type", "ByTime"))
+        ci = self.type.findData(self._pending.get("type", "ByPiecesProduced"))
         blocked = self.type.blockSignals(True)
         self.type.setCurrentIndex(ci if ci >= 0 else 0)
         self.type.blockSignals(blocked)
         self._rebuild()
-        self._load(criterion)
 
     def start_value(self):
         return self.start_date.get_value()
 
     def _rebuild(self, *_):
-        while self._form.rowCount():
-            self._form.removeRow(0)
+        _clear_layout(self._host_lay)
         self._widgets = {}
         canonical = self.type.currentData()
-        if canonical == "ByTime":
-            e = DateTimeWidget("")  # an absolute stop date, not a duration
-            self._widgets["time"] = e
-            self._form.addRow("stop at", e)
-        elif canonical == "ByPiecesProduced":
-            timeout = InfFloatWidget("inf")  # a duration, in raw minutes
-            self._widgets["timeout"] = timeout
-            self._form.addRow("timeout (minutes)", timeout)
+        src = self._pending if self._pending.get("type") == canonical else {}
+        if canonical == "ByPiecesProduced":
+            self._build_pieces(src)
+        elif canonical == "ByTime":
+            self._build_time(src)
+        self._host_lay.addStretch(1)
 
-    def _load(self, criterion):
-        if criterion.get("type") != self.type.currentData():
-            return
-        if "time" in self._widgets:
-            self._widgets["time"].set_value(criterion.get("time", ""))
-        if "timeout" in self._widgets:
-            self._widgets["timeout"].set_value(criterion.get("timeout", "inf"))
+    def _add_row(self, label, widget):
+        box = QtWidgets.QGroupBox(label)
+        bl = QtWidgets.QVBoxLayout(box); bl.setContentsMargins(8, 4, 8, 8)
+        bl.addWidget(widget)
+        self._host_lay.addWidget(box)
+
+    def _build_pieces(self, src):
+        shifts = ShiftPickerWidget(self._shift_names, src.get("shifts", []))
+        self._widgets["shifts"] = shifts
+        self._add_row("shifts", shifts)
+        goals = NameValuePicker(self._leaf_models, "goal", integer=True,
+                                entries=src.get("models_goals", []), key="model")
+        self._widgets["goals"] = goals
+        self._add_row("model goals (only leaf models can be generated)", goals)
+        timeout = InfFloatWidget(src.get("timeout", "inf"))
+        self._widgets["timeout"] = timeout
+        self._add_row("timeout (minutes)", timeout)
+
+    def _build_time(self, src):
+        stop = DateTimeWidget(src.get("time", ""))  # an absolute stop date
+        self._widgets["time"] = stop
+        self._add_row("stop at", stop)
+        shifts = ShiftPickerWidget(self._shift_names, src.get("shifts", []))
+        self._widgets["shifts"] = shifts
+        self._add_row("shifts", shifts)
+        gap = TimeFunctionWidget(src.get("gap") or {"kind": "constant", "value": 1.0})
+        self._widgets["gap"] = gap
+        self._add_row("gap between pieces (minutes; constant or function of time)", gap)
+        probs = ModelProbsWidget(self._leaf_models, src.get("models_probs", []))
+        self._widgets["probs"] = probs
+        self._add_row("model probabilities (one may be the freeloader; checked when sampled)", probs)
 
     def value(self):
         canonical = self.type.currentData()
-        if canonical == "ByTime":
-            return {"type": "ByTime", "time": self._widgets["time"].get_value()}  # "dd-mm-yyyy hh:mm"
-        return {"type": "ByPiecesProduced",
-                "timeout": self._widgets["timeout"].get_value()}  # minutes | "inf"
+        if canonical == "ByPiecesProduced":
+            return {"type": "ByPiecesProduced",
+                    "timeout": self._widgets["timeout"].get_value(),  # minutes | "inf"
+                    "shifts": self._widgets["shifts"].chosen(),
+                    "models_goals": [{"model": e["model"], "goal": e["value"]}
+                                     for e in self._widgets["goals"].value()]}
+        return {"type": "ByTime",
+                "time": self._widgets["time"].get_value(),  # "dd-mm-yyyy hh:mm"
+                "shifts": self._widgets["shifts"].chosen(),
+                "gap": self._widgets["gap"].get_value(),
+                "models_probs": self._widgets["probs"].value()}
 
 
 class BreakdownMenuDialog(QtWidgets.QDialog):
@@ -2600,7 +2670,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             self.statusBar().showMessage(f"{len(self.shift_registry)} shift definitions.")
 
     def edit_simulation_settings(self):
-        dlg = SimulationSettingsDialog(self, self.start_date, self.stopping_criterion)
+        dlg = SimulationSettingsDialog(self, self.start_date, self.stopping_criterion,
+                                       self.model_registry, _names(self.shift_registry))
         if dlg.exec():
             self.start_date = dlg.start_value()
             self.stopping_criterion = dlg.value()
@@ -2618,8 +2689,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             dlg = BufferMenuDialog(self, node, self.model_registry)
         elif kind == "Router":
             dlg = RouterMenuDialog(self, node)
-        elif kind == "PieceGenerator":
-            dlg = GeneratorMenuDialog(self, node, self.model_registry, _names(self.shift_registry))
         elif kind == "Breakdown":
             dlg = BreakdownMenuDialog(self, node)
         elif kind == "Task":
@@ -2739,8 +2808,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "shift": {s["name"]: s["id"] for s in shifts if s.get("name") and s.get("id")},
             "closing_day": {c["date"]: c["id"] for c in closing_days if c.get("date") and c.get("id")},
         }
+        criterion = copy.deepcopy(self.stopping_criterion)
         _apply_ref_map(nodes, models, resources, operators,
-                       lambda kind, v: name_to_id[kind].get(v, v), shifts=shifts)
+                       lambda kind, v: name_to_id[kind].get(v, v), shifts=shifts, criterion=criterion)
         return {
             "editor": {"name": APP_NAME, "version": EDITOR_VERSION, "format": "clean-json"},
             "models": models,
@@ -2748,7 +2818,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "operators": operators,
             "closing_days": closing_days,
             "shifts": shifts,
-            "stopping_criterion": self.stopping_criterion,
+            "stopping_criterion": criterion,
             "start_date": self.start_date,
             "nodes": nodes,
             "connections": self.connections_clean(),
@@ -3012,13 +3082,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                         problems.append(f"Breakdown '{name}' on resource task '{t.name()}' cannot have outlets.")
 
             elif kind == "PieceGenerator":
-                goals = get_property_json(node, "models_goals", [])
-                if not goals:
-                    problems.append(f"Piece Generator '{name}' has no model goals.")
+                # What it generates now lives in the stopping criterion (Simulation
+                # Settings); the node itself is validated only for its wiring. The
+                # criterion block below checks the models against these outlets.
                 if not get_output_refs(node, "bufs_out"):
                     problems.append(f"Piece Generator '{name}' has no outlets.")
-                self._check_flushability(node, [g.get("model") for g in goals if g.get("model")],
-                                         "bufs_out", "Piece Generator", problems)
                 # A scrap buffer must never sit on the generator's outlet chain, not
                 # even through routers: freshly generated pieces would be scrapped on
                 # arrival, and the parser cannot build the object cycle
@@ -3123,18 +3191,46 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             problems.append("Simulation start date missing or not 'dd-mm-yyyy hh:mm' "
                             "(Simulation > Settings...).")
 
+        # The stopping criterion also carries the piece generator's schedule and
+        # mix; validate the generation params here (the generator node only checks
+        # its wiring) and flush its models through the generator's outlets.
         crit = self.stopping_criterion or {}
+        gen_node = next((n for n in self.all_nodes() if node_kind(n) == "PieceGenerator"), None)
         if not crit:
             problems.append("No stopping criterion set (Simulation > Settings...); "
                             "the simulation may never terminate.")
-        elif crit.get("type") == "ByPiecesProduced" and exit_count != 1:
-            problems.append("Stopping criterion 'Pieces produced' needs exactly one EXIT buffer to count.")
+        elif crit.get("type") == "ByPiecesProduced":
+            if exit_count != 1:
+                problems.append("Stopping criterion 'Pieces produced' needs exactly one EXIT buffer to count.")
+            goals = crit.get("models_goals", [])
+            if not goals:
+                problems.append("Stopping criterion 'Pieces produced' has no model goals (Simulation > Settings...).")
+            if any(as_int(g.get("goal", 0)) <= 0 for g in goals):
+                problems.append("Stopping criterion 'Pieces produced': every model goal must be a positive integer.")
+            if not crit.get("shifts"):
+                problems.append("Stopping criterion 'Pieces produced' has no generation shifts (Simulation > Settings...).")
+            if gen_node is not None:
+                self._check_flushability(gen_node, [g.get("model") for g in goals if g.get("model")],
+                                         "bufs_out", "Piece Generator", problems)
         elif crit.get("type") == "ByTime":
             stop_dt = parse_date_time(crit.get("time"))
             if stop_dt is None:
                 problems.append("Stopping date must be 'dd-mm-yyyy hh:mm' (Simulation > Settings...).")
             elif start_dt is not None and stop_dt <= start_dt:
                 problems.append("Stopping date must be after the simulation start date.")
+            probs = crit.get("models_probs", [])
+            if not probs:
+                problems.append("Stopping criterion 'Time' has no model probabilities (Simulation > Settings...).")
+            if sum(1 for mp in probs if mp.get("probability") is None) > 1:
+                problems.append("Stopping criterion 'Time': at most one model can be the freeloader "
+                                "(the one with no probability).")
+            if not crit.get("shifts"):
+                problems.append("Stopping criterion 'Time' has no generation shifts (Simulation > Settings...).")
+            if not crit.get("gap"):
+                problems.append("Stopping criterion 'Time' has no gap between pieces (Simulation > Settings...).")
+            if gen_node is not None:
+                self._check_flushability(gen_node, [mp.get("model") for mp in probs if mp.get("model")],
+                                         "bufs_out", "Piece Generator", problems)
 
         # Shifts: days off come from the closing-days registry; custom mode = absolute
         # date intervals; weekly mode = date horizon containing the days off.
@@ -3423,7 +3519,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     _IMPORT_JSON_PROPS = {
         "Shutdowns": ["intervals", "generator"],
         "Buffer": ["valid_models"],
-        "PieceGenerator": ["models_goals", "shifts"],
         "Task": ["models_configs", "startup_duration", "loading_duration", "operators",
                  "loading_operators", "startup_operators", "task_shifts", "policies"],
         "ResourceTask": ["non_transformed_resources", "transformed_resources", "resources_out",
@@ -3530,7 +3625,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         id_to_name["closing_day"] = {e["id"]: e["date"] for e in data.get("closing_days", [])
                                      if e.get("id") and e.get("date")}
         _apply_ref_map(data.get("nodes", []), regs["model"], regs["resource"], regs["operator"],
-                       lambda kind, v: id_to_name[kind].get(v, v), shifts=regs["shift"])
+                       lambda kind, v: id_to_name[kind].get(v, v), shifts=regs["shift"],
+                       criterion=data.get("stopping_criterion"))
         return data
 
     def _merge_models(self, imported_models: list) -> None:

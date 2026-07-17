@@ -8,10 +8,10 @@ from simulation import env, kpis, graphs
 from datetime import date, time, datetime, timedelta
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
 from simulation.resource_task import ResourceTask, ResourceTaskConfig, ResourceCollectorType
-from simulation.piece import Model, PieceGenerator
+from simulation.piece import Model, GoalPieceGenerator, RatePieceGenerator
 from simulation.task import Task, Scope, Protocols
 from simulation.sampler import Sampler, Distribution, FailureRate
-from simulation.function_generator import Linear, Exponential, Bathtub
+from simulation.function_generator import Linear, Exponential, Step, Bathtub
 from simulation.outlet import Outlet, Buffer, Router, BufferType
 from simulation.judgement_day import ByTime, ByPiecesProduced, SimulationStopper
 from simulation.interval import Interval
@@ -53,6 +53,8 @@ def make_callable(c: dict) -> float | Callable[[float], float]:
             return Linear.generate(c['x1'], c['y1'], c['x2'], c['y2'])
         case 'exponential':
             return Exponential.generate(c['x1'], c['y1'], c['x2'], c['y2'], c['limit'])
+        case 'step':
+            return Step.generate(c['x1'], c['y1'], c['x2'], c['y2'], c['step_size'])
         case _:
             raise NotImplementedError()
 
@@ -400,24 +402,32 @@ class Parser:
 
     def load_piece_generator(self) -> None:
         assert len(self.per_kind['PieceGenerator']) == 1
-        piece_generator_node = self.per_kind['PieceGenerator'][0]
+        node = self.per_kind['PieceGenerator'][0]
+        criterion = self.data['stopping_criterion']
 
-        for id_ in piece_generator_node['outlets']:
+        for id_ in node['outlets']:
             if id_ not in self.outlets:
                 raise ValueError(f"piece generator outlet {id_} is (or routes into) a scrap buffer")
 
-        models_goals = {
-            self.models[mg['model']]: mg['goal']
-            for mg in piece_generator_node['models_goals']
-        }
-        shifts = join_shifts([self.shifts[id_] for id_ in piece_generator_node['shifts']])
-        outlets = [self.outlets[id_] for id_ in piece_generator_node['outlets']]
-        self.piece_generator = PieceGenerator(
-            name=piece_generator_node['name'],
-            models_goals=models_goals,
-            shifts=shifts,
-            outlets=outlets
-        )
+        # the generator's behaviour is set by the stopping criterion: a fixed set of
+        # goals (ByPiecesProduced) or a stream at a given gap and mix (ByTime)
+        shifts = join_shifts([self.shifts[id_] for id_ in criterion['shifts']])
+        outlets = [self.outlets[id_] for id_ in node['outlets']]
+
+        match criterion['type']:
+            case 'ByPiecesProduced':
+                models_goals = {self.models[mg['model']]: mg['goal'] for mg in criterion['models_goals']}
+                self.piece_generator = GoalPieceGenerator(
+                    name=node['name'], models_goals=models_goals, shifts=shifts, outlets=outlets)
+            case 'ByTime':
+                models = [self.models[mp['model']] for mp in criterion['models_probs']]
+                model_probs = [make_callable(mp['probability']) if mp['probability'] is not None else None
+                               for mp in criterion['models_probs']]
+                self.piece_generator = RatePieceGenerator(
+                    name=node['name'], models=models, shifts=shifts, outlets=outlets,
+                    gap=make_callable(criterion['gap']), model_probs=model_probs)
+            case _:
+                raise NotImplementedError()
 
     def load_scrap_buffers(self) -> None:
         for id_ in self.scrap_buffers_ids:
@@ -543,7 +553,7 @@ class Parser:
                 minutes = ShiftManager.minutes_between(self.sim_start, to_datetime(criterion['time']))
                 self.stopping_criterion = ByTime(time=minutes)
             case 'ByPiecesProduced':
-                total = sum(mg['goal'] for mg in self.per_kind['PieceGenerator'][0]['models_goals'])
+                total = sum(mg['goal'] for mg in criterion['models_goals'])
                 exit_buffer = next(self.outlets[b['id']] for b in self.per_kind['Buffer']
                                    if b['buffer_type'] == 'EXIT')
                 self.stopping_criterion = ByPiecesProduced(

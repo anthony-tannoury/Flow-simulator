@@ -275,29 +275,46 @@ def production_histogram(base, buffers, piece_generator):
         return
     exits = Counter(p.model for b in buffers if b.buffer_type is BufferType.EXIT for p in b)
 
+    # The rate generator has no per-model objective; only the goal generator does.
+    # Without objectives the chart shows just générées vs produites.
+    goals = getattr(piece_generator, 'goals', None)
     names = [m.name for m in piece_generator.models]
-    objectifs = list(piece_generator.goals)
     generees = list(piece_generator.total_generated)
     produites = [exits.get(m, 0) for m in piece_generator.models]
+    objectifs = list(goals) if goals is not None else None
 
     with open(_out_path(base, 'csv', 'modeles', 'production', 'csv'), 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
-        writer.writerow(['modele', 'objectif', 'generees', 'produites'])
-        for row in zip(names, objectifs, generees, produites):
-            writer.writerow(row)
+        if objectifs is not None:
+            writer.writerow(['modele', 'objectif', 'generees', 'produites'])
+            for row in zip(names, objectifs, generees, produites):
+                writer.writerow(row)
+        else:
+            writer.writerow(['modele', 'generees', 'produites'])
+            for row in zip(names, generees, produites):
+                writer.writerow(row)
 
     x = range(len(names))
-    width = 0.27
     fig, ax = plt.subplots(figsize=(max(7, 1.6 * len(names)), 4.5))
-    ax.bar([i - width for i in x], objectifs, width, label='objectif', color='#9aa0a5')
-    ax.bar(x, generees, width, label='générées', color=WAIT_COLOR)
-    ax.bar([i + width for i in x], produites, width, label='produites (sorties)', color=TASK_COLOR)
+    if objectifs is not None:
+        width = 0.27
+        ax.bar([i - width for i in x], objectifs, width, label='objectif', color='#9aa0a5')
+        ax.bar(x, generees, width, label='générées', color=WAIT_COLOR)
+        ax.bar([i + width for i in x], produites, width, label='produites (sorties)', color=TASK_COLOR)
+        prod_x = [i + width for i in x]
+        title = 'Production par modèle : objectif / générées / produites'
+    else:
+        width = 0.38
+        ax.bar([i - width / 2 for i in x], generees, width, label='générées', color=WAIT_COLOR)
+        ax.bar([i + width / 2 for i in x], produites, width, label='produites (sorties)', color=TASK_COLOR)
+        prod_x = [i + width / 2 for i in x]
+        title = 'Production par modèle : générées / produites'
     for i in x:
-        ax.text(i + width, produites[i], f" {produites[i]}", ha='center', va='bottom', fontsize=8)
+        ax.text(prod_x[i], produites[i], f" {produites[i]}", ha='center', va='bottom', fontsize=8)
     ax.set_xticks(list(x))
     ax.set_xticklabels(names, rotation=20, ha='right')
     ax.set_ylabel('pieces')
-    ax.set_title('Production par modèle : objectif / générées / produites')
+    ax.set_title(title)
     ax.legend()
     ax.grid(axis='y', alpha=0.25)
     fig.tight_layout()

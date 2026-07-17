@@ -687,8 +687,47 @@
     }
   ],
   "stopping_criterion": {
-    "type": "ByTime",
-    "time": "01-01-2027 00:00"
+    "type": "ByPiecesProduced",
+    "timeout": 525600.0,
+    "shifts": [
+      "shift_c01ba51b",
+      "shift_191d58b8",
+      "shift_43a68d28"
+    ],
+    "models_goals": [
+      {
+        "model": "model_c1c20e4c",
+        "goal": 300
+      },
+      {
+        "model": "model_f551538b",
+        "goal": 300
+      },
+      {
+        "model": "model_f8a1d4ad",
+        "goal": 300
+      },
+      {
+        "model": "model_742fd366",
+        "goal": 300
+      },
+      {
+        "model": "model_300990ff",
+        "goal": 450
+      },
+      {
+        "model": "model_e093ec36",
+        "goal": 450
+      },
+      {
+        "model": "model_02d3ef7d",
+        "goal": 450
+      },
+      {
+        "model": "model_256d4101",
+        "goal": 450
+      }
+    ]
   },
   "start_date": "01-01-2026 00:00",
   "nodes": [
@@ -696,45 +735,6 @@
       "id": "piecegenerator_97bcc3df",
       "kind": "PieceGenerator",
       "name": "Piece Generator",
-      "models_goals": [
-        {
-          "model": "model_c1c20e4c",
-          "goal": 300
-        },
-        {
-          "model": "model_f551538b",
-          "goal": 300
-        },
-        {
-          "model": "model_f8a1d4ad",
-          "goal": 300
-        },
-        {
-          "model": "model_742fd366",
-          "goal": 300
-        },
-        {
-          "model": "model_300990ff",
-          "goal": 450
-        },
-        {
-          "model": "model_e093ec36",
-          "goal": 450
-        },
-        {
-          "model": "model_02d3ef7d",
-          "goal": 450
-        },
-        {
-          "model": "model_256d4101",
-          "goal": 450
-        }
-      ],
-      "shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
-      ],
       "outlets": [
         "buffer_8b98db8b",
         "buffer_8fb86b24"

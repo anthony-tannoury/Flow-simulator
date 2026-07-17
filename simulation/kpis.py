@@ -332,16 +332,21 @@ def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
         scraps_par_modele: dict = {}
         for p in scraps:
             scraps_par_modele[p.model] = scraps_par_modele.get(p.model, 0) + 1
-        for model, objectif in zip(piece_generator.models, piece_generator.goals):
+        # Only the goal generator carries per-model objectives; the rate generator
+        # has none, so its objectif/atteinte columns stay blank.
+        goals = getattr(piece_generator, 'goals', None)
+        for i, model in enumerate(piece_generator.models):
             leads = sorted(exits_par_modele.get(model, []))
             rebuts = scraps_par_modele.get(model, 0)
+            objectif = goals[i] if goals is not None else ''
             par_modele.append({
                 'modele': model.name,
                 'objectif': objectif,
+                'genere': piece_generator.total_generated[i],
                 'sorties': len(leads),
                 'rebuts': rebuts,
                 'taux_rebut': ratio(rebuts, len(leads) + rebuts),
-                'atteinte': ratio(len(leads), objectif),
+                'atteinte': ratio(len(leads), objectif) if goals is not None else '',
                 **_lead_stats(leads),
             })
     return flux, par_modele

@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 from simulation import env
@@ -33,6 +34,23 @@ class Exponential:
             return alpha * np.exp(beta * t) + limit
         
         return exponential
+
+
+class Step:
+    @staticmethod
+    def generate(x1: float, y1: float, x2: float, y2: float, step_size: float) -> Callable[[float], float]:
+        if x1 == x2:
+            raise ValueError("Cannot generate vertical step function")
+        if step_size <= 0:
+            raise ValueError("Step function step_size must be positive")
+
+        slope = (y2 - y1) / (x2 - x1)
+
+        def step(t: float) -> float:
+            anchor = x1 + math.floor((t - x1) / step_size) * step_size  # start of the step holding t
+            return y1 + slope * (anchor - x1)
+
+        return step
 
 
 class Bathtub:
