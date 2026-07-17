@@ -894,7 +894,7 @@ def closing_day_label(entry: dict) -> str:
     """Display text for a closing-day registry entry: the date, plus the optional label."""
     date = entry.get("date", "?")
     name = (entry.get("name") or "").strip()
-    return f"{date} — {name}" if name else date
+    return f"{date} - {name}" if name else date
 
 
 class ClosingDayPickerWidget(QtWidgets.QListWidget):
@@ -2086,7 +2086,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self._add_row("Gap between pieces (minutes; constant or function of time)", gap)
         probs = FixedModelProbsWidget(self._leaf_models, src.get("models_probs", []))
         self._widgets["probs"] = probs
-        self._add_row("Model probabilities (one per leaf model; the freeloader gets 1 − sum of the others)", probs)
+        self._add_row("Model probabilities (one per leaf model; the freeloader gets 1 - sum of the others)", probs)
 
     def value(self):
         canonical = self.type.currentData()
@@ -2466,12 +2466,12 @@ class RunSimulationDialog(QtWidgets.QDialog):
         form = QtWidgets.QFormLayout()
         self.elapsed_lbl = QtWidgets.QLabel("0:00:00")
         form.addRow("Elapsed time", self.elapsed_lbl)
-        self.sim_time_lbl = QtWidgets.QLabel("—")
+        self.sim_time_lbl = QtWidgets.QLabel("-")
         form.addRow("Simulated time", self.sim_time_lbl)
-        self.pieces_lbl = QtWidgets.QLabel("—")
+        self.pieces_lbl = QtWidgets.QLabel("-")
         self._pieces_row = form.rowCount()
         form.addRow("Pieces in exit buffer", self.pieces_lbl)
-        self.timeout_lbl = QtWidgets.QLabel("—")
+        self.timeout_lbl = QtWidgets.QLabel("-")
         self._timeout_row = form.rowCount()
         form.addRow("Timeout", self.timeout_lbl)
         lay.addLayout(form)
@@ -2603,10 +2603,10 @@ class RunSimulationDialog(QtWidgets.QDialog):
             goal = meta.get("goal")
             if pieces is not None and goal:
                 if pieces >= goal:
-                    return f"Goal reached — {pieces} / {goal} pieces."
+                    return f"Goal reached: {pieces} / {goal} pieces."
                 if meta.get("timeout"):
-                    return f"Timeout reached — {pieces} / {goal} pieces."
-                return (f"Goal not reached — {pieces} / {goal} pieces "
+                    return f"Timeout reached: {pieces} / {goal} pieces."
+                return (f"Goal not reached: {pieces} / {goal} pieces "
                         f"(the simulation ran out of work; check the shifts).")
         elif meta.get("criterion") == "ByTime":
             return "Stop date reached."
@@ -2690,7 +2690,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.resize(1400, 850)
 
         # Word-style session state: the file backing the canvas and whether the
-        # canvas has diverged from it. The title shows "name[*] — app"; Qt swaps
+        # canvas has diverged from it. The title shows "name[*] - app"; Qt swaps
         # the [*] marker in and out with setWindowModified.
         self.current_path = None
         self._dirty = False
@@ -2899,7 +2899,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         return os.path.basename(self.current_path) if self.current_path else "Untitled"
 
     def _update_title(self):
-        self.setWindowTitle(f"{self._display_name()}[*] — {APP_NAME}")
+        self.setWindowTitle(f"{self._display_name()}[*] - {APP_NAME}")
         self.setWindowModified(self._dirty)
 
     def maybe_save(self) -> bool:
@@ -3465,12 +3465,12 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                         mx = as_float(m.get("max_carrier_capacity", 1))
                         if cap < mn:
                             problems.append(f"Piece task '{name}': max_capacity {cap:g} is smaller than "
-                                            f"min_carrier_capacity {mn:g} (model '{m.get('model')}') — "
+                                            f"min_carrier_capacity {mn:g} (model '{m.get('model')}'); "
                                             f"carriers can never collect their minimum batch.")
                         elif not contiguous and cap < mx:
                             problems.append(f"Piece task '{name}': non-contiguous carriers reserve "
                                             f"max_carrier_capacity {mx:g} slots (model '{m.get('model')}') "
-                                            f"but max_capacity is {cap:g} — the collector deadlocks "
+                                            f"but max_capacity is {cap:g}; the collector deadlocks "
                                             f"waiting for slots that cannot exist.")
                     # non-discriminating collectors need uniform duration / carrier-capacity across models
                     ct = str(node.get_property("collector_type") if node.has_property("collector_type") else "")
@@ -3494,11 +3494,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 mx = as_float(node.get_property("max_carrier_capacity") if node.has_property("max_carrier_capacity") else 1.0, 1.0)
                 if cap < mn:
                     problems.append(f"Resource task '{name}': max_capacity {cap:g} is smaller than "
-                                    f"min_carrier_capacity {mn:g} — carriers can never collect "
+                                    f"min_carrier_capacity {mn:g}; carriers can never collect "
                                     f"their minimum batch.")
                 elif not contiguous and cap < mx:
                     problems.append(f"Resource task '{name}': non-contiguous carriers reserve "
-                                    f"max_carrier_capacity {mx:g} slots but max_capacity is {cap:g} — "
+                                    f"max_carrier_capacity {mx:g} slots but max_capacity is {cap:g}; "
                                     f"the collector deadlocks waiting for slots that cannot exist.")
                 outs = get_property_json(node, "resources_out", [])
                 if not outs:
@@ -3603,7 +3603,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     if duration <= 0:
                         problems.append(f"Shutdowns '{name}': duration must be > 0 minutes.")
                     if in_between > 0 and duration > in_between:
-                        problems.append(f"Shutdowns '{name}': duration exceeds 'in between' — "
+                        problems.append(f"Shutdowns '{name}': duration exceeds 'in between'; "
                                         f"consecutive shutdowns would overlap (the simulation "
                                         f"rejects overlapping intervals).")
                 else:
