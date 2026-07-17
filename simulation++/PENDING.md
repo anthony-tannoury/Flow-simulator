@@ -150,6 +150,20 @@ Data hooks needed:
   `TRG = TRS * (TR/TO)`, `TRE = TRS * (TR/TT)`; the old `TU`-based identity is
   dropped. `Do = TF_union / TR` is unchanged.
 
+## 7. Freeze/startup lifecycle fixes
+
+* `operator.py`: `OperatorGroup` gets `dependent_tasks: list`; `Task.setup`
+  registers itself on every group it uses (operators + loading_operators +
+  startup_operators). `OperatorShiftManager.on_enter` clears `is_frozen` on
+  those tasks when the group comes back on shift. Reason: a task frozen because
+  operators left was only unfrozen at its own next shift start; with merged
+  multi-day shifts that could be weeks away, so one operator-shift-end froze
+  the task for days. Now it resumes when the operators return.
+* `task.py`: `TaskShiftManager.on_leave` sets `entity.started_up = False`
+  (the machine warms up again each shift; `nb_mises_en_route` becomes per-shift
+  instead of once per run). Note: this reduces throughput for tasks with a
+  startup crew (they re-warm-up and wait for the crew every shift).
+
 ## Not needed in C++
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON

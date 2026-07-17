@@ -20,6 +20,10 @@ class OperatorShiftManager(ShiftManager):
         assert isinstance(self.entity, OperatorGroup)
         self.entity.set_capacity(self.entity.n_operators)
         self.entity.trigger.trigger()
+        # a task frozen because these operators had left resumes when they come back,
+        # instead of staying frozen until its own (possibly weeks-away) shift start
+        for task in self.entity.dependent_tasks:
+            task.is_frozen.set(False)
         super().on_enter(*args)
 
     @override
@@ -40,6 +44,7 @@ class OperatorGroup(sim.Resource, HasShifts, Triggerable):
         self.productivity = productivity
         self.n_operators = self.capacity()
         self.set_capacity(0)
+        self.dependent_tasks: list = []  # tasks to unfreeze when this group comes back on shift
         self.manager = OperatorShiftManager(operator_group=self)
         
 
