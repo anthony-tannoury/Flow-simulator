@@ -358,6 +358,8 @@ class PieceCarrier(Carrier):
         pieces = self.piece_collector.collected_pieces
         self.task.batch_sizes.tally(len(pieces))
         self.task.cycle_times.tally(env.now() - self.creation_time())
+        for piece in pieces:
+            piece.journal.append(('task', self.task.name(), env.now()))
         place(pieces, self.task.outlets)
         for piece in pieces:
             self.task.deposited[piece.model] += 1
