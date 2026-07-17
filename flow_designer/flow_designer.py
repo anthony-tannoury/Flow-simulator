@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import re
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, List, Tuple
 
 from Qt import QtCore, QtGui, QtWidgets
@@ -56,8 +58,8 @@ SHUTDOWN_TYPES = ["NON_FLEXIBLE", "FLEXIBLE"]
 # BufferType (outlet.py): where a piece lands.
 BUFFER_TYPES = ["PASSAGE", "SCRAP", "EXIT"]
 
-# Simulation stopping criteria (judgement_day.py). Friendly label -> canonical class name.
-STOPPING_CRITERION_TYPES = [("Time", "ByTime"), ("Pieces produced", "ByPiecesProduced")]
+# Simulation stopping criteria (judgement_day.py), canonical class names.
+STOPPING_CRITERION_TYPES = ["ByTime", "ByPiecesProduced"]
 
 PORT_COLORS = {
     "buffer": (80, 180, 120),
@@ -87,6 +89,39 @@ def as_int(value: Any, default: int = 0) -> int:
         return int(value)
     except Exception:
         return default
+
+
+def sentence_case(name: str) -> str:
+    """Display form of an identifier: words split on underscores and CamelCase
+    humps, all lowercase except a single leading capital. ByTime -> 'By time',
+    PER_BATCH -> 'Per batch', AbortPendingCarriers -> 'Abort pending carriers'."""
+    text = str(name or "").replace("_", " ")
+    text = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
+    text = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", text)
+    words = text.split()
+    if not words:
+        return ""
+    joined = " ".join(w.lower() for w in words)
+    return joined[0].upper() + joined[1:]
+
+
+def to_canonical(value: str, canonical_items: list) -> str:
+    """Inverse of sentence_case over a known vocabulary: accept either the
+    canonical identifier or its display form; anything else passes through."""
+    for canonical in canonical_items:
+        if value == canonical or value == sentence_case(canonical):
+            return canonical
+    return value
+
+
+def fill_combo(combo, canonical_items: list, current: str | None = None) -> None:
+    """Populate a combo with sentence-case labels carrying the canonical values
+    as item data (read back with currentData()), selecting `current` if given."""
+    for canonical in canonical_items:
+        combo.addItem(sentence_case(canonical), canonical)
+    if current is not None:
+        i = combo.findData(to_canonical(current, canonical_items))
+        combo.setCurrentIndex(i if i >= 0 else 0)
 
 
 def qmessage(parent, title: str, text: str, icon=QtWidgets.QMessageBox.Information):
@@ -207,7 +242,7 @@ def add_combo_input(node: BaseNode, name: str, label: str, items: list, default:
 
 class SimNode(BaseNode):
     __identifier__ = "simulation.flow"
-    NODE_NAME = "Simulation Node"
+    NODE_NAME = "Simulation node"
 
     kind = "SimNode"
     color = (70, 70, 70)
@@ -238,18 +273,21 @@ class ShutdownsNode(SimNode):
     def __init__(self):
         super().__init__()
         self.add_output("shutdowns", color=PORT_COLORS["shutdown"])
-        add_combo_input(self, "shutdown_type", "type", SHUTDOWN_TYPES, "NON_FLEXIBLE")
+        # the on-card combo shows display labels; to_clean_json canonicalizes
+        add_combo_input(self, "shutdown_type", "Type",
+                        [sentence_case(t) for t in SHUTDOWN_TYPES], sentence_case("NON_FLEXIBLE"))
         self.create_property("mode", "custom")   # "custom" (explicit intervals) | "generator" (periodic)
         self.create_property("intervals", "[]")  # [{start, end}]
         self.create_property("generator", "{}")  # {in_between, duration, start, end}
 
     def to_clean_json(self) -> dict:
         mode = self.get_property("mode") if self.has_property("mode") else "custom"
+        shutdown_type = self.get_property("shutdown_type") if self.has_property("shutdown_type") else "NON_FLEXIBLE"
         out = {
             "id": node_uid(self),
             "kind": self.kind,
             "name": self.name(),
-            "shutdown_type": self.get_property("shutdown_type") if self.has_property("shutdown_type") else "NON_FLEXIBLE",
+            "shutdown_type": to_canonical(shutdown_type, SHUTDOWN_TYPES),
             "mode": mode,
             "position": [self.x_pos(), self.y_pos()],
         }
@@ -317,7 +355,7 @@ class PieceGeneratorNode(SimNode):
     during the shifts chosen in its card menu. What it emits (models, and either
     goals or per-model rates) lives in the stopping criterion under Simulation
     Settings."""
-    NODE_NAME = "Piece Generator"
+    NODE_NAME = "Piece generator"
     kind = "PieceGenerator"
     color = (145, 80, 80)
 
@@ -341,7 +379,7 @@ class TaskNode(SimNode):
     """PieceTask. Everything except the piece-flow wiring lives in the card menu:
     per-model configs, task-level durations, operator alternatives, scopes, policies,
     task shifts, carrier settings."""
-    NODE_NAME = "Piece Task"
+    NODE_NAME = "Piece task"
     kind = "Task"
     color = (150, 90, 60)
 
@@ -405,7 +443,7 @@ class TaskNode(SimNode):
 class ResourceTaskNode(SimNode):
     """ResourceTask. Consumes/transforms resources into output resources. No piece
     flow; breakdown and shutdown cards wire directly into it."""
-    NODE_NAME = "Resource Task"
+    NODE_NAME = "Resource task"
     kind = "ResourceTask"
     color = (150, 120, 60)
 
@@ -544,7 +582,7 @@ class ModelRegistryDialog(QtWidgets.QDialog):
         self.resize(520, 360)
 
         self.table = QtWidgets.QTableWidget(0, 2)
-        self.table.setHorizontalHeaderLabels(["model name", "parent model"])
+        self.table.setHorizontalHeaderLabels(["Model name", "Parent model"])
         self.table.horizontalHeader().setStretchLastSection(True)
 
         btn_add = QtWidgets.QPushButton("Add")
@@ -641,7 +679,7 @@ class TimeFunctionWidget(QtWidgets.QWidget):
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         self.kind = QtWidgets.QComboBox()
-        self.kind.addItems(list(FUNCTION_SPECS.keys()))
+        fill_combo(self.kind, list(FUNCTION_SPECS.keys()))
         lay.addWidget(self.kind)
         self._host = QtWidgets.QWidget()
         self._play = QtWidgets.QHBoxLayout(self._host)
@@ -655,8 +693,8 @@ class TimeFunctionWidget(QtWidgets.QWidget):
     def _rebuild(self, *_):
         _clear_layout(self._play)
         self._edits = {}
-        for name, default in FUNCTION_SPECS[self.kind.currentText()]:
-            self._play.addWidget(QtWidgets.QLabel(f"{name}:"))
+        for name, default in FUNCTION_SPECS[self.kind.currentData()]:
+            self._play.addWidget(QtWidgets.QLabel(f"{sentence_case(name)}:"))
             e = QtWidgets.QLineEdit(str(default))
             e.setMaximumWidth(64)
             self._play.addWidget(e)
@@ -664,11 +702,11 @@ class TimeFunctionWidget(QtWidgets.QWidget):
 
     def set_value(self, value):
         value = value or {}
-        kind = value.get("kind", "constant")
+        kind = to_canonical(value.get("kind", "constant"), list(FUNCTION_SPECS.keys()))
         if kind not in FUNCTION_SPECS:
             kind = "constant"
         blocked = self.kind.blockSignals(True)
-        self.kind.setCurrentText(kind)
+        self.kind.setCurrentIndex(max(0, self.kind.findData(kind)))
         self.kind.blockSignals(blocked)
         self._rebuild()
         for name, _ in FUNCTION_SPECS[kind]:
@@ -676,7 +714,7 @@ class TimeFunctionWidget(QtWidgets.QWidget):
                 self._edits[name].setText(str(value[name]))
 
     def get_value(self):
-        kind = self.kind.currentText()
+        kind = self.kind.currentData()
         out = {"kind": kind}
         for name, _ in FUNCTION_SPECS[kind]:
             out[name] = as_float(self._edits[name].text())
@@ -692,9 +730,9 @@ class SamplerWidget(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         top = QtWidgets.QHBoxLayout()
-        top.addWidget(QtWidgets.QLabel("type:"))
+        top.addWidget(QtWidgets.QLabel("Type:"))
         self.dist = QtWidgets.QComboBox()
-        self.dist.addItems(list(DISTRIBUTION_SPECS.keys()))
+        fill_combo(self.dist, list(DISTRIBUTION_SPECS.keys()))
         top.addWidget(self.dist)
         top.addStretch(1)
         lay.addLayout(top)
@@ -711,18 +749,18 @@ class SamplerWidget(QtWidgets.QWidget):
         while self._form.rowCount():
             self._form.removeRow(0)
         self._params = {}
-        for pname, _ptype, pdefault in DISTRIBUTION_SPECS[self.dist.currentText()]:
+        for pname, _ptype, pdefault in DISTRIBUTION_SPECS[self.dist.currentData()]:
             tf = TimeFunctionWidget(value={"kind": "constant", "value": pdefault})
-            self._form.addRow(f"{pname}", tf)
+            self._form.addRow(sentence_case(pname), tf)
             self._params[pname] = tf
 
     def set_value(self, value):
         value = value or {}
-        dist_type = value.get("dist_type", "Constant")
+        dist_type = to_canonical(value.get("dist_type", "Constant"), list(DISTRIBUTION_SPECS.keys()))
         if dist_type not in DISTRIBUTION_SPECS:
             dist_type = "Constant"
         blocked = self.dist.blockSignals(True)
-        self.dist.setCurrentText(dist_type)
+        self.dist.setCurrentIndex(max(0, self.dist.findData(dist_type)))
         self.dist.blockSignals(blocked)
         self._rebuild()
         params = value.get("params", {})
@@ -731,7 +769,7 @@ class SamplerWidget(QtWidgets.QWidget):
                 tf.set_value(params[pname])
 
     def get_value(self):
-        return {"dist_type": self.dist.currentText(),
+        return {"dist_type": self.dist.currentData(),
                 "params": {n: w.get_value() for n, w in self._params.items()}}
 
 
@@ -742,7 +780,7 @@ class InfFloatWidget(QtWidgets.QWidget):
         super().__init__(parent)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        self.chk = QtWidgets.QCheckBox("infinite")
+        self.chk = QtWidgets.QCheckBox("Infinite")
         self.edit = QtWidgets.QLineEdit()
         self.edit.setMaximumWidth(90)
         lay.addWidget(self.chk)
@@ -894,8 +932,8 @@ class _IntervalRow(QtWidgets.QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         self.start = HourMinuteWidget(start)
         self.end = HourMinuteWidget(end)
-        lay.addWidget(QtWidgets.QLabel("start:")); lay.addWidget(self.start)
-        lay.addWidget(QtWidgets.QLabel("end:")); lay.addWidget(self.end)
+        lay.addWidget(QtWidgets.QLabel("Start:")); lay.addWidget(self.start)
+        lay.addWidget(QtWidgets.QLabel("End:")); lay.addWidget(self.end)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
         if on_remove:
             rm.clicked.connect(lambda: on_remove(self))
@@ -954,8 +992,8 @@ class _CustomIntervalRow(QtWidgets.QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         self.start = DateTimeWidget(start)
         self.end = DateTimeWidget(end)
-        lay.addWidget(QtWidgets.QLabel("from:")); lay.addWidget(self.start)
-        lay.addWidget(QtWidgets.QLabel("to:")); lay.addWidget(self.end)
+        lay.addWidget(QtWidgets.QLabel("From:")); lay.addWidget(self.start)
+        lay.addWidget(QtWidgets.QLabel("To:")); lay.addWidget(self.end)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
         if on_remove:
             rm.clicked.connect(lambda: on_remove(self))
@@ -1007,11 +1045,11 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         lay = QtWidgets.QVBoxLayout(self)
         form = QtWidgets.QFormLayout()
         self.name = QtWidgets.QLineEdit(entry.get("name", ""))
-        form.addRow("name", self.name)
+        form.addRow("Name", self.name)
         self.mode = QtWidgets.QComboBox()
         for label, canonical in self.SHIFT_MODES:
             self.mode.addItem(label, canonical)
-        form.addRow("type", self.mode)
+        form.addRow("Type", self.mode)
         lay.addLayout(form)
         self._stack = QtWidgets.QStackedWidget()
         lay.addWidget(self._stack)
@@ -1032,10 +1070,10 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         hbox = QtWidgets.QHBoxLayout()
         self.h_start = DateWidget(hz.get("start"))
         self.h_end = DateWidget(hz.get("end"))
-        hbox.addWidget(QtWidgets.QLabel("from day:")); hbox.addWidget(self.h_start)
-        hbox.addWidget(QtWidgets.QLabel("to day:")); hbox.addWidget(self.h_end); hbox.addStretch(1)
+        hbox.addWidget(QtWidgets.QLabel("From day:")); hbox.addWidget(self.h_start)
+        hbox.addWidget(QtWidgets.QLabel("To day:")); hbox.addWidget(self.h_end); hbox.addStretch(1)
         hw = QtWidgets.QWidget(); hw.setLayout(hbox)
-        form2.addRow("horizon", hw)
+        form2.addRow("Horizon", hw)
         wl.addLayout(form2)
         self._stack.addWidget(weekly)
 
@@ -1058,9 +1096,9 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         # --- Days off: shared by both modes, chosen from the closing-days registry ---
         closing_days = closing_days or []
         if closing_days:
-            lay.addWidget(QtWidgets.QLabel("days off (check closing days; applies in either mode):"))
+            lay.addWidget(QtWidgets.QLabel("Days off (check closing days; applies in either mode):"))
         else:
-            lay.addWidget(QtWidgets.QLabel("days off: the closing-days registry is empty\n"
+            lay.addWidget(QtWidgets.QLabel("Days off: the closing-days registry is empty\n"
                                            "(add days in Registries > Edit closing days...)."))
         self.days_off = ClosingDayPickerWidget(closing_days, chosen=entry.get("days_off", []))
         self.days_off.setMaximumHeight(140)
@@ -1090,13 +1128,13 @@ class OperatorEditorDialog(QtWidgets.QDialog):
         form = QtWidgets.QFormLayout()
         self.name = QtWidgets.QLineEdit(entry.get("name", ""))
         self.capacity = QtWidgets.QLineEdit(str(entry.get("capacity", 1)))
-        form.addRow("name", self.name)
-        form.addRow("capacity (number of operators)", self.capacity)
+        form.addRow("Name", self.name)
+        form.addRow("Capacity (number of operators)", self.capacity)
         lay.addLayout(form)
-        lay.addWidget(QtWidgets.QLabel("productivity:"))
+        lay.addWidget(QtWidgets.QLabel("Productivity:"))
         self.prod = SamplerWidget(entry.get("productivity"))
         lay.addWidget(self.prod)
-        lay.addWidget(QtWidgets.QLabel("shifts (their concatenation is the group's schedule):"))
+        lay.addWidget(QtWidgets.QLabel("Shifts (their concatenation is the group's schedule):"))
         self.shifts = QtWidgets.QListWidget()
         chosen = set(entry.get("shifts", []))
         for nm in (shift_names or []):
@@ -1131,24 +1169,24 @@ class ResourceEditorDialog(QtWidgets.QDialog):
         self.lifespan = InfFloatWidget(entry.get("lifespan", "inf"))
         self.max_cap = QtWidgets.QLineEdit(str(entry.get("max_capacity", 1.0)))
         self.init_cap = QtWidgets.QLineEdit(str(entry.get("initial_capacity", entry.get("max_capacity", 1.0))))
-        self.restockable = QtWidgets.QCheckBox("restockable")
-        form.addRow("name", self.name)
-        form.addRow("lifespan", self.lifespan)
-        form.addRow("max storage capacity", self.max_cap)
-        form.addRow("initial capacity (in [0, max])", self.init_cap)
+        self.restockable = QtWidgets.QCheckBox("Restockable")
+        form.addRow("Name", self.name)
+        form.addRow("Lifespan", self.lifespan)
+        form.addRow("Max storage capacity", self.max_cap)
+        form.addRow("Initial capacity (in [0, max])", self.init_cap)
         form.addRow("", self.restockable)
         lay.addLayout(form)
-        self.restock_box = QtWidgets.QGroupBox("restocking")
+        self.restock_box = QtWidgets.QGroupBox("Restocking")
         rlay = QtWidgets.QVBoxLayout(self.restock_box)
-        rlay.addWidget(QtWidgets.QLabel("order duration:"))
+        rlay.addWidget(QtWidgets.QLabel("Order duration:"))
         self.order = SamplerWidget(entry.get("order_duration"))
         rlay.addWidget(self.order)
-        rlay.addWidget(QtWidgets.QLabel("delivery duration:"))
+        rlay.addWidget(QtWidgets.QLabel("Delivery duration:"))
         self.delivery = SamplerWidget(entry.get("delivery_duration"))
         rlay.addWidget(self.delivery)
         tform = QtWidgets.QFormLayout()
         self.threshold = QtWidgets.QLineEdit(str(entry.get("threshold", 0.0)))
-        tform.addRow("reorder threshold", self.threshold)
+        tform.addRow("Reorder threshold", self.threshold)
         rlay.addLayout(tform)
         lay.addWidget(self.restock_box)
         self.restockable.toggled.connect(self.restock_box.setVisible)
@@ -1261,7 +1299,7 @@ class ClosingDaysRegistryDialog(QtWidgets.QDialog):
         self._vl.addStretch(1)
         scroll.setWidget(self._host)
         lay.addWidget(scroll)
-        add = QtWidgets.QPushButton("+ closing day")
+        add = QtWidgets.QPushButton("+ Closing day")
         add.clicked.connect(lambda: self._add())
         lay.addWidget(add)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -1277,7 +1315,7 @@ class ClosingDaysRegistryDialog(QtWidgets.QDialog):
         rl = QtWidgets.QHBoxLayout(row); rl.setContentsMargins(0, 0, 0, 0)
         picker = DateWidget(entry.get("date") or "01-01-2026")
         label = QtWidgets.QLineEdit(entry.get("name", ""))
-        label.setPlaceholderText("label (optional)")
+        label.setPlaceholderText("Label (optional)")
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
         rl.addWidget(picker); rl.addWidget(label, 1); rl.addWidget(rm)
         rec = (row, picker, label, entry)  # entry kept so an existing id survives edits
@@ -1437,7 +1475,7 @@ class ResourcePickerWidget(QtWidgets.QWidget):
         self._vl = QtWidgets.QVBoxLayout(self._host)
         self._vl.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._host)
-        add = QtWidgets.QPushButton(f"+ {add_label}")
+        add = QtWidgets.QPushButton(f"+ {sentence_case(add_label)}")
         add.clicked.connect(lambda: self._add())
         lay.addWidget(add)
         for e in (entries or []):
@@ -1452,7 +1490,7 @@ class ResourcePickerWidget(QtWidgets.QWidget):
         text = str(as_int(value)) if self._int else str(value)  # counts show as 1, not 1.0
         edit = QtWidgets.QLineEdit(text); edit.setMaximumWidth(70)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
-        h.addWidget(combo); h.addWidget(QtWidgets.QLabel(self._label + ":")); h.addWidget(edit); h.addWidget(rm); h.addStretch(1)
+        h.addWidget(combo); h.addWidget(QtWidgets.QLabel(sentence_case(self._label) + ":")); h.addWidget(edit); h.addWidget(rm); h.addStretch(1)
         entry = (row, combo, edit)
         rm.clicked.connect(lambda: self._remove(entry))
         self._rows.append(entry)
@@ -1486,19 +1524,19 @@ class AlternativesWidget(QtWidgets.QWidget):
         self._vl = QtWidgets.QVBoxLayout(self._host)
         self._vl.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._host)
-        add = QtWidgets.QPushButton("+ alternative (OR)")
+        add = QtWidgets.QPushButton("+ Alternative (OR)")
         add.clicked.connect(lambda: self._add_alt())
         lay.addWidget(add)
         for alt in (value or []):
             self._add_alt(alt)
 
     def _add_alt(self, members=None):
-        box = QtWidgets.QGroupBox(f"alternative {len(self._alts) + 1} (all needed together)")
+        box = QtWidgets.QGroupBox(f"Alternative {len(self._alts) + 1} (all needed together)")
         bl = QtWidgets.QVBoxLayout(box)
         picker = ResourcePickerWidget(self._names, value_label="count", add_label="operator group", integer=True,
                                       entries=[{"resource": m.get("operator"), "value": m.get("count", 1)} for m in (members or [])])
         bl.addWidget(picker)
-        rm = QtWidgets.QPushButton("remove alternative")
+        rm = QtWidgets.QPushButton("Remove alternative")
         bl.addWidget(rm)
         entry = (box, picker)
         rm.clicked.connect(lambda: self._remove_alt(entry))
@@ -1535,34 +1573,34 @@ class PoliciesWidget(QtWidgets.QWidget):
         for name, (options, default) in (policy_options or POLICY_OPTIONS).items():
             row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
             saved = value.get(name, {})
-            combo = QtWidgets.QComboBox(); combo.addItems(options)
-            combo.setCurrentText(saved.get("type", default))
+            saved_type = to_canonical(saved.get("type", default), options)
+            combo = QtWidgets.QComboBox(); fill_combo(combo, options, saved_type)
             h.addWidget(combo)
             lbl = QtWidgets.QLabel("")
             edit = QtWidgets.QLineEdit(); edit.setMaximumWidth(60)
-            saved_spec = POLICY_TYPE_PARAMS.get(saved.get("type", default))
+            saved_spec = POLICY_TYPE_PARAMS.get(saved_type)
             if saved_spec is not None and saved_spec[0] in saved:
                 edit.setText(str(saved[saved_spec[0]]))
             h.addWidget(lbl); h.addWidget(edit); h.addStretch(1)
             self._combos[name] = combo
             self._params[name] = (lbl, edit)
             def _upd(_=None, n=name):
-                spec = POLICY_TYPE_PARAMS.get(self._combos[n].currentText())
+                spec = POLICY_TYPE_PARAMS.get(self._combos[n].currentData())
                 p_lbl, p_edit = self._params[n]
                 p_lbl.setVisible(spec is not None)
                 p_edit.setVisible(spec is not None)
                 if spec is not None:
-                    p_lbl.setText(spec[1] + ":")
+                    p_lbl.setText(sentence_case(spec[1]) + ":")
                     if not p_edit.text():
                         p_edit.setText(str(spec[2]))
             combo.currentTextChanged.connect(_upd)
             _upd()
-            form.addRow(name, row)
+            form.addRow(sentence_case(name), row)
 
     def get_value(self):
         out = {}
         for name, combo in self._combos.items():
-            t = combo.currentText()
+            t = combo.currentData()
             entry = {"type": t}
             spec = POLICY_TYPE_PARAMS.get(t)
             if spec is not None:
@@ -1734,13 +1772,14 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         self.setWindowTitle("Shutdowns")
         lay = QtWidgets.QVBoxLayout(self)
         form = QtWidgets.QFormLayout()
-        self.type = QtWidgets.QComboBox(); self.type.addItems(SHUTDOWN_TYPES)
-        self.type.setCurrentText(node.get_property("shutdown_type") if node.has_property("shutdown_type") else "NON_FLEXIBLE")
-        form.addRow("type", self.type)
+        self.type = QtWidgets.QComboBox()
+        fill_combo(self.type, SHUTDOWN_TYPES,
+                   node.get_property("shutdown_type") if node.has_property("shutdown_type") else "NON_FLEXIBLE")
+        form.addRow("Type", self.type)
         self.mode = QtWidgets.QComboBox()
         for label, canonical in self.MODES:
             self.mode.addItem(label, canonical)
-        form.addRow("intervals", self.mode)
+        form.addRow("Intervals", self.mode)
         lay.addLayout(form)
         self._stack = QtWidgets.QStackedWidget()
         lay.addWidget(self._stack)
@@ -1748,7 +1787,7 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         # --- Custom page: the explicit interval list ---
         custom = QtWidgets.QWidget()
         cl = QtWidgets.QVBoxLayout(custom); cl.setContentsMargins(0, 0, 0, 0)
-        cl.addWidget(QtWidgets.QLabel("intervals (absolute dates, dd-mm-yyyy hh:mm):"))
+        cl.addWidget(QtWidgets.QLabel("Intervals (absolute dates, dd-mm-yyyy hh:mm):"))
         self.intervals = CustomIntervalListWidget(get_property_json(node, "intervals", []))
         cl.addWidget(self.intervals)
         cl.addStretch(1)
@@ -1766,10 +1805,10 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         self.g_duration = QtWidgets.QLineEdit(str(g.get("duration", 30.0)))
         self.g_start = DateTimeWidget(default_start)
         self.g_end = DateTimeWidget(g.get("end", ""))
-        gform.addRow("in between (minutes)", self.g_in_between)
-        gform.addRow("duration (minutes)", self.g_duration)
-        gform.addRow("from", self.g_start)
-        gform.addRow("to", self.g_end)
+        gform.addRow("In between (minutes)", self.g_in_between)
+        gform.addRow("Duration (minutes)", self.g_duration)
+        gform.addRow("From", self.g_start)
+        gform.addRow("To", self.g_end)
         gl.addLayout(gform)
         gl.addStretch(1)
         self._stack.addWidget(gen)
@@ -1783,7 +1822,8 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
 
     def apply(self):
-        self.node.set_property("shutdown_type", self.type.currentText())
+        # the on-card combo lists display labels, so store the label form
+        self.node.set_property("shutdown_type", sentence_case(self.type.currentData()))
         self.node.set_property("mode", self.mode.currentData())
         set_property_json(self.node, "intervals", self.intervals.value())
         set_property_json(self.node, "generator", {
@@ -1806,17 +1846,14 @@ class BufferMenuDialog(QtWidgets.QDialog):
         # --- Buffer tab: valid models + type ---
         buf_tab = QtWidgets.QWidget()
         bl = QtWidgets.QVBoxLayout(buf_tab)
-        bl.addWidget(QtWidgets.QLabel("valid models (selecting a model selects its children):"))
+        bl.addWidget(QtWidgets.QLabel("Valid models (selecting a model selects its children):"))
         self.models = ModelTreeWidget(model_registry, checked=get_property_json(node, "valid_models", []))
         bl.addWidget(self.models)
         form = QtWidgets.QFormLayout()
         self.buffer_type = QtWidgets.QComboBox()
-        for t in BUFFER_TYPES:
-            self.buffer_type.addItem(t.capitalize(), t)
-        cur_type = node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
-        i = self.buffer_type.findData(cur_type)
-        self.buffer_type.setCurrentIndex(i if i >= 0 else 0)
-        form.addRow("type", self.buffer_type)
+        fill_combo(self.buffer_type, BUFFER_TYPES,
+                   node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE")
+        form.addRow("Type", self.buffer_type)
         bl.addLayout(form)
         tabs.addTab(buf_tab, "Buffer")
 
@@ -1849,7 +1886,7 @@ class RouterMenuDialog(QtWidgets.QDialog):
         self.freeloader.setCurrentIndex(fi if fi >= 0 else 0)
         if self._buffers:
             ff = QtWidgets.QFormLayout()
-            ff.addRow("freeloader", self.freeloader)
+            ff.addRow("Freeloader", self.freeloader)
             lay.addLayout(ff)
         form = QtWidgets.QFormLayout()
         for b in self._buffers:
@@ -1909,7 +1946,7 @@ class GeneratorMenuDialog(QtWidgets.QDialog):
         self.node = node
         self.setWindowTitle("Piece generator")
         lay = QtWidgets.QVBoxLayout(self)
-        lay.addWidget(QtWidgets.QLabel("shifts (when the generator emits pieces):"))
+        lay.addWidget(QtWidgets.QLabel("Shifts (when the generator emits pieces):"))
         self.shifts = ShiftPickerWidget(shift_names, get_property_json(node, "shifts", []))
         lay.addWidget(self.shifts)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -1933,7 +1970,7 @@ class ModelProbsWidget(QtWidgets.QWidget):
         self._host = QtWidgets.QWidget()
         self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._host)
-        add = QtWidgets.QPushButton("+ model"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        add = QtWidgets.QPushButton("+ Model"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
         for e in (entries or []):
             self._add(e.get("model"), e.get("probability"))
 
@@ -1945,7 +1982,7 @@ class ModelProbsWidget(QtWidgets.QWidget):
             combo.setCurrentText(name)
         tf = TimeFunctionWidget(probability if not is_free else {"kind": "constant", "value": 0.0})
         tf.setDisabled(is_free)
-        free_chk = QtWidgets.QCheckBox("freeloader"); free_chk.setChecked(is_free)
+        free_chk = QtWidgets.QCheckBox("Freeloader"); free_chk.setChecked(is_free)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
         h.addWidget(combo); h.addWidget(tf); h.addWidget(free_chk); h.addWidget(rm); h.addStretch(1)
         entry = (row, combo, tf, free_chk)
@@ -1993,19 +2030,18 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self._pending = criterion or {}
         lay = QtWidgets.QVBoxLayout(self)
 
-        start_box = QtWidgets.QGroupBox("start date (calendar anchor of t=0)")
+        start_box = QtWidgets.QGroupBox("Start date (calendar anchor of t=0)")
         sl = QtWidgets.QHBoxLayout(start_box)
         self.start_date = DateTimeWidget(start_date or "01-01-2026 00:00")
         sl.addWidget(self.start_date); sl.addStretch(1)
         lay.addWidget(start_box)
 
-        crit_box = QtWidgets.QGroupBox("stopping criterion and piece generation")
+        crit_box = QtWidgets.QGroupBox("Stopping criterion and piece generation")
         cl = QtWidgets.QVBoxLayout(crit_box)
         top = QtWidgets.QFormLayout()
         self.type = QtWidgets.QComboBox()
-        for label, canonical in STOPPING_CRITERION_TYPES:
-            self.type.addItem(label, canonical)
-        top.addRow("stop on", self.type)
+        fill_combo(self.type, STOPPING_CRITERION_TYPES)
+        top.addRow("Stop on", self.type)
         cl.addLayout(top)
         self._host = QtWidgets.QWidget()
         self._host_lay = QtWidgets.QVBoxLayout(self._host)
@@ -2047,21 +2083,21 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
     def _build_pieces(self, src):
         goals = FixedGoalsWidget(self._leaf_models, src.get("models_goals", []))
         self._widgets["goals"] = goals
-        self._add_row("model goals (one goal per leaf model)", goals)
+        self._add_row("Model goals (one goal per leaf model)", goals)
         timeout = InfFloatWidget(src.get("timeout", "inf"))
         self._widgets["timeout"] = timeout
-        self._add_row("timeout (minutes)", timeout)
+        self._add_row("Timeout (minutes)", timeout)
 
     def _build_time(self, src):
         stop = DateTimeWidget(src.get("time", ""))  # an absolute stop date
         self._widgets["time"] = stop
-        self._add_row("stop at", stop)
+        self._add_row("Stop at", stop)
         gap = TimeFunctionWidget(src.get("gap") or {"kind": "constant", "value": 1.0})
         self._widgets["gap"] = gap
-        self._add_row("gap between pieces (minutes; constant or function of time)", gap)
+        self._add_row("Gap between pieces (minutes; constant or function of time)", gap)
         probs = ModelProbsWidget(self._leaf_models, src.get("models_probs", []))
         self._widgets["probs"] = probs
-        self._add_row("model probabilities (one may be the freeloader; checked when sampled)", probs)
+        self._add_row("Model probabilities (one may be the freeloader; checked when sampled)", probs)
 
     def value(self):
         canonical = self.type.currentData()
@@ -2082,21 +2118,23 @@ class BreakdownMenuDialog(QtWidgets.QDialog):
         self.setWindowTitle("Breakdown")
         lay = QtWidgets.QVBoxLayout(self)
         mtbf = get_property_json(node, "mtbf", {}) or {}
-        lay.addWidget(QtWidgets.QLabel("mtbf (mean time between failures):"))
-        self.mode = QtWidgets.QComboBox(); self.mode.addItems(["distribution", "bathtub"])
-        self.mode.setCurrentText(mtbf.get("mode", "distribution"))
+        lay.addWidget(QtWidgets.QLabel("MTBF (mean time between failures):"))
+        self.mode = QtWidgets.QComboBox()
+        fill_combo(self.mode, ["distribution", "bathtub"], mtbf.get("mode", "distribution"))
         lay.addWidget(self.mode)
         self.dist = SamplerWidget(mtbf.get("distribution"))
         lay.addWidget(self.dist)
-        self.bathtub_box = QtWidgets.QGroupBox("bathtub failure-rate a·e^(t/tau)+c+(beta/eta)(t/eta)^(beta-1)")
+        self.bathtub_box = QtWidgets.QGroupBox("Bathtub failure-rate a·e^(t/tau)+c+(beta/eta)(t/eta)^(beta-1)")
         bl = QtWidgets.QFormLayout(self.bathtub_box)
         self.bt = {}
         for k, d in (("a", 0.001), ("tau", 500.0), ("c", 0.01), ("beta", 2.0), ("eta", 300.0),
                      ("tolerance", 60.0), ("max_iters", 10000)):
-            e = QtWidgets.QLineEdit(str(mtbf.get(k, d))); self.bt[k] = e; bl.addRow(k, e)
+            e = QtWidgets.QLineEdit(str(mtbf.get(k, d))); self.bt[k] = e
+            # formula symbols (a, tau, ...) match the title; only word-y params get prettified
+            bl.addRow(k if len(k) <= 4 else sentence_case(k), e)
         lay.addWidget(self.bathtub_box)
         self.mode.currentTextChanged.connect(self._upd)
-        lay.addWidget(QtWidgets.QLabel("mttr (mean time to repair) distribution:"))
+        lay.addWidget(QtWidgets.QLabel("MTTR (mean time to repair) distribution:"))
         self.mttr = SamplerWidget(get_property_json(node, "mttr", None))
         lay.addWidget(self.mttr)
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -2104,11 +2142,11 @@ class BreakdownMenuDialog(QtWidgets.QDialog):
         self._upd()
 
     def _upd(self, *_):
-        bathtub = self.mode.currentText() == "bathtub"
+        bathtub = self.mode.currentData() == "bathtub"
         self.bathtub_box.setVisible(bathtub); self.dist.setVisible(not bathtub)
 
     def apply(self):
-        if self.mode.currentText() == "distribution":
+        if self.mode.currentData() == "distribution":
             mtbf = {"mode": "distribution", "distribution": self.dist.get_value()}
         else:
             mtbf = {"mode": "bathtub"}
@@ -2128,7 +2166,7 @@ class ModelConfigsWidget(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
         self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._host)
-        add = QtWidgets.QPushButton("+ model config"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        add = QtWidgets.QPushButton("+ Model config"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
         for e in (entries or []):
             self._add(e)
 
@@ -2138,16 +2176,16 @@ class ModelConfigsWidget(QtWidgets.QWidget):
         combo = QtWidgets.QComboBox(); combo.addItems(self._models)
         if entry.get("model") in self._models:
             combo.setCurrentText(entry["model"])
-        bl.addRow("model", combo)
-        dur = SamplerWidget(entry.get("duration")); bl.addRow("duration", dur)
+        bl.addRow("Model", combo)
+        dur = SamplerWidget(entry.get("duration")); bl.addRow("Duration", dur)
         res = ResourcePickerWidget(self._resources, "quantity",
                                    [{"resource": r.get("resource"), "value": r.get("value", r.get("quantity", 1.0))}
                                     for r in entry.get("resources", [])])
-        bl.addRow("resources", res)
+        bl.addRow("Resources", res)
         mn = QtWidgets.QLineEdit(str(entry.get("min_carrier_capacity", 1))); mn.setMaximumWidth(60)
         mx = QtWidgets.QLineEdit(str(entry.get("max_carrier_capacity", 1))); mx.setMaximumWidth(60)
-        bl.addRow("min carrier capacity", mn); bl.addRow("max carrier capacity", mx)
-        rm = QtWidgets.QPushButton("remove model"); bl.addRow(rm)
+        bl.addRow("Min carrier capacity", mn); bl.addRow("Max carrier capacity", mx)
+        rm = QtWidgets.QPushButton("Remove model"); bl.addRow(rm)
         rec = (box, combo, dur, res, mn, mx)
         rm.clicked.connect(lambda: self._remove(rec))
         self._rows.append(rec); self._vl.addWidget(box)
@@ -2183,8 +2221,8 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
 
     # durations
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
-    f.addWidget(QtWidgets.QLabel("startup duration:")); acc["startup_duration"] = SamplerWidget(get_property_json(node, "startup_duration", None)); f.addWidget(acc["startup_duration"])
-    f.addWidget(QtWidgets.QLabel("loading duration:")); acc["loading_duration"] = SamplerWidget(get_property_json(node, "loading_duration", None)); f.addWidget(acc["loading_duration"])
+    f.addWidget(QtWidgets.QLabel("Startup duration:")); acc["startup_duration"] = SamplerWidget(get_property_json(node, "startup_duration", None)); f.addWidget(acc["startup_duration"])
+    f.addWidget(QtWidgets.QLabel("Loading duration:")); acc["loading_duration"] = SamplerWidget(get_property_json(node, "loading_duration", None)); f.addWidget(acc["loading_duration"])
     for label, wdg in extra.get("durations", []):
         f.addWidget(QtWidgets.QLabel(label)); f.addWidget(wdg)
     f.addStretch(1)
@@ -2192,32 +2230,34 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
 
     # operators
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
-    f.addWidget(QtWidgets.QLabel("operators (alternatives):")); acc["operators"] = AlternativesWidget(operator_names, get_property_json(node, "operators", [])); f.addWidget(acc["operators"])
-    f.addWidget(QtWidgets.QLabel("loading operators:")); acc["loading_operators"] = AlternativesWidget(operator_names, get_property_json(node, "loading_operators", [])); f.addWidget(acc["loading_operators"])
-    f.addWidget(QtWidgets.QLabel("startup operators:")); acc["startup_operators"] = AlternativesWidget(operator_names, get_property_json(node, "startup_operators", [])); f.addWidget(acc["startup_operators"])
+    f.addWidget(QtWidgets.QLabel("Operators (alternatives):")); acc["operators"] = AlternativesWidget(operator_names, get_property_json(node, "operators", [])); f.addWidget(acc["operators"])
+    f.addWidget(QtWidgets.QLabel("Loading operators:")); acc["loading_operators"] = AlternativesWidget(operator_names, get_property_json(node, "loading_operators", [])); f.addWidget(acc["loading_operators"])
+    f.addWidget(QtWidgets.QLabel("Startup operators:")); acc["startup_operators"] = AlternativesWidget(operator_names, get_property_json(node, "startup_operators", [])); f.addWidget(acc["startup_operators"])
     tabs.append(("Operators", _scroll(t)))
 
     # carriers
     t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
-    acc["min_carriers"] = QtWidgets.QLineEdit(str(node.get_property("min_carriers"))); f.addRow("min_carriers", acc["min_carriers"])
-    acc["max_capacity"] = QtWidgets.QLineEdit(str(node.get_property("max_capacity"))); f.addRow("max_capacity", acc["max_capacity"])
+    acc["min_carriers"] = QtWidgets.QLineEdit(str(node.get_property("min_carriers"))); f.addRow("Min carriers", acc["min_carriers"])
+    acc["max_capacity"] = QtWidgets.QLineEdit(str(node.get_property("max_capacity"))); f.addRow("Max capacity", acc["max_capacity"])
     acc["timeout"] = InfFloatWidget(node.get_property("timeout") if node.has_property("timeout") else "inf")
-    f.addRow("timeout", acc["timeout"])
-    acc["priority"] = QtWidgets.QLineEdit(str(node.get_property("priority"))); f.addRow("priority", acc["priority"])
-    acc["contiguous_carriers"] = QtWidgets.QCheckBox(); acc["contiguous_carriers"].setChecked(bool(node.get_property("contiguous_carriers"))); f.addRow("contiguous carriers", acc["contiguous_carriers"])
-    acc["independent_carriers"] = QtWidgets.QCheckBox(); acc["independent_carriers"].setChecked(bool(node.get_property("independent_carriers"))); f.addRow("independent carriers", acc["independent_carriers"])
+    f.addRow("Timeout", acc["timeout"])
+    acc["priority"] = QtWidgets.QLineEdit(str(node.get_property("priority"))); f.addRow("Priority", acc["priority"])
+    acc["contiguous_carriers"] = QtWidgets.QCheckBox(); acc["contiguous_carriers"].setChecked(bool(node.get_property("contiguous_carriers"))); f.addRow("Contiguous carriers", acc["contiguous_carriers"])
+    acc["independent_carriers"] = QtWidgets.QCheckBox(); acc["independent_carriers"].setChecked(bool(node.get_property("independent_carriers"))); f.addRow("Independent carriers", acc["independent_carriers"])
     for label, wdg in extra.get("carriers", []):
         f.addRow(label, wdg)
     tabs.append(("Carriers", _scroll(t)))
 
     # scopes
     t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
-    acc["operator_scope"] = QtWidgets.QComboBox(); acc["operator_scope"].addItems(["PER_BATCH", "PER_TASK"]); acc["operator_scope"].setCurrentText(node.get_property("operator_scope"))
-    acc["resource_scope"] = QtWidgets.QComboBox(); acc["resource_scope"].addItems(["PER_UNIT", "PER_BATCH"]); acc["resource_scope"].setCurrentText(node.get_property("resource_scope"))
-    f.addRow("operator scope", acc["operator_scope"]); f.addRow("resource scope", acc["resource_scope"])
+    acc["operator_scope"] = QtWidgets.QComboBox(); fill_combo(acc["operator_scope"], ["PER_BATCH", "PER_TASK"], node.get_property("operator_scope"))
+    acc["resource_scope"] = QtWidgets.QComboBox(); fill_combo(acc["resource_scope"], ["PER_UNIT", "PER_BATCH"], node.get_property("resource_scope"))
+    f.addRow("Operator scope", acc["operator_scope"]); f.addRow("Resource scope", acc["resource_scope"])
     if collector_types is not None:
-        acc["collector_type"] = QtWidgets.QComboBox(); acc["collector_type"].addItems(collector_types); acc["collector_type"].setCurrentText(node.get_property("collector_type") if node.has_property("collector_type") else collector_types[0])
-        f.addRow("collector type", acc["collector_type"])
+        acc["collector_type"] = QtWidgets.QComboBox()
+        fill_combo(acc["collector_type"], collector_types,
+                   node.get_property("collector_type") if node.has_property("collector_type") else collector_types[0])
+        f.addRow("Collector type", acc["collector_type"])
     for label, wdg in extra.get("scopes", []):
         f.addRow(label, wdg)
     tabs.append(("Scopes", _scroll(t)))
@@ -2230,7 +2270,7 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
 
     # shifts
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
-    f.addWidget(QtWidgets.QLabel("task shifts:")); acc["task_shifts"] = ShiftPickerWidget(shift_names, get_property_json(node, "task_shifts", [])); f.addWidget(acc["task_shifts"]); f.addStretch(1)
+    f.addWidget(QtWidgets.QLabel("Task shifts:")); acc["task_shifts"] = ShiftPickerWidget(shift_names, get_property_json(node, "task_shifts", [])); f.addWidget(acc["task_shifts"]); f.addStretch(1)
     tabs.append(("Shifts", _scroll(t)))
 
     return tabs, acc
@@ -2246,10 +2286,10 @@ def _apply_carrier_common(node, acc):
     set_property_json(node, "operators", acc["operators"].get_value())
     set_property_json(node, "loading_operators", acc["loading_operators"].get_value())
     set_property_json(node, "startup_operators", acc["startup_operators"].get_value())
-    node.set_property("operator_scope", acc["operator_scope"].currentText())
-    node.set_property("resource_scope", acc["resource_scope"].currentText())
+    node.set_property("operator_scope", acc["operator_scope"].currentData())
+    node.set_property("resource_scope", acc["resource_scope"].currentData())
     if "collector_type" in acc:
-        node.set_property("collector_type", acc["collector_type"].currentText())
+        node.set_property("collector_type", acc["collector_type"].currentData())
     node.set_property("min_carriers", as_int(acc["min_carriers"].text(), 1))
     node.set_property("max_capacity", as_float(acc["max_capacity"].text(), 1.0))
     node.set_property("timeout", acc["timeout"].get_value())  # number of minutes | "inf"
@@ -2294,14 +2334,14 @@ class ResourceTaskMenuDialog(QtWidgets.QDialog):
         tabs = QtWidgets.QTabWidget(); lay.addWidget(tabs)
         # resources tab (resource I/O only)
         t0 = QtWidgets.QWidget(); f0 = QtWidgets.QVBoxLayout(t0)
-        f0.addWidget(QtWidgets.QLabel("non-transformed inputs (quantity consumed):"))
+        f0.addWidget(QtWidgets.QLabel("Non-transformed inputs (quantity consumed):"))
         self.non_transformed = ResourcePickerWidget(rnames, "quantity",
             [{"resource": e.get("resource"), "value": e.get("value", e.get("quantity", 1.0))} for e in get_property_json(node, "non_transformed_resources", [])])
         f0.addWidget(self.non_transformed)
-        f0.addWidget(QtWidgets.QLabel("transformed inputs (proportion + salvageable):"))
+        f0.addWidget(QtWidgets.QLabel("Transformed inputs (proportion + salvageable):"))
         self.transformed = _TransformedWidget(rnames, get_property_json(node, "transformed_resources", []))
         f0.addWidget(self.transformed)
-        f0.addWidget(QtWidgets.QLabel("outputs produced (bounded distribution, ≥ 0):"))
+        f0.addWidget(QtWidgets.QLabel("Outputs produced (bounded distribution, ≥ 0):"))
         self.outputs = _OutputsWidget(rnames, get_property_json(node, "resources_out", []))
         f0.addWidget(self.outputs)
         tabs.addTab(_scroll(t0), "Resources")
@@ -2309,11 +2349,11 @@ class ResourceTaskMenuDialog(QtWidgets.QDialog):
         self.duration = SamplerWidget(get_property_json(node, "duration", None))
         self.min_cc = QtWidgets.QLineEdit(str(node.get_property("min_carrier_capacity")))
         self.max_cc = QtWidgets.QLineEdit(str(node.get_property("max_carrier_capacity")))
-        self.rct = QtWidgets.QComboBox(); self.rct.addItems(RESOURCE_COLLECTOR_TYPES); self.rct.setCurrentText(node.get_property("resource_collector_type"))
+        self.rct = QtWidgets.QComboBox(); fill_combo(self.rct, RESOURCE_COLLECTOR_TYPES, node.get_property("resource_collector_type"))
         extra = {
-            "durations": [("duration:", self.duration)],
-            "carriers": [("min carrier capacity", self.min_cc), ("max carrier capacity", self.max_cc)],
-            "scopes": [("resource collector type", self.rct)],
+            "durations": [("Duration:", self.duration)],
+            "carriers": [("Min carrier capacity", self.min_cc), ("Max carrier capacity", self.max_cc)],
+            "scopes": [("Resource collector type", self.rct)],
         }
         common, self.acc = _carrier_common_tab(node, _names(win.operator_registry), _names(win.shift_registry), None, extra=extra)
         for label, wdg in common:
@@ -2328,7 +2368,7 @@ class ResourceTaskMenuDialog(QtWidgets.QDialog):
         set_property_json(self.node, "resources_out", self.outputs.value())
         self.node.set_property("min_carrier_capacity", as_float(self.min_cc.text(), 1.0))
         self.node.set_property("max_carrier_capacity", as_float(self.max_cc.text(), 1.0))
-        self.node.set_property("resource_collector_type", self.rct.currentText())
+        self.node.set_property("resource_collector_type", self.rct.currentData())
         _apply_carrier_common(self.node, self.acc)
 
 
@@ -2339,7 +2379,7 @@ class _TransformedWidget(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
         self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._host)
-        add = QtWidgets.QPushButton("+ transformed resource"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        add = QtWidgets.QPushButton("+ Transformed resource"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
         for e in (entries or []):
             self._add(e)
 
@@ -2350,9 +2390,9 @@ class _TransformedWidget(QtWidgets.QWidget):
         if entry.get("resource") in self._names:
             combo.setCurrentText(entry["resource"])
         prop = QtWidgets.QLineEdit(str(entry.get("proportion", 1.0))); prop.setMaximumWidth(60)
-        salv = QtWidgets.QCheckBox("salvageable"); salv.setChecked(bool(entry.get("salvageable", True)))
+        salv = QtWidgets.QCheckBox("Salvageable"); salv.setChecked(bool(entry.get("salvageable", True)))
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
-        h.addWidget(combo); h.addWidget(QtWidgets.QLabel("proportion:")); h.addWidget(prop); h.addWidget(salv); h.addWidget(rm); h.addStretch(1)
+        h.addWidget(combo); h.addWidget(QtWidgets.QLabel("Proportion:")); h.addWidget(prop); h.addWidget(salv); h.addWidget(rm); h.addStretch(1)
         rec = (row, combo, prop, salv); rm.clicked.connect(lambda: self._remove(rec))
         self._rows.append(rec); self._vl.addWidget(row)
 
@@ -2372,7 +2412,7 @@ class _OutputsWidget(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
         self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._host)
-        add = QtWidgets.QPushButton("+ output resource"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
+        add = QtWidgets.QPushButton("+ Output resource"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
         for e in (entries or []):
             self._add(e)
 
@@ -2382,12 +2422,12 @@ class _OutputsWidget(QtWidgets.QWidget):
         combo = QtWidgets.QComboBox(); combo.addItems(self._names)
         if entry.get("resource") in self._names:
             combo.setCurrentText(entry["resource"])
-        bl.addRow("resource", combo)
-        dist = SamplerWidget(entry.get("distribution")); bl.addRow("amount", dist)
+        bl.addRow("Resource", combo)
+        dist = SamplerWidget(entry.get("distribution")); bl.addRow("Amount", dist)
         lb = QtWidgets.QLineEdit(str(entry.get("lowerbound", 0.0))); lb.setMaximumWidth(90)
         ub = QtWidgets.QLineEdit(str(entry.get("upperbound", 1.0))); ub.setMaximumWidth(90)
-        bl.addRow("lowerbound (≥ 0)", lb)
-        bl.addRow("upperbound (finite)", ub)
+        bl.addRow("Lowerbound (≥ 0)", lb)
+        bl.addRow("Upperbound (finite)", ub)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24); bl.addRow(rm)
         rec = (box, combo, dist, lb, ub); rm.clicked.connect(lambda: self._remove(rec))
         self._rows.append(rec); self._vl.addWidget(box)
@@ -2402,11 +2442,237 @@ class _OutputsWidget(QtWidgets.QWidget):
                 for _, c, d, lb, ub in self._rows if c.currentText()]
 
 
+# ============================================================
+# Run simulation (subprocess + progress popup)
+# ============================================================
+
+class RunSimulationDialog(QtWidgets.QDialog):
+    """Progress popup for a simulation run. The simulation runs in a subprocess
+    (sim_runner.py) that prints machine-readable '@@TAG {json}' lines; this dialog
+    shows elapsed wall time, the simulated date and, per stopping criterion,
+    either time progress (By time) or pieces produced (By pieces produced), with
+    an 'n / total' caption above the progress bar. When the run finishes, the
+    report folder is one click away."""
+
+    BAR_STEPS = 1000  # progress bar resolution (fractions map to 0..BAR_STEPS)
+
+    def __init__(self, parent, json_path: str):
+        super().__init__(parent)
+        self.setWindowTitle("Run simulation")
+        self.setMinimumWidth(460)
+        self._json_path = json_path
+        self._meta = None
+        self._sim_start = None
+        self._report_dir = None
+        self._error_message = None
+        self._stderr_tail = []
+        self._stdout_buffer = ""
+        self._finished = False
+
+        lay = QtWidgets.QVBoxLayout(self)
+        file_lbl = QtWidgets.QLabel(f"Running {os.path.basename(json_path)}")
+        file_lbl.setStyleSheet("font-weight: bold;")
+        lay.addWidget(file_lbl)
+
+        form = QtWidgets.QFormLayout()
+        self.elapsed_lbl = QtWidgets.QLabel("0:00:00")
+        form.addRow("Elapsed time", self.elapsed_lbl)
+        self.sim_time_lbl = QtWidgets.QLabel("—")
+        form.addRow("Simulated time", self.sim_time_lbl)
+        self.pieces_lbl = QtWidgets.QLabel("—")
+        self._pieces_row = form.rowCount()
+        form.addRow("Pieces in exit buffer", self.pieces_lbl)
+        lay.addLayout(form)
+        self._form = form
+        self._set_pieces_row_visible(False)
+
+        self.caption_lbl = QtWidgets.QLabel("")
+        self.caption_lbl.setAlignment(QtCore.Qt.AlignHCenter)
+        lay.addWidget(self.caption_lbl)
+        self.bar = QtWidgets.QProgressBar()
+        self.bar.setRange(0, self.BAR_STEPS)
+        self.bar.setValue(0)
+        lay.addWidget(self.bar)
+
+        self.status_lbl = QtWidgets.QLabel("Starting...")
+        self.status_lbl.setWordWrap(True)
+        lay.addWidget(self.status_lbl)
+
+        buttons = QtWidgets.QHBoxLayout()
+        self.open_report_btn = QtWidgets.QPushButton("Open report folder")
+        self.open_report_btn.setVisible(False)
+        self.open_report_btn.clicked.connect(self._open_report)
+        buttons.addStretch(1)
+        buttons.addWidget(self.open_report_btn)
+        self.cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self._on_cancel_clicked)
+        buttons.addWidget(self.cancel_btn)
+        lay.addLayout(buttons)
+
+        # wall clock, ticking every half second
+        self._wall = QtCore.QElapsedTimer()
+        self._wall.start()
+        self._tick = QtCore.QTimer(self)
+        self._tick.setInterval(500)
+        self._tick.timeout.connect(self._update_elapsed)
+        self._tick.start()
+
+        # the simulation subprocess
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sim_runner.py")
+        self._proc = QtCore.QProcess(self)
+        self._proc.setWorkingDirectory(repo_root)
+        env = QtCore.QProcessEnvironment.systemEnvironment()
+        env.insert("MPLBACKEND", "Agg")  # report figures only; never open windows
+        self._proc.setProcessEnvironment(env)
+        self._proc.readyReadStandardOutput.connect(self._on_stdout)
+        self._proc.readyReadStandardError.connect(self._on_stderr)
+        self._proc.finished.connect(self._on_finished)
+        self._proc.start(sys.executable, ["-u", runner, json_path])
+
+    # --- subprocess plumbing ---
+
+    def _on_stdout(self):
+        data = bytes(self._proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        self._stdout_buffer += data
+        while "\n" in self._stdout_buffer:
+            line, self._stdout_buffer = self._stdout_buffer.split("\n", 1)
+            self._handle_line(line.strip())
+
+    def _on_stderr(self):
+        data = bytes(self._proc.readAllStandardError()).decode("utf-8", errors="replace")
+        self._stderr_tail.extend(data.splitlines())
+        self._stderr_tail = self._stderr_tail[-30:]
+
+    def _handle_line(self, line: str):
+        if not line.startswith("@@"):
+            return
+        tag, _, payload = line[2:].partition(" ")
+        try:
+            info = json.loads(payload or "{}")
+        except Exception:
+            return
+        if tag == "META":
+            self._meta = info
+            self._sim_start = parse_date_time(info.get("sim_start"))
+            self._set_pieces_row_visible(info.get("criterion") == "ByPiecesProduced")
+            self.status_lbl.setText("Simulation running...")
+        elif tag == "PROGRESS":
+            self._show_progress(info)
+        elif tag == "DONE":
+            self._report_dir = info.get("report_dir")
+            self._show_progress(info)
+        elif tag == "ERROR":
+            self._error_message = info.get("message")
+
+    def _show_progress(self, info: dict):
+        sim_now = info.get("sim_now")
+        if sim_now is None:
+            return
+        if self._sim_start is not None:
+            date = self._sim_start + timedelta(minutes=sim_now)
+            self.sim_time_lbl.setText(f"{date.strftime(PY_DATE_TIME_FORMAT)}  (day {int(sim_now // 1440) + 1})")
+        else:
+            self.sim_time_lbl.setText(f"{sim_now:.0f} minutes")
+        meta = self._meta or {}
+        if meta.get("criterion") == "ByPiecesProduced":
+            pieces = info.get("pieces")
+            goal = meta.get("goal")
+            if pieces is not None:
+                self.pieces_lbl.setText(str(pieces))
+                if goal:
+                    self.caption_lbl.setText(f"{pieces} / {goal} pieces")
+                    self.bar.setValue(min(self.BAR_STEPS, int(self.BAR_STEPS * pieces / goal)))
+        elif meta.get("criterion") == "ByTime":
+            total = meta.get("total_time")
+            if total:
+                self.caption_lbl.setText(f"{sim_now / 1440.0:.1f} / {total / 1440.0:.1f} days simulated")
+                self.bar.setValue(min(self.BAR_STEPS, int(self.BAR_STEPS * sim_now / total)))
+
+    def _on_finished(self, exit_code, *args):
+        self._finished = True
+        self._tick.stop()
+        self._update_elapsed()
+        self.cancel_btn.setText("Close")
+        if exit_code == 0 and self._report_dir:
+            self.status_lbl.setText(f"Simulation finished. Report written to:\n{self._report_dir}")
+            self.open_report_btn.setVisible(True)
+        elif self._error_message:
+            self.status_lbl.setText(f"Simulation failed: {self._error_message}")
+        elif exit_code != 0:
+            tail = "\n".join(self._stderr_tail[-8:])
+            self.status_lbl.setText(f"Simulation failed (exit code {exit_code}).\n{tail}")
+        else:
+            self.status_lbl.setText("Simulation finished.")
+
+    # --- UI helpers ---
+
+    def _set_pieces_row_visible(self, visible: bool):
+        try:
+            self._form.setRowVisible(self._pieces_row, visible)
+        except Exception:  # Qt < 6.4 fallback: hide the widgets themselves
+            self.pieces_lbl.setVisible(visible)
+            lbl = self._form.labelForField(self.pieces_lbl)
+            if lbl is not None:
+                lbl.setVisible(visible)
+
+    def _update_elapsed(self):
+        seconds = int(self._wall.elapsed() / 1000)
+        h, rem = divmod(seconds, 3600)
+        m, s = divmod(rem, 60)
+        self.elapsed_lbl.setText(f"{h}:{m:02d}:{s:02d}")
+
+    def _open_report(self):
+        if self._report_dir:
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(self._report_dir))
+
+    def _confirm_abort(self) -> bool:
+        answer = QtWidgets.QMessageBox.question(
+            self, "Stop simulation", "The simulation is still running. Stop it?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+        return answer == QtWidgets.QMessageBox.Yes
+
+    def _kill(self):
+        try:
+            self._proc.kill()
+            self._proc.waitForFinished(2000)
+        except Exception:
+            pass
+
+    def _on_cancel_clicked(self):
+        if self._finished:
+            self.accept()
+        elif self._confirm_abort():
+            self._kill()
+            self.reject()
+
+    def closeEvent(self, event):
+        if self._finished or self._confirm_abort():
+            self._kill()
+            event.accept()
+        else:
+            event.ignore()
+
+    def reject(self):  # Esc key lands here too
+        if self._finished:
+            super().reject()
+        elif self._confirm_abort():
+            self._kill()
+            super().reject()
+
+
 class FlowEditorWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(APP_NAME)
         self.resize(1400, 850)
+
+        # Word-style session state: the file backing the canvas and whether the
+        # canvas has diverged from it. The title shows "name[*] — app"; Qt swaps
+        # the [*] marker in and out with setWindowModified.
+        self.current_path = None
+        self._dirty = False
+        self._suspend_dirty = False  # True while (re)loading, so restores stay clean
+        self._update_title()
 
         self.graph = NodeGraph()
 
@@ -2459,11 +2725,20 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def _build_menus(self):
         file_menu = self.menuBar().addMenu("File")
         act_new = file_menu.addAction("New")
+        act_new.setShortcut(QtGui.QKeySequence.New)
+        act_open = file_menu.addAction("Open...")
+        act_open.setShortcut(QtGui.QKeySequence.Open)
         act_import = file_menu.addAction("Import clean JSON (add)...")
-        act_export = file_menu.addAction("Export clean JSON...")
-        act_new.triggered.connect(self.new_graph)
+        file_menu.addSeparator()
+        act_save = file_menu.addAction("Save")
+        act_save.setShortcut(QtGui.QKeySequence.Save)
+        act_save_as = file_menu.addAction("Save as...")
+        act_save_as.setShortcut(QtGui.QKeySequence.SaveAs)
+        act_new.triggered.connect(lambda checked=False: self.new_graph())
+        act_open.triggered.connect(lambda checked=False: self.open_file_dialog())
         act_import.triggered.connect(self.import_clean_json_dialog)
-        act_export.triggered.connect(self.export_clean_json_dialog)
+        act_save.triggered.connect(lambda checked=False: self.save_file())
+        act_save_as.triggered.connect(lambda checked=False: self.save_file_as())
 
         registries_menu = self.menuBar().addMenu("Registries")
         registries_menu.addAction("Edit models...").triggered.connect(self.edit_models)
@@ -2474,6 +2749,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
         simulation_menu = self.menuBar().addMenu("Simulation")
         simulation_menu.addAction("Settings...").triggered.connect(self.edit_simulation_settings)
+        act_run = simulation_menu.addAction("Run simulation...")
+        act_run.setShortcut("F5")
+        act_run.triggered.connect(lambda checked=False: self.run_simulation())
 
         edit_menu = self.menuBar().addMenu("Edit")
         copy_action = edit_menu.addAction("Copy cards")
@@ -2498,16 +2776,16 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         tools_menu.addAction("Frame all").triggered.connect(self.frame_all)
 
         templates_menu = self.menuBar().addMenu("Templates")
-        templates_menu.addAction("Add Backdrop Around Selection").triggered.connect(self.add_backdrop_around_selection)
+        templates_menu.addAction("Add backdrop around selection").triggered.connect(self.add_backdrop_around_selection)
 
         create_menu = self.menuBar().addMenu("Create")
         for label, cls_name in [
             ("Shutdowns", "simulation.flow.ShutdownsNode"),
             ("Buffer", "simulation.flow.BufferNode"),
             ("Router", "simulation.flow.RouterNode"),
-            ("Piece Generator", "simulation.flow.PieceGeneratorNode"),
-            ("Piece Task", "simulation.flow.TaskNode"),
-            ("Resource Task", "simulation.flow.ResourceTaskNode"),
+            ("Piece generator", "simulation.flow.PieceGeneratorNode"),
+            ("Piece task", "simulation.flow.TaskNode"),
+            ("Resource task", "simulation.flow.ResourceTaskNode"),
             ("Breakdown", "simulation.flow.BreakdownNode"),
         ]:
             action = create_menu.addAction(label)
@@ -2566,6 +2844,150 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             self.graph.port_connected.connect(self.on_port_connected)
         except Exception:
             pass
+        # anything that mutates the graph marks the session dirty (node lifecycle,
+        # wiring, property/position edits); best effort across NodeGraphQt versions
+        for signal_name in ("node_created", "nodes_deleted", "port_connected",
+                            "port_disconnected", "property_changed"):
+            try:
+                getattr(self.graph, signal_name).connect(self.mark_dirty)
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
+    # Dirty tracking + Word-style save flow. The canvas belongs to a file
+    # (current_path); mutating it marks the session dirty, and New / Open /
+    # closing the window offer to save first.
+    # ------------------------------------------------------------------
+
+    def mark_dirty(self, *args, **kwargs):
+        if self._suspend_dirty or self._dirty:
+            return
+        self._dirty = True
+        self.setWindowModified(True)
+
+    def set_clean(self):
+        self._dirty = False
+        self.setWindowModified(False)
+
+    def is_dirty(self) -> bool:
+        return self._dirty
+
+    def _display_name(self) -> str:
+        return os.path.basename(self.current_path) if self.current_path else "Untitled"
+
+    def _update_title(self):
+        self.setWindowTitle(f"{self._display_name()}[*] — {APP_NAME}")
+        self.setWindowModified(self._dirty)
+
+    def maybe_save(self) -> bool:
+        """Offer to save unsaved changes before discarding the session.
+        True = go ahead (saved or explicitly discarded), False = cancel."""
+        if not self._dirty:
+            return True
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle(APP_NAME)
+        box.setIcon(QtWidgets.QMessageBox.Warning)
+        box.setText(f"Do you want to save the changes made to {self._display_name()}?")
+        box.setInformativeText("Your changes will be lost if you don't save them.")
+        box.setStandardButtons(QtWidgets.QMessageBox.Save | QtWidgets.QMessageBox.Discard
+                               | QtWidgets.QMessageBox.Cancel)
+        box.setDefaultButton(QtWidgets.QMessageBox.Save)
+        answer = box.exec()
+        if answer == QtWidgets.QMessageBox.Save:
+            return self.save_file()
+        return answer == QtWidgets.QMessageBox.Discard
+
+    def save_file(self) -> bool:
+        if not self.current_path:
+            return self.save_file_as()
+        return self._write_to(self.current_path)
+
+    def save_file_as(self) -> bool:
+        suggested = self.current_path or "flow.json"
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save flow JSON", suggested, "JSON (*.json)")
+        if not path:
+            return False
+        if not path.lower().endswith(".json"):
+            path += ".json"
+        return self._write_to(path)
+
+    def _write_to(self, path: str) -> bool:
+        try:
+            data = self.export_clean_json()
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as error:
+            qmessage(self, "Save failed", f"Could not save {path}:\n{error}",
+                     QtWidgets.QMessageBox.Warning)
+            return False
+        self.current_path = path
+        self.set_clean()
+        self._update_title()
+        self.statusBar().showMessage(f"Saved {path}")
+        return True
+
+    def open_file_dialog(self):
+        if not self.maybe_save():
+            return
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open flow JSON", "", "JSON (*.json)")
+        if not path:
+            return
+        self.open_file(path)
+
+    def open_file(self, path: str):
+        """Replace the session with a file's content (unlike the import action,
+        which adds to it). Ids are kept, so open then save round-trips cleanly."""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as error:
+            qmessage(self, "Open failed", f"Could not open {path}:\n{error}",
+                     QtWidgets.QMessageBox.Warning)
+            return
+        self._suspend_dirty = True
+        try:
+            self.reset_session()
+            self.import_clean_json(data, remap_ids=False)
+        finally:
+            self._suspend_dirty = False
+        self.current_path = path
+        self.set_clean()
+        self._update_title()
+        self.statusBar().showMessage(f"Opened {path}")
+
+    def closeEvent(self, event):
+        if self.maybe_save():
+            event.accept()
+        else:
+            event.ignore()
+
+    def run_simulation(self):
+        """Save (the run executes the file on disk), warn about validation
+        problems, then run the parser + simulation in a subprocess behind a
+        progress popup."""
+        if self._dirty and self.current_path:
+            box = QtWidgets.QMessageBox(self)
+            box.setWindowTitle("Run simulation")
+            box.setIcon(QtWidgets.QMessageBox.Question)
+            box.setText(f"{self._display_name()} has unsaved changes.")
+            box.setInformativeText("The simulation runs the saved file, so the changes "
+                                   "must be saved first. Save and run?")
+            box.setStandardButtons(QtWidgets.QMessageBox.Save | QtWidgets.QMessageBox.Cancel)
+            box.setDefaultButton(QtWidgets.QMessageBox.Save)
+            if box.exec() != QtWidgets.QMessageBox.Save:
+                return
+        if self._dirty or not self.current_path:
+            if not self.save_file():  # falls through to Save as... when never saved
+                return
+        problems = self.validate_graph()
+        if problems:
+            answer = QtWidgets.QMessageBox.question(
+                self, "Validation warnings",
+                "The graph has validation warnings; the run may fail.\nRun anyway?\n\n"
+                + "\n".join(problems[:12]))
+            if answer != QtWidgets.QMessageBox.Yes:
+                return
+        RunSimulationDialog(self, self.current_path).exec()
 
     def all_nodes(self) -> List[BaseNode]:
         try:
@@ -2620,6 +3042,18 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         return node
 
     def new_graph(self):
+        if not self.maybe_save():
+            return
+        self._suspend_dirty = True
+        try:
+            self.reset_session()
+        finally:
+            self._suspend_dirty = False
+        self.current_path = None
+        self.set_clean()
+        self._update_title()
+
+    def reset_session(self):
         self.graph.clear_session()
         self.model_registry = []
         self.resource_registry = []
@@ -2633,11 +3067,17 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def _ids_by_name(entries):
         return {e.get("name"): e.get("id") for e in entries if e.get("id")}
 
+    def _mark_dirty_if_changed(self, before, after):
+        if before != after:
+            self.mark_dirty()
+
     def edit_models(self):
         dlg = ModelRegistryDialog(self, self.model_registry)
         if dlg.exec():
             try:
+                before = copy.deepcopy(self.model_registry)
                 self.model_registry = ensure_ids(dlg.models(), "model", self._ids_by_name(self.model_registry))
+                self._mark_dirty_if_changed(before, self.model_registry)
                 self.statusBar().showMessage(f"{len(self.model_registry)} models defined.")
             except Exception as e:
                 qmessage(self, "Invalid models", str(e), QtWidgets.QMessageBox.Warning)
@@ -2645,37 +3085,46 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def edit_resources(self):
         dlg = ResourceRegistryDialog(self, self.resource_registry)
         if dlg.exec():
+            before = copy.deepcopy(self.resource_registry)
             self.resource_registry = ensure_ids(dlg.entries(), "resource", self._ids_by_name(self.resource_registry))
+            self._mark_dirty_if_changed(before, self.resource_registry)
             self.statusBar().showMessage(f"{len(self.resource_registry)} resources defined.")
 
     def edit_operators(self):
         shift_names = [s.get("name", "") for s in self.shift_registry if s.get("name")]
         dlg = OperatorRegistryDialog(self, self.operator_registry, shift_names=shift_names)
         if dlg.exec():
+            before = copy.deepcopy(self.operator_registry)
             self.operator_registry = ensure_ids(dlg.entries(), "operator", self._ids_by_name(self.operator_registry))
+            self._mark_dirty_if_changed(before, self.operator_registry)
             self.statusBar().showMessage(f"{len(self.operator_registry)} operator groups defined.")
 
     def edit_closing_days(self):
         dlg = ClosingDaysRegistryDialog(self, self.closing_day_registry)
         if dlg.exec():
+            before = copy.deepcopy(self.closing_day_registry)
             old_by_date = {e.get("date"): e.get("id") for e in self.closing_day_registry if e.get("id")}
             self.closing_day_registry = ensure_ids(dlg.entries(), "closingday", old_by_date, key="date")
+            self._mark_dirty_if_changed(before, self.closing_day_registry)
             self.statusBar().showMessage(f"{len(self.closing_day_registry)} closing days defined.")
 
     def edit_shifts(self):
         dlg = ShiftRegistryDialog(self, self.shift_registry, closing_days=self.closing_day_registry)
         if dlg.exec():
+            before = copy.deepcopy(self.shift_registry)
             self.shift_registry = ensure_ids(dlg.entries(), "shift", self._ids_by_name(self.shift_registry))
+            self._mark_dirty_if_changed(before, self.shift_registry)
             self.statusBar().showMessage(f"{len(self.shift_registry)} shift definitions.")
 
     def edit_simulation_settings(self):
         dlg = SimulationSettingsDialog(self, self.start_date, self.stopping_criterion,
                                        self.model_registry)
         if dlg.exec():
+            before = (self.start_date, copy.deepcopy(self.stopping_criterion))
             self.start_date = dlg.start_value()
             self.stopping_criterion = dlg.value()
-            label = next((lbl for lbl, canon in STOPPING_CRITERION_TYPES
-                          if canon == self.stopping_criterion.get("type")), "?")
+            self._mark_dirty_if_changed(before, (self.start_date, self.stopping_criterion))
+            label = sentence_case(self.stopping_criterion.get("type") or "?")
             start = self.start_date or "not set"
             self.statusBar().showMessage(f"Simulation: start {start}; stops on {label}.")
 
@@ -2826,21 +3275,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "backdrops": backdrops,
         }
 
-    def export_clean_json_dialog(self):
-        problems = self.validate_graph()
-        if problems:
-            answer = QtWidgets.QMessageBox.question(
-                self, "Validation warnings",
-                "The graph has validation warnings. Export anyway?\n\n" + "\n".join(problems[:12]))
-            if answer != QtWidgets.QMessageBox.Yes:
-                return
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export clean JSON", "clean_export.json", "JSON (*.json)")
-        if not path:
-            return
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.export_clean_json(), f, indent=2, ensure_ascii=False)
-        self.statusBar().showMessage(f"Exported clean JSON: {path}")
-
     def validate_graph_dialog(self):
         problems = self.validate_graph()
         if not problems:
@@ -2987,16 +3421,16 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                                         f"(must be <= 1 so the freeloader can take the rest).")
             if kind == "Task":
                 if not connected_refs_from_port(node, "bufs_in", "input"):
-                    problems.append(f"Piece Task '{name}' has no input buffers.")
+                    problems.append(f"Piece task '{name}' has no input buffers.")
                 if not get_output_refs(node, "bufs_out"):
-                    problems.append(f"Piece Task '{name}' has no output buffers.")
+                    problems.append(f"Piece task '{name}' has no output buffers.")
                 mc = get_property_json(node, "models_configs", [])
                 if not mc:
-                    problems.append(f"Piece Task '{name}' has no model configs.")
+                    problems.append(f"Piece task '{name}' has no model configs.")
                 else:
                     for m in mc:
                         if not m.get("duration"):
-                            problems.append(f"Piece Task '{name}' model '{m.get('model')}' has no duration.")
+                            problems.append(f"Piece task '{name}' model '{m.get('model')}' has no duration.")
                     # The vacant-slot pool (max_capacity) must fit the carrier
                     # capacities, or collectors deadlock waiting for slots that
                     # can never exist (they hold what they have while asking
@@ -3007,11 +3441,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                         mn = as_float(m.get("min_carrier_capacity", 1))
                         mx = as_float(m.get("max_carrier_capacity", 1))
                         if cap < mn:
-                            problems.append(f"Piece Task '{name}': max_capacity {cap:g} is smaller than "
+                            problems.append(f"Piece task '{name}': max_capacity {cap:g} is smaller than "
                                             f"min_carrier_capacity {mn:g} (model '{m.get('model')}') — "
                                             f"carriers can never collect their minimum batch.")
                         elif not contiguous and cap < mx:
-                            problems.append(f"Piece Task '{name}': non-contiguous carriers reserve "
+                            problems.append(f"Piece task '{name}': non-contiguous carriers reserve "
                                             f"max_carrier_capacity {mx:g} slots (model '{m.get('model')}') "
                                             f"but max_capacity is {cap:g} — the collector deadlocks "
                                             f"waiting for slots that cannot exist.")
@@ -3022,48 +3456,48 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                                        ("min_carrier_capacity", "min_carrier_capacity"),
                                        ("max_carrier_capacity", "max_carrier_capacity")]:
                             if len({json.dumps(m.get(f), sort_keys=True) for m in mc}) > 1:
-                                problems.append(f"Piece Task '{name}': a non-discriminating collector requires "
+                                problems.append(f"Piece task '{name}': a non-discriminating collector requires "
                                                 f"all models to share the same {lbl}.")
                     self._check_flushability(node, [m.get("model") for m in mc if m.get("model")],
-                                             "bufs_out", "Piece Task", problems)
+                                             "bufs_out", "Piece task", problems)
 
             elif kind == "ResourceTask":
                 if not get_property_json(node, "duration", None):
-                    problems.append(f"Resource Task '{name}' has no duration.")
+                    problems.append(f"Resource task '{name}' has no duration.")
                 # same slot-pool rule as piece tasks
                 cap = as_float(node.get_property("max_capacity") if node.has_property("max_capacity") else 1.0, 1.0)
                 contiguous = bool(node.get_property("contiguous_carriers")) if node.has_property("contiguous_carriers") else False
                 mn = as_float(node.get_property("min_carrier_capacity") if node.has_property("min_carrier_capacity") else 1.0, 1.0)
                 mx = as_float(node.get_property("max_carrier_capacity") if node.has_property("max_carrier_capacity") else 1.0, 1.0)
                 if cap < mn:
-                    problems.append(f"Resource Task '{name}': max_capacity {cap:g} is smaller than "
+                    problems.append(f"Resource task '{name}': max_capacity {cap:g} is smaller than "
                                     f"min_carrier_capacity {mn:g} — carriers can never collect "
                                     f"their minimum batch.")
                 elif not contiguous and cap < mx:
-                    problems.append(f"Resource Task '{name}': non-contiguous carriers reserve "
+                    problems.append(f"Resource task '{name}': non-contiguous carriers reserve "
                                     f"max_carrier_capacity {mx:g} slots but max_capacity is {cap:g} — "
                                     f"the collector deadlocks waiting for slots that cannot exist.")
                 outs = get_property_json(node, "resources_out", [])
                 if not outs:
-                    problems.append(f"Resource Task '{name}' has no output resources.")
+                    problems.append(f"Resource task '{name}' has no output resources.")
                 for out in outs:
                     if as_float(out.get("lowerbound", 0.0)) < 0:
-                        problems.append(f"Resource Task '{name}': output '{out.get('resource')}' "
+                        problems.append(f"Resource task '{name}': output '{out.get('resource')}' "
                                         f"lowerbound must be ≥ 0.")
                     ub = out.get("upperbound", 1.0)
                     if ub in ("inf", "Infinity") or as_float(ub, 1.0) == float("inf"):
-                        problems.append(f"Resource Task '{name}': output '{out.get('resource')}' "
+                        problems.append(f"Resource task '{name}': output '{out.get('resource')}' "
                                         f"upperbound must be finite.")
                 # transformed-resource proportions are treated as probabilities: in [0,1] and sum to 1
                 tr = get_property_json(node, "transformed_resources", [])
                 props = [as_float(t.get("proportion", 0.0)) for t in tr]
                 if not tr:
-                    problems.append(f"Resource Task '{name}': needs transformed resources whose proportions "
+                    problems.append(f"Resource task '{name}': needs transformed resources whose proportions "
                                     f"sum to 1 (the simulation rejects an empty set).")
                 elif any(p < 0 or p > 1 for p in props):
-                    problems.append(f"Resource Task '{name}': transformed-resource proportions must be in [0, 1].")
+                    problems.append(f"Resource task '{name}': transformed-resource proportions must be in [0, 1].")
                 elif abs(sum(props) - 1.0) > 1e-6:
-                    problems.append(f"Resource Task '{name}': transformed-resource proportions must sum to 1 "
+                    problems.append(f"Resource task '{name}': transformed-resource proportions must sum to 1 "
                                     f"(currently {sum(props):g}).")
 
             elif kind == "Breakdown":
@@ -3087,9 +3521,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 # (Simulation Settings); the node carries its shifts and its wiring.
                 # The criterion block below checks the models against these outlets.
                 if not get_output_refs(node, "bufs_out"):
-                    problems.append(f"Piece Generator '{name}' has no outlets.")
+                    problems.append(f"Piece generator '{name}' has no outlets.")
                 if not get_property_json(node, "shifts", []):
-                    problems.append(f"Piece Generator '{name}' has no shifts (double-click it to choose when it emits).")
+                    problems.append(f"Piece generator '{name}' has no shifts (double-click it to choose when it emits).")
                 # A scrap buffer must never sit on the generator's outlet chain, not
                 # even through routers: freshly generated pieces would be scrapped on
                 # arrival, and the parser cannot build the object cycle
@@ -3104,7 +3538,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     okind = node_kind(outlet)
                     if (okind == "Buffer" and outlet.has_property("buffer_type")
                             and outlet.get_property("buffer_type") == "SCRAP"):
-                        problems.append(f"Piece Generator '{name}': its outlet chain reaches SCRAP "
+                        problems.append(f"Piece generator '{name}': its outlet chain reaches SCRAP "
                                         f"buffer '{outlet.name()}' (generated pieces would be "
                                         f"scrapped on arrival).")
                     elif okind == "Router":
@@ -3185,9 +3619,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         # Mirror the simulation's guard: exactly one piece generator.
         gen_count = sum(1 for n in self.all_nodes() if node_kind(n) == "PieceGenerator")
         if gen_count == 0:
-            problems.append("No Piece Generator: the simulation requires exactly one.")
+            problems.append("No piece generator: the simulation requires exactly one.")
         elif gen_count > 1:
-            problems.append(f"{gen_count} Piece Generators: the simulation allows exactly one.")
+            problems.append(f"{gen_count} piece generators: the simulation allows exactly one.")
 
         # The start date is mandatory: every absolute date converts against it.
         if start_dt is None:
@@ -3215,7 +3649,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                                 "(give at least one model a goal above zero).")
             if gen_node is not None:
                 self._check_flushability(gen_node, [g.get("model") for g in goals if g.get("model")],
-                                         "bufs_out", "Piece Generator", problems)
+                                         "bufs_out", "Piece generator", problems)
         elif crit.get("type") == "ByTime":
             stop_dt = parse_date_time(crit.get("time"))
             if stop_dt is None:
@@ -3232,7 +3666,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 problems.append("Stopping criterion 'Time' has no gap between pieces (Simulation > Settings...).")
             if gen_node is not None:
                 self._check_flushability(gen_node, [mp.get("model") for mp in probs if mp.get("model")],
-                                         "bufs_out", "Piece Generator", problems)
+                                         "bufs_out", "Piece generator", problems)
 
         # Shifts: days off come from the closing-days registry; custom mode = absolute
         # date intervals; weekly mode = date horizon containing the days off.
@@ -3497,7 +3931,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             selected = []
         if not selected:
             qmessage(self, "No selection",
-                     "Select nodes, then use Templates > Add Backdrop Around Selection.",
+                     "Select nodes, then use Templates > Add backdrop around selection.",
                      QtWidgets.QMessageBox.Information)
             return
         self.add_backdrop_for_nodes(selected, "Group")
@@ -3558,6 +3992,10 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 self.set_property_safe(node, key, node_data[key])
 
         # Shapes that differ between the flat export and the stored property:
+        if kind == "Shutdowns" and node_data.get("shutdown_type") is not None:
+            # the on-card combo lists display labels while the JSON stays canonical
+            self.set_property_safe(node, "shutdown_type",
+                                   sentence_case(to_canonical(node_data["shutdown_type"], SHUTDOWN_TYPES)))
         if kind == "Router":
             prob_map = {}
             for item in node_data.get("buffer_probs", []):
@@ -3712,9 +4150,10 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                       f"{connection.get('to_node')}.{connection.get('to_port')}: {error}")
         return id_to_node
 
-    def import_clean_json(self, data: dict):
+    def import_clean_json(self, data: dict, remap_ids: bool = True):
         data = self._resolve_ref_ids_to_names(data)
-        data = self._remap_ids(data)
+        if remap_ids:  # False when a file replaces the session (open): ids kept stable
+            data = self._remap_ids(data)
         data = self._offset_imported_positions(data)
         self._merge_models(data.get("models", []))
         self._merge_named_registry("resource_registry", data.get("resources", []))

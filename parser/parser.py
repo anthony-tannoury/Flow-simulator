@@ -45,8 +45,31 @@ def join_shifts(shifts: list[list[Interval]]) -> list[Interval]:
         return joined
 
 
+def canon_name(value: str) -> str:
+    """Normalization for type names: the canonical identifiers (ByTime, PER_BATCH,
+    AbortPendingCarriers) and their sentence-case display forms (By time, Per batch,
+    Abort pending carriers) collapse to one key, so files written with either
+    naming parse the same."""
+    return ''.join(ch for ch in str(value) if ch.isalnum()).lower()
+
+
+def lookup(table: dict, value: str, what: str):
+    """table[value], accepting any spelling canon_name folds together."""
+    if value in table:
+        return table[value]
+    key = canon_name(value)
+    for k, v in table.items():
+        if canon_name(k) == key:
+            return v
+    raise NotImplementedError(f"unknown {what}: {value!r}")
+
+
+def same_name(value: str, canonical: str) -> bool:
+    return canon_name(value) == canon_name(canonical)
+
+
 def make_callable(c: dict) -> float | Callable[[float], float]:
-    match c['kind']:
+    match canon_name(c['kind']):
         case 'constant':
             return c['value']
         case 'linear':
@@ -64,10 +87,7 @@ def make_distribution(distribution: dict) -> Distribution:
         for param in distribution['params'].values():
             params.append(make_callable(param))
 
-        if distribution['dist_type'] not in DISTR_TYPE_TO_CLASS:
-            raise NotImplementedError()
-
-        return Distribution(DISTR_TYPE_TO_CLASS[distribution['dist_type']], *params)
+        return Distribution(lookup(DISTR_TYPE_TO_CLASS, distribution['dist_type'], 'distribution type'), *params)
 
 
 def make_salabim_distribution(distribution: dict) -> sim.Distribution:
@@ -75,14 +95,12 @@ def make_salabim_distribution(distribution: dict) -> sim.Distribution:
 
     if not all(isinstance(p, (int, float)) for p in params):
         raise NotImplementedError('output-resource distributions must have constant parameters')
-    if distribution['dist_type'] not in DISTR_TYPE_TO_CLASS:
-        raise NotImplementedError()
 
-    return DISTR_TYPE_TO_CLASS[distribution['dist_type']](*params)
+    return lookup(DISTR_TYPE_TO_CLASS, distribution['dist_type'], 'distribution type')(*params)
 
 
 def make_mtbf(mtbf: dict) -> Sampler:
-    match mtbf['mode']:
+    match canon_name(mtbf['mode']):
         case 'distribution':
             return make_distribution(mtbf['distribution'])
         case 'bathtub':
@@ -96,32 +114,32 @@ def make_mtbf(mtbf: dict) -> Sampler:
 
 
 def make_protocol(policy: dict):
-    match policy['type']:
-        case 'AbortPendingCarriers':
+    match canon_name(policy['type']):
+        case 'abortpendingcarriers':
             return AbortPendingCarriers()
-        case 'WaitForCarriers':
+        case 'waitforcarriers':
             return WaitForCarriers()
-        case 'AbortOrWaitForCarriers':
+        case 'abortorwaitforcarriers':
             return AbortOrWaitForCarriers(tolerance_fraction=policy['tolerance_fraction'])
-        case 'ConstrainedByShift':
+        case 'constrainedbyshift':
             return ConstrainedByShift()
-        case 'NotConstrainedByShift':
+        case 'notconstrainedbyshift':
             return NotConstrainedByShift()
-        case 'PartiallyConstrainedByShift':
+        case 'partiallyconstrainedbyshift':
             return PartiallyConstrainedByShift(tolerance=policy['tolerance'])
-        case 'Conscious':
+        case 'conscious':
             return Conscious()
-        case 'Unconscious':
+        case 'unconscious':
             return Unconscious()
-        case 'FirstInFirstOut':
+        case 'firstinfirstout':
             return FirstInFirstOut()
-        case 'FirstCreatedFirstOut':
+        case 'firstcreatedfirstout':
             return FirstCreatedFirstOut()
-        case 'MostPresent':
+        case 'mostpresent':
             return MostPresent()
-        case 'FastestTaskDuration':
+        case 'fastesttaskduration':
             return FastestTaskDuration()
-        case 'SmallestGapToMinCarrierCapacity':
+        case 'smallestgaptomincarriercapacity':
             return SmallestGapToMinCarrierCapacity()
         case _:
             raise NotImplementedError()
@@ -284,7 +302,7 @@ class Parser:
             target = self.by_id[entry['buffer']]
             if target['kind'] == 'Router':
                 raise NotImplementedError('router-to-router chains are not supported')
-            if target['buffer_type'] == 'SCRAP':
+            if same_name(target['buffer_type'], 'SCRAP'):
                 return True
         return False
 
@@ -318,7 +336,7 @@ class Parser:
         for shift in self.data['shifts']:
             days_off = {self.closing_days[d] for d in shift['days_off']}
 
-            match shift['mode']:
+            match canon_name(shift['mode']):
                 case 'weekly':
                     working_days = [d['working'] for d in shift['days']]
                     shifts_per_day = [[(to_minutes(s['start']), to_minutes(s['end'])) for s in d['intervals']] for d in shift['days']]
@@ -382,14 +400,14 @@ class Parser:
         self.scrap_buffers_ids = []
 
         for buffer in self.per_kind['Buffer']:
-            if buffer['buffer_type'] == 'SCRAP':
+            if same_name(buffer['buffer_type'], 'SCRAP'):
                 self.scrap_buffers_ids.append(buffer['id'])
                 continue
 
             self.outlets[buffer['id']] = Buffer(
                 name=buffer['name'],
                 valid_models=[self.models[m] for m in buffer['valid_models']],
-                buffer_type=STR_TO_BUFFER_TYPE[buffer['buffer_type']],
+                buffer_type=lookup(STR_TO_BUFFER_TYPE, buffer['buffer_type'], 'buffer type'),
             )
 
     def load_routers(self, with_scrap: bool) -> None:
@@ -415,12 +433,12 @@ class Parser:
         shifts = join_shifts([self.shifts[id_] for id_ in node['shifts']])
         outlets = [self.outlets[id_] for id_ in node['outlets']]
 
-        match criterion['type']:
-            case 'ByPiecesProduced':
+        match canon_name(criterion['type']):
+            case 'bypiecesproduced':
                 models_goals = {self.models[mg['model']]: mg['goal'] for mg in criterion['models_goals']}
                 self.piece_generator = GoalPieceGenerator(
                     name=node['name'], models_goals=models_goals, shifts=shifts, outlets=outlets)
-            case 'ByTime':
+            case 'bytime':
                 models = [self.models[mp['model']] for mp in criterion['models_probs']]
                 model_probs = [make_callable(mp['probability']) if mp['probability'] is not None else None
                                for mp in criterion['models_probs']]
@@ -451,8 +469,8 @@ class Parser:
                 startup_operators=self.make_alternative(pt['startup_operators']),
                 loading_operators=self.make_alternative(pt['loading_operators']),
                 operators=self.make_alternative(pt['operators']),
-                operator_scope=STR_TO_SCOPE[pt['operator_scope']],
-                resource_scope=STR_TO_SCOPE[pt['resource_scope']],
+                operator_scope=lookup(STR_TO_SCOPE, pt['operator_scope'], 'operator scope'),
+                resource_scope=lookup(STR_TO_SCOPE, pt['resource_scope'], 'resource scope'),
                 min_carriers=pt['min_carriers'],
                 max_capacity=pt['max_capacity'],
                 timeout=float(pt['timeout']),
@@ -461,7 +479,7 @@ class Parser:
                 independent_carriers=pt['independent_carriers'],
                 protocols=make_piece_protocols(pt['policies']),
                 models_configs=self.make_models_configs(pt['models_configs']),
-                piece_collector_type=STR_TO_PIECE_COLLECTOR_TYPE[pt['collector_type']]
+                piece_collector_type=lookup(STR_TO_PIECE_COLLECTOR_TYPE, pt['collector_type'], 'collector type')
             )
             self.tasks[pt['id']] = PieceTask(
                 name=pt['name'],
@@ -479,8 +497,8 @@ class Parser:
                 startup_operators=self.make_alternative(rt['startup_operators']),
                 loading_operators=self.make_alternative(rt['loading_operators']),
                 operators=self.make_alternative(rt['operators']),
-                operator_scope=STR_TO_SCOPE[rt['operator_scope']],
-                resource_scope=STR_TO_SCOPE[rt['resource_scope']],
+                operator_scope=lookup(STR_TO_SCOPE, rt['operator_scope'], 'operator scope'),
+                resource_scope=lookup(STR_TO_SCOPE, rt['resource_scope'], 'resource scope'),
                 min_carriers=rt['min_carriers'],
                 max_capacity=rt['max_capacity'],
                 timeout=float(rt['timeout']),
@@ -497,7 +515,7 @@ class Parser:
                                                   r['lowerbound'], r['upperbound']))
                                      for r in rt['resources_out']],
                 duration=make_distribution(rt['duration']),
-                resource_collector_type=STR_TO_RESOURCE_COLLECTOR_TYPE[rt['resource_collector_type']],
+                resource_collector_type=lookup(STR_TO_RESOURCE_COLLECTOR_TYPE, rt['resource_collector_type'], 'resource collector type'),
                 min_carrier_capacity=rt['min_carrier_capacity'],
                 max_carrier_capacity=rt['max_carrier_capacity']
             )
@@ -512,7 +530,7 @@ class Parser:
             for id_ in task_node['shutdowns']:
                 shutdowns_node = self.by_id[id_]
 
-                match shutdowns_node.get('mode', 'custom'):
+                match canon_name(shutdowns_node.get('mode', 'custom')):
                     case 'custom':
                         intervals = [self.to_interval(i) for i in shutdowns_node['intervals']]
                     case 'generator':
@@ -528,10 +546,10 @@ class Parser:
                     case _:
                         raise NotImplementedError()
 
-                match shutdowns_node['shutdown_type']:
-                    case 'FLEXIBLE':
+                match canon_name(shutdowns_node['shutdown_type']):
+                    case 'flexible':
                         FlexibleShutdowns(task=task, intervals=intervals)
-                    case 'NON_FLEXIBLE':
+                    case 'nonflexible':
                         NonFlexibleShutdowns(task=task, intervals=intervals)
                     case _:
                         raise NotImplementedError()
@@ -549,14 +567,14 @@ class Parser:
     def load_stopping_criterion(self) -> None:
         criterion = self.data['stopping_criterion']
 
-        match criterion['type']:
-            case 'ByTime':
+        match canon_name(criterion['type']):
+            case 'bytime':
                 minutes = ShiftManager.minutes_between(self.sim_start, to_datetime(criterion['time']))
                 self.stopping_criterion = ByTime(time=minutes)
-            case 'ByPiecesProduced':
+            case 'bypiecesproduced':
                 total = sum(mg['goal'] for mg in criterion['models_goals'])
                 exit_buffer = next(self.outlets[b['id']] for b in self.per_kind['Buffer']
-                                   if b['buffer_type'] == 'EXIT')
+                                   if same_name(b['buffer_type'], 'EXIT'))
                 self.stopping_criterion = ByPiecesProduced(
                     total=total,
                     exit_buffer=exit_buffer,
