@@ -381,6 +381,9 @@ class PieceTask(Task, PickyPieceTaker):
                 raise ValueError("Piece task cannot have different max_carrrier_capacity for models and not discriminate")
 
         PickyPieceTaker.__init__(self, list(config.models_configs.keys()))
+        for inlet in inlets:
+            if not inlet.can_flush_into(self):
+                raise ValueError("Inlets must be able to flush into piece task")
         check_outlet_validity(self, outlets)
 
         super().setup(config=config, carrier_type=PieceCarrier)
