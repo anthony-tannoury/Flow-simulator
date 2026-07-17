@@ -215,6 +215,40 @@ class Parser:
         self.discriminate()
         self.by_id = {n['id']: n for n in self.data['nodes']}
 
+    @staticmethod
+    def _describe_fn(fn) -> str:
+        """Compact text for a time-function dict: constants show as the bare
+        number, anything else as kind(param=value, ...)."""
+        if not isinstance(fn, dict):
+            return str(fn)
+        if canon_name(fn.get('kind', 'constant')) == 'constant':
+            return f"{fn.get('value', 0):g}"
+        params = ', '.join(f"{k}={v:g}" for k, v in fn.items() if k != 'kind')
+        return f"{fn['kind']}({params})"
+
+    def describe_criterion(self) -> str:
+        """The stopping criterion as readable text: model ids resolved to names,
+        durations rendered like the rest of the report, functions compacted."""
+        parts = []
+        for key, value in self.data['stopping_criterion'].items():
+            if key == 'type':
+                continue
+            if key == 'models_goals':
+                parts.append('models_goals: ' + ', '.join(
+                    f"{self.models[mg['model']].name} = {mg['goal']}" for mg in value))
+            elif key == 'models_probs':
+                parts.append('models_probs: ' + ', '.join(
+                    f"{self.models[mp['model']].name} = "
+                    + ('reste' if mp['probability'] is None else self._describe_fn(mp['probability']))
+                    for mp in value))
+            elif key == 'gap':
+                parts.append(f"gap = {self._describe_fn(value)}")
+            elif key in ('timeout', 'grace_period') and isinstance(value, (int, float)) and value != float('inf'):
+                parts.append(f"{key} = {kpis.fmt_duree(value)}")
+            else:
+                parts.append(f"{key} = {value}")
+        return '; '.join(parts)
+
     def report(self, directory: str | None = None) -> str:
         if directory is None:
             stem = os.path.splitext(os.path.basename(self.filename))[0]
@@ -228,7 +262,7 @@ class Parser:
             'fin': (self.sim_start + timedelta(minutes=env.now())).strftime('%d-%m-%Y %H:%M'),
             'temps_calcul': kpis.fmt_duree((perf_counter() - self.loaded_at) / 60),
             'critere_arret': criterion['type'],
-            'critere_details': ', '.join(f"{k} = {v}" for k, v in criterion.items() if k != 'type'),
+            'critere_details': self.describe_criterion(),
         }
         kpis.write_report(
             directory,
