@@ -1956,59 +1956,48 @@ class GeneratorMenuDialog(QtWidgets.QDialog):
         set_property_json(self.node, "shifts", self.shifts.chosen())
 
 
-class ModelProbsWidget(QtWidgets.QWidget):
-    """Rows of (model-combo, probability time-function), used by the rate generator.
-    Exactly one row may be marked the freeloader: its probability is 1 - sum(others),
-    so its function slot is disabled and it is exported as None. Value:
-    [{"model": name, "probability": <time-function> | None}]."""
+class FixedModelProbsWidget(QtWidgets.QWidget):
+    """One fixed probability row per leaf model, used by the rate generator: no
+    add/remove, no model dropdown, so every leaf model is forced to carry an
+    explicit emission probability (a constant or a function of time). At most one
+    model may be marked the freeloader: its probability is 1 - sum(others), so
+    its function slot is disabled and it is exported as None. A model absent from
+    the prior entries starts at 0. Value: [{"model", "probability": <time-function>
+    | None}] over all leaf models."""
 
-    def __init__(self, model_names, entries=None, parent=None):
+    def __init__(self, leaf_model_names, entries=None, parent=None):
         super().__init__(parent)
-        self._names = list(model_names)
-        self._rows = []  # (row_widget, combo, tf, free_chk)
-        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
-        self._host = QtWidgets.QWidget()
-        self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self._host)
-        add = QtWidgets.QPushButton("+ Model"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
-        for e in (entries or []):
-            self._add(e.get("model"), e.get("probability"))
-
-    def _add(self, name=None, probability=0.0):
-        is_free = probability is None
-        row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
-        combo = QtWidgets.QComboBox(); combo.addItems(self._names)
-        if name in self._names:
-            combo.setCurrentText(name)
-        tf = TimeFunctionWidget(probability if not is_free else {"kind": "constant", "value": 0.0})
-        tf.setDisabled(is_free)
-        free_chk = QtWidgets.QCheckBox("Freeloader"); free_chk.setChecked(is_free)
-        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
-        h.addWidget(combo); h.addWidget(tf); h.addWidget(free_chk); h.addWidget(rm); h.addStretch(1)
-        entry = (row, combo, tf, free_chk)
-        free_chk.toggled.connect(lambda checked, e=entry: self._on_free_toggled(e, checked))
-        rm.clicked.connect(lambda: self._remove(entry))
-        self._rows.append(entry); self._vl.addWidget(row)
+        prior = {e.get("model"): e.get("probability") for e in (entries or [])}
+        self._rows = []  # (name, tf, free_chk)
+        form = QtWidgets.QFormLayout(self)
+        form.setContentsMargins(0, 0, 0, 0)
+        if not leaf_model_names:
+            form.addRow(QtWidgets.QLabel("(define at least one leaf model first)"))
+        for name in leaf_model_names:
+            is_free = name in prior and prior[name] is None
+            probability = prior.get(name) or {"kind": "constant", "value": 0.0}
+            row = QtWidgets.QWidget()
+            h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
+            tf = TimeFunctionWidget(probability)
+            tf.setDisabled(is_free)
+            free_chk = QtWidgets.QCheckBox("Freeloader"); free_chk.setChecked(is_free)
+            h.addWidget(tf); h.addWidget(free_chk); h.addStretch(1)
+            entry = (name, tf, free_chk)
+            free_chk.toggled.connect(lambda checked, e=entry: self._on_free_toggled(e, checked))
+            self._rows.append(entry)
+            form.addRow(name, row)
 
     def _on_free_toggled(self, entry, checked):
         if checked:  # freeloader is exclusive: clear any other, re-enable its slot
             for e in self._rows:
-                if e is not entry and e[3].isChecked():
-                    blocked = e[3].blockSignals(True); e[3].setChecked(False); e[3].blockSignals(blocked)
-                    e[2].setDisabled(False)
-        entry[2].setDisabled(checked)
-
-    def _remove(self, entry):
-        if entry in self._rows:
-            self._rows.remove(entry); entry[0].setParent(None); entry[0].deleteLater()
+                if e is not entry and e[2].isChecked():
+                    blocked = e[2].blockSignals(True); e[2].setChecked(False); e[2].blockSignals(blocked)
+                    e[1].setDisabled(False)
+        entry[1].setDisabled(checked)
 
     def value(self):
-        out = []
-        for _, combo, tf, free_chk in self._rows:
-            if combo.currentText():
-                out.append({"model": combo.currentText(),
-                            "probability": None if free_chk.isChecked() else tf.get_value()})
-        return out
+        return [{"model": name, "probability": None if free_chk.isChecked() else tf.get_value()}
+                for name, tf, free_chk in self._rows]
 
 
 class SimulationSettingsDialog(QtWidgets.QDialog):
@@ -2095,9 +2084,9 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         gap = TimeFunctionWidget(src.get("gap") or {"kind": "constant", "value": 1.0})
         self._widgets["gap"] = gap
         self._add_row("Gap between pieces (minutes; constant or function of time)", gap)
-        probs = ModelProbsWidget(self._leaf_models, src.get("models_probs", []))
+        probs = FixedModelProbsWidget(self._leaf_models, src.get("models_probs", []))
         self._widgets["probs"] = probs
-        self._add_row("Model probabilities (one may be the freeloader; checked when sampled)", probs)
+        self._add_row("Model probabilities (one per leaf model; the freeloader gets 1 − sum of the others)", probs)
 
     def value(self):
         canonical = self.type.currentData()
@@ -3638,14 +3627,14 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                             "the simulation may never terminate.")
         elif crit.get("type") == "ByPiecesProduced":
             if exit_count != 1:
-                problems.append("Stopping criterion 'Pieces produced' needs exactly one EXIT buffer to count.")
+                problems.append("Stopping criterion 'By pieces produced' needs exactly one EXIT buffer to count.")
             goals = crit.get("models_goals", [])
             if not goals:
-                problems.append("Stopping criterion 'Pieces produced' has no model goals (Simulation > Settings...).")
+                problems.append("Stopping criterion 'By pieces produced' has no model goals (Simulation > Settings...).")
             if any(as_int(g.get("goal", 0)) < 0 for g in goals):
-                problems.append("Stopping criterion 'Pieces produced': every model goal must be a non-negative integer.")
+                problems.append("Stopping criterion 'By pieces produced': every model goal must be a non-negative integer.")
             if goals and sum(as_int(g.get("goal", 0)) for g in goals) <= 0:
-                problems.append("Stopping criterion 'Pieces produced': the total goal must be positive "
+                problems.append("Stopping criterion 'By pieces produced': the total goal must be positive "
                                 "(give at least one model a goal above zero).")
             if gen_node is not None:
                 self._check_flushability(gen_node, [g.get("model") for g in goals if g.get("model")],
@@ -3658,12 +3647,30 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 problems.append("Stopping date must be after the simulation start date.")
             probs = crit.get("models_probs", [])
             if not probs:
-                problems.append("Stopping criterion 'Time' has no model probabilities (Simulation > Settings...).")
-            if sum(1 for mp in probs if mp.get("probability") is None) > 1:
-                problems.append("Stopping criterion 'Time': at most one model can be the freeloader "
+                problems.append("Stopping criterion 'By time' has no model probabilities (Simulation > Settings...).")
+            freeloaders = [mp for mp in probs if mp.get("probability") is None]
+            if len(freeloaders) > 1:
+                problems.append("Stopping criterion 'By time': at most one model can be the freeloader "
                                 "(the one with no probability).")
+            # every probability box holds a value; catch what is statically checkable
+            # (all-constant mixes) at design time, like the router branches
+            consts = [mp["probability"].get("value", 0.0) for mp in probs
+                      if isinstance(mp.get("probability"), dict) and mp["probability"].get("kind") == "constant"]
+            if any(not 0 <= v <= 1 for v in consts):
+                problems.append("Stopping criterion 'By time': model probabilities must be in [0, 1].")
+            if probs and all(mp.get("probability") is None
+                             or (isinstance(mp.get("probability"), dict)
+                                 and mp["probability"].get("kind") == "constant")
+                             for mp in probs):
+                s = sum(consts)
+                if not freeloaders and abs(s - 1.0) > 1e-6:
+                    problems.append(f"Stopping criterion 'By time': model probabilities sum to {s:g} "
+                                    f"(must sum to 1, or mark one model as the freeloader).")
+                elif freeloaders and s > 1 + 1e-6:
+                    problems.append(f"Stopping criterion 'By time': model probabilities sum to {s:g} "
+                                    f"(must be <= 1 so the freeloader can take the rest).")
             if not crit.get("gap"):
-                problems.append("Stopping criterion 'Time' has no gap between pieces (Simulation > Settings...).")
+                problems.append("Stopping criterion 'By time' has no gap between pieces (Simulation > Settings...).")
             if gen_node is not None:
                 self._check_flushability(gen_node, [mp.get("model") for mp in probs if mp.get("model")],
                                          "bufs_out", "Piece generator", problems)

@@ -273,8 +273,10 @@ the stopping criterion now drives which is built.
 * The flow-designer refactor around generation is designer-only; the C++ port has
   no designer and reads the criterion-based JSON described in §10. For the record:
   the generation mix (goals or per-model rates) lives in Simulation Settings per
-  stopping-criterion type (with a freeloader picker for the rate mode); the
-  generator's `shifts` are edited on the generator card itself; ByPiecesProduced
-  shows one fixed goal box per leaf model (every leaf model always exported, goal
-  >= 0, total > 0); and importing a JSON no longer wraps it in an auto-generated
-  backdrop (only backdrops saved in the file are recreated).
+  stopping-criterion type; the generator's `shifts` are edited on the generator
+  card itself; both criteria show one fixed box per leaf model (no add/remove/
+  dropdown, every leaf model always exported) — ByPiecesProduced a goal box
+  (goal >= 0, total > 0), ByTime a probability time-function box with at most
+  one freeloader (exported as null; all-constant mixes are validated to sum to
+  1, or <= 1 with a freeloader); and importing a JSON no longer wraps it in an
+  auto-generated backdrop (only backdrops saved in the file are recreated).
