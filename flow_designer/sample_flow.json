@@ -286,9 +286,6 @@
   "stopping_criterion": {
     "type": "ByPiecesProduced",
     "timeout": "inf",
-    "shifts": [
-      "s_day"
-    ],
     "models_goals": [
       {
         "model": "m_widgetA",
@@ -306,6 +303,9 @@
       "id": "gen",
       "kind": "PieceGenerator",
       "name": "Bodies In",
+      "shifts": [
+        "s_day"
+      ],
       "outlets": [
         "buf_raw"
       ],

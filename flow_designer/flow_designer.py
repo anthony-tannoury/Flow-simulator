@@ -313,9 +313,10 @@ class RouterNode(SimNode):
 
 
 class PieceGeneratorNode(SimNode):
-    """PieceGenerator: the single source of pieces, wired to its outlets. What it
-    generates (models, goals or per-model rates, shifts) lives in the stopping
-    criterion under Simulation Settings, so this node has no menu of its own."""
+    """PieceGenerator: the single source of pieces, wired to its outlets, emitting
+    during the shifts chosen in its card menu. What it emits (models, and either
+    goals or per-model rates) lives in the stopping criterion under Simulation
+    Settings."""
     NODE_NAME = "Piece Generator"
     kind = "PieceGenerator"
     color = (145, 80, 80)
@@ -323,12 +324,14 @@ class PieceGeneratorNode(SimNode):
     def __init__(self):
         super().__init__()
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
+        self.create_property("shifts", "[]")   # [shift_name]
 
     def to_clean_json(self) -> dict:
         return {
             "id": node_uid(self),
             "kind": self.kind,
             "name": self.name(),
+            "shifts": get_property_json(self, "shifts", []),
             "outlets": get_output_refs(self, "bufs_out"),
             "position": [self.x_pos(), self.y_pos()],
         }
@@ -1646,7 +1649,8 @@ def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None, cr
     """Translate every registry reference (model/resource/operator/shift/closing day)
     in place, via resolve(kind, value) -> value. Node-to-node wires (node uids) are
     untouched. Shifts reference closing days: internally by date, exported by id.
-    The stopping criterion carries the generator's shifts and per-model goals/probs."""
+    The generator node carries its shifts; the stopping criterion carries the
+    per-model goals/probs."""
     for m in models:
         if m.get("parent"):
             m["parent"] = resolve("model", m["parent"])
@@ -1660,6 +1664,8 @@ def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None, cr
         k = n.get("kind")
         if k == "Buffer":
             n["valid_models"] = [resolve("model", x) for x in n.get("valid_models", [])]
+        elif k == "PieceGenerator":
+            n["shifts"] = [resolve("shift", s) for s in n.get("shifts", [])]
         elif k in ("Task", "ResourceTask"):
             if k == "Task":
                 for mc in n.get("models_configs", []):
@@ -1681,7 +1687,6 @@ def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None, cr
             n["task_shifts"] = [resolve("shift", s) for s in n.get("task_shifts", [])]
 
     if criterion is not None:
-        criterion["shifts"] = [resolve("shift", s) for s in criterion.get("shifts", [])]
         for g in criterion.get("models_goals", []):
             if "model" in g:
                 g["model"] = resolve("model", g["model"])
@@ -1713,44 +1718,6 @@ def _check_date_intervals(label, intervals, start_dt, problems):
         problems.append(f"{label}: an interval begins before the simulation start date "
                         f"(would convert to negative minutes).")
     return parsed
-
-
-class NameValuePicker(QtWidgets.QWidget):
-    """Rows of (name-combo, int/float). Generic; used for generator model goals."""
-
-    def __init__(self, names, value_label="goal", integer=True, entries=None, key="model", parent=None):
-        super().__init__(parent)
-        self._names = list(names); self._label = value_label; self._int = integer; self._key = key
-        self._rows = []
-        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
-        self._host = QtWidgets.QWidget(); self._vl = QtWidgets.QVBoxLayout(self._host); self._vl.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self._host)
-        add = QtWidgets.QPushButton("+"); add.clicked.connect(lambda: self._add()); lay.addWidget(add)
-        for e in (entries or []):
-            self._add(e.get(key), e.get("value", e.get("goal", 1)))
-
-    def _add(self, name=None, value=1):
-        row = QtWidgets.QWidget(); h = QtWidgets.QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0)
-        combo = QtWidgets.QComboBox(); combo.addItems(self._names)
-        if name in self._names:
-            combo.setCurrentText(name)
-        edit = QtWidgets.QLineEdit(str(value)); edit.setMaximumWidth(70)
-        rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
-        h.addWidget(combo); h.addWidget(QtWidgets.QLabel(self._label + ":")); h.addWidget(edit); h.addWidget(rm); h.addStretch(1)
-        entry = (row, combo, edit); rm.clicked.connect(lambda: self._remove(entry))
-        self._rows.append(entry); self._vl.addWidget(row)
-
-    def _remove(self, entry):
-        if entry in self._rows:
-            self._rows.remove(entry); entry[0].setParent(None); entry[0].deleteLater()
-
-    def value(self):
-        out = []
-        for _, combo, edit in self._rows:
-            if combo.currentText():
-                v = as_int(edit.text()) if self._int else as_float(edit.text())
-                out.append({self._key: combo.currentText(), "value": v})
-        return out
 
 
 class ShutdownsMenuDialog(QtWidgets.QDialog):
@@ -1909,6 +1876,49 @@ class RouterMenuDialog(QtWidgets.QDialog):
                            for bid, w in self._widgets.items()})
 
 
+class FixedGoalsWidget(QtWidgets.QWidget):
+    """One fixed goal box per leaf model: no add/remove, no model dropdown, so every
+    leaf model is forced to carry an explicit production goal. A model absent from
+    the prior entries starts at 0. Value: [{"model", "goal"}] over all leaf models."""
+
+    def __init__(self, leaf_model_names, entries=None, parent=None):
+        super().__init__(parent)
+        prior = {e.get("model"): e.get("goal", e.get("value", 0)) for e in (entries or [])}
+        self._rows = []
+        form = QtWidgets.QFormLayout(self)
+        form.setContentsMargins(0, 0, 0, 0)
+        if not leaf_model_names:
+            form.addRow(QtWidgets.QLabel("(define at least one leaf model first)"))
+        for name in leaf_model_names:
+            edit = QtWidgets.QLineEdit(str(prior.get(name, 0)))
+            edit.setMaximumWidth(90)
+            form.addRow(name, edit)
+            self._rows.append((name, edit))
+
+    def value(self):
+        return [{"model": name, "goal": as_int(edit.text())} for name, edit in self._rows]
+
+
+class GeneratorMenuDialog(QtWidgets.QDialog):
+    """The piece generator's only card setting: the shifts during which it emits.
+    What it emits (models + goals or per-model rates) lives in the stopping
+    criterion under Simulation Settings."""
+
+    def __init__(self, parent, node, shift_names):
+        super().__init__(parent)
+        self.node = node
+        self.setWindowTitle("Piece generator")
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.addWidget(QtWidgets.QLabel("shifts (when the generator emits pieces):"))
+        self.shifts = ShiftPickerWidget(shift_names, get_property_json(node, "shifts", []))
+        lay.addWidget(self.shifts)
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
+
+    def apply(self):
+        set_property_json(self.node, "shifts", self.shifts.chosen())
+
+
 class ModelProbsWidget(QtWidgets.QWidget):
     """Rows of (model-combo, probability time-function), used by the rate generator.
     Exactly one row may be marked the freeloader: its probability is 1 - sum(others),
@@ -1966,21 +1976,20 @@ class ModelProbsWidget(QtWidgets.QWidget):
 
 class SimulationSettingsDialog(QtWidgets.QDialog):
     """Simulation settings: the start date (the calendar anchor every absolute date
-    is converted against, always set) and the stopping criterion, which now also
-    carries the piece generator's schedule and mix. Each criterion type has its own
-    section:
-      - Pieces produced: shifts, per-model integer goals (only leaf models), and a
-        timeout in minutes. The run ends when every goal is met (or the timeout
-        elapses first); pieces are paced to hit the goals over the shifts.
-      - Time: an explicit stop date, shifts, a gap (constant or a function of time)
-        and a per-model probability mix (each constant or a function of time), with
-        one model optionally left as the freeloader (probability 1 - sum(others))."""
+    is converted against, always set) and the stopping criterion, which carries the
+    piece generator's mix (the generator's shifts live on its own card). Each
+    criterion type has its own section:
+      - Pieces produced: one integer goal per leaf model and a timeout in minutes.
+        The run ends when every goal is met (or the timeout elapses first); pieces
+        are paced to hit the goals over the generator's shifts.
+      - Time: an explicit stop date, a gap (constant or a function of time) and a
+        per-model probability mix (each constant or a function of time), with one
+        model optionally left as the freeloader (probability 1 - sum(others))."""
 
-    def __init__(self, parent, start_date, criterion, model_registry, shift_names):
+    def __init__(self, parent, start_date, criterion, model_registry):
         super().__init__(parent)
         self.setWindowTitle("Simulation settings")
         self._leaf_models = _leaf_model_names(model_registry)
-        self._shift_names = list(shift_names)
         self._pending = criterion or {}
         lay = QtWidgets.QVBoxLayout(self)
 
@@ -2036,13 +2045,9 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self._host_lay.addWidget(box)
 
     def _build_pieces(self, src):
-        shifts = ShiftPickerWidget(self._shift_names, src.get("shifts", []))
-        self._widgets["shifts"] = shifts
-        self._add_row("shifts", shifts)
-        goals = NameValuePicker(self._leaf_models, "goal", integer=True,
-                                entries=src.get("models_goals", []), key="model")
+        goals = FixedGoalsWidget(self._leaf_models, src.get("models_goals", []))
         self._widgets["goals"] = goals
-        self._add_row("model goals (only leaf models can be generated)", goals)
+        self._add_row("model goals (one goal per leaf model)", goals)
         timeout = InfFloatWidget(src.get("timeout", "inf"))
         self._widgets["timeout"] = timeout
         self._add_row("timeout (minutes)", timeout)
@@ -2051,9 +2056,6 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         stop = DateTimeWidget(src.get("time", ""))  # an absolute stop date
         self._widgets["time"] = stop
         self._add_row("stop at", stop)
-        shifts = ShiftPickerWidget(self._shift_names, src.get("shifts", []))
-        self._widgets["shifts"] = shifts
-        self._add_row("shifts", shifts)
         gap = TimeFunctionWidget(src.get("gap") or {"kind": "constant", "value": 1.0})
         self._widgets["gap"] = gap
         self._add_row("gap between pieces (minutes; constant or function of time)", gap)
@@ -2066,12 +2068,9 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         if canonical == "ByPiecesProduced":
             return {"type": "ByPiecesProduced",
                     "timeout": self._widgets["timeout"].get_value(),  # minutes | "inf"
-                    "shifts": self._widgets["shifts"].chosen(),
-                    "models_goals": [{"model": e["model"], "goal": e["value"]}
-                                     for e in self._widgets["goals"].value()]}
+                    "models_goals": self._widgets["goals"].value()}
         return {"type": "ByTime",
                 "time": self._widgets["time"].get_value(),  # "dd-mm-yyyy hh:mm"
-                "shifts": self._widgets["shifts"].chosen(),
                 "gap": self._widgets["gap"].get_value(),
                 "models_probs": self._widgets["probs"].value()}
 
@@ -2671,7 +2670,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
     def edit_simulation_settings(self):
         dlg = SimulationSettingsDialog(self, self.start_date, self.stopping_criterion,
-                                       self.model_registry, _names(self.shift_registry))
+                                       self.model_registry)
         if dlg.exec():
             self.start_date = dlg.start_value()
             self.stopping_criterion = dlg.value()
@@ -2689,6 +2688,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             dlg = BufferMenuDialog(self, node, self.model_registry)
         elif kind == "Router":
             dlg = RouterMenuDialog(self, node)
+        elif kind == "PieceGenerator":
+            dlg = GeneratorMenuDialog(self, node, _names(self.shift_registry))
         elif kind == "Breakdown":
             dlg = BreakdownMenuDialog(self, node)
         elif kind == "Task":
@@ -3082,11 +3083,13 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                         problems.append(f"Breakdown '{name}' on resource task '{t.name()}' cannot have outlets.")
 
             elif kind == "PieceGenerator":
-                # What it generates now lives in the stopping criterion (Simulation
-                # Settings); the node itself is validated only for its wiring. The
-                # criterion block below checks the models against these outlets.
+                # What it emits (models + goals/rates) lives in the stopping criterion
+                # (Simulation Settings); the node carries its shifts and its wiring.
+                # The criterion block below checks the models against these outlets.
                 if not get_output_refs(node, "bufs_out"):
                     problems.append(f"Piece Generator '{name}' has no outlets.")
+                if not get_property_json(node, "shifts", []):
+                    problems.append(f"Piece Generator '{name}' has no shifts (double-click it to choose when it emits).")
                 # A scrap buffer must never sit on the generator's outlet chain, not
                 # even through routers: freshly generated pieces would be scrapped on
                 # arrival, and the parser cannot build the object cycle
@@ -3191,9 +3194,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             problems.append("Simulation start date missing or not 'dd-mm-yyyy hh:mm' "
                             "(Simulation > Settings...).")
 
-        # The stopping criterion also carries the piece generator's schedule and
-        # mix; validate the generation params here (the generator node only checks
-        # its wiring) and flush its models through the generator's outlets.
+        # The stopping criterion carries the piece generator's mix (its shifts live
+        # on the generator node); validate the generation params here and flush its
+        # models through the generator's outlets.
         crit = self.stopping_criterion or {}
         gen_node = next((n for n in self.all_nodes() if node_kind(n) == "PieceGenerator"), None)
         if not crit:
@@ -3205,10 +3208,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             goals = crit.get("models_goals", [])
             if not goals:
                 problems.append("Stopping criterion 'Pieces produced' has no model goals (Simulation > Settings...).")
-            if any(as_int(g.get("goal", 0)) <= 0 for g in goals):
-                problems.append("Stopping criterion 'Pieces produced': every model goal must be a positive integer.")
-            if not crit.get("shifts"):
-                problems.append("Stopping criterion 'Pieces produced' has no generation shifts (Simulation > Settings...).")
+            if any(as_int(g.get("goal", 0)) < 0 for g in goals):
+                problems.append("Stopping criterion 'Pieces produced': every model goal must be a non-negative integer.")
+            if goals and sum(as_int(g.get("goal", 0)) for g in goals) <= 0:
+                problems.append("Stopping criterion 'Pieces produced': the total goal must be positive "
+                                "(give at least one model a goal above zero).")
             if gen_node is not None:
                 self._check_flushability(gen_node, [g.get("model") for g in goals if g.get("model")],
                                          "bufs_out", "Piece Generator", problems)
@@ -3224,8 +3228,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             if sum(1 for mp in probs if mp.get("probability") is None) > 1:
                 problems.append("Stopping criterion 'Time': at most one model can be the freeloader "
                                 "(the one with no probability).")
-            if not crit.get("shifts"):
-                problems.append("Stopping criterion 'Time' has no generation shifts (Simulation > Settings...).")
             if not crit.get("gap"):
                 problems.append("Stopping criterion 'Time' has no gap between pieces (Simulation > Settings...).")
             if gen_node is not None:
@@ -3519,6 +3521,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     _IMPORT_JSON_PROPS = {
         "Shutdowns": ["intervals", "generator"],
         "Buffer": ["valid_models"],
+        "PieceGenerator": ["shifts"],
         "Task": ["models_configs", "startup_duration", "loading_duration", "operators",
                  "loading_operators", "startup_operators", "task_shifts", "policies"],
         "ResourceTask": ["non_transformed_resources", "transformed_resources", "resources_out",
@@ -3732,22 +3735,18 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
         id_to_node = self._instantiate_cards(data)
 
-        imported_backdrops = data.get("backdrops", [])
-        if imported_backdrops:
-            for group in imported_backdrops:
-                group_node_ids = group.get("nodes", group.get("wrapped_node_ids", []))
-                group_nodes = [id_to_node[nid] for nid in group_node_ids if nid in id_to_node]
-                if not group_nodes:
-                    continue
-                backdrop = self.add_backdrop_for_nodes(group_nodes, group.get("title", "Imported group"),
-                                                       width=group.get("width"), height=group.get("height"))
-                position = group.get("position")
-                if backdrop is not None and isinstance(position, list) and len(position) >= 2:
-                    self.set_node_position_safe(backdrop, position[0], position[1])
-        else:
-            imported_nodes = list(id_to_node.values())
-            if imported_nodes:
-                self.add_backdrop_for_nodes(imported_nodes, "Imported simulation")
+        # Only recreate backdrops that were actually saved in the file; never wrap
+        # the import in a backdrop of our own.
+        for group in data.get("backdrops", []):
+            group_node_ids = group.get("nodes", group.get("wrapped_node_ids", []))
+            group_nodes = [id_to_node[nid] for nid in group_node_ids if nid in id_to_node]
+            if not group_nodes:
+                continue
+            backdrop = self.add_backdrop_for_nodes(group_nodes, group.get("title", "Imported group"),
+                                                   width=group.get("width"), height=group.get("height"))
+            position = group.get("position")
+            if backdrop is not None and isinstance(position, list) and len(position) >= 2:
+                self.set_node_position_safe(backdrop, position[0], position[1])
 
         self.frame_all()
 

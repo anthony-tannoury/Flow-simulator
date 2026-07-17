@@ -199,17 +199,20 @@ the stopping criterion now drives which is built.
   `hold_within_shift(current_gap())` (continue on a shift spill), sample with
   `current_probs()`, `emit`. Runs until the ByTime stopper fires.
 
-## 10. Parser: generation lives in the stopping criterion (`parser.py`)
+## 10. Parser: generation split between the generator node and the criterion (`parser.py`)
 
 * `make_callable` gains a `'step'` case ->
   `Step.generate(x1, y1, x2, y2, step_size)`.
-* `load_piece_generator` reads `data['stopping_criterion']`: shifts + outlets are
-  shared; `ByPiecesProduced` -> `GoalPieceGenerator(models_goals=...)`,
-  `ByTime` -> `RatePieceGenerator(models=..., gap=make_callable(criterion['gap']),
+* `load_piece_generator`: the generator node carries `shifts` and `outlets`
+  (`shifts = join_shifts([self.shifts[id] for id in node['shifts']])`); what it
+  emits comes from `data['stopping_criterion']`. `ByPiecesProduced` ->
+  `GoalPieceGenerator(models_goals=...)`, `ByTime` ->
+  `RatePieceGenerator(models=..., gap=make_callable(criterion['gap']),
   model_probs=[make_callable(p) if p is not None else None ...])`. The generator
-  node in the JSON now carries only its wiring (id/kind/name/outlets/position);
-  `models_goals`/`shifts` moved under the criterion. `load_stopping_criterion`
-  totals `ByPiecesProduced` from `criterion['models_goals']`.
+  node JSON is `id/kind/name/shifts/outlets/position`; `models_goals`/
+  `models_probs` live under the criterion, but the generator's `shifts` stay on
+  the node. `load_stopping_criterion` totals `ByPiecesProduced` from
+  `criterion['models_goals']`.
 
 ## 11. KPI/graph handling for the rate generator (`kpis.py`, `graphs.py`)
 
@@ -224,7 +227,11 @@ the stopping criterion now drives which is built.
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON
   format — the C++ port never had them; nothing to do.
-* The flow-designer refactor that moved the generation parameters out of the
-  generator card into Simulation Settings (per stopping-criterion type, with a
-  freeloader picker for the rate mode) is a designer-only change; the C++ port
-  has no designer and reads the same criterion-based JSON described in §10.
+* The flow-designer refactor around generation is designer-only; the C++ port has
+  no designer and reads the criterion-based JSON described in §10. For the record:
+  the generation mix (goals or per-model rates) lives in Simulation Settings per
+  stopping-criterion type (with a freeloader picker for the rate mode); the
+  generator's `shifts` are edited on the generator card itself; ByPiecesProduced
+  shows one fixed goal box per leaf model (every leaf model always exported, goal
+  >= 0, total > 0); and importing a JSON no longer wraps it in an auto-generated
+  backdrop (only backdrops saved in the file are recreated).
