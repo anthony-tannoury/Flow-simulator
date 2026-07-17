@@ -279,6 +279,7 @@ class Task(Component, HasShifts, ABC):
         self.batch_sizes = sim.Monitor("batch_sizes")
         self.cycle_times = sim.Monitor("cycle_times")
         self.startup_times = sim.Monitor("startup_times")
+        self.pieces_in = 0  # pieces physically taken from the inlets (retries included)
 
         self.skip_frozen_check = False
         self.skip_downtime_check = False

@@ -13,12 +13,49 @@ from __future__ import annotations
 
 import csv
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import salabim as sim
 
 import simulation
 from simulation import env
+
+
+def fmt_duree(minutes) -> str:
+    """70 -> '1h 10m', 525600 -> '365j 0h 0m', 3.33 -> '3m 20s', 0.5 -> '30s'."""
+    if minutes == '' or minutes is None:
+        return ''
+    m = float(minutes)
+    if m < 1:
+        return f"{round(m * 60)}s"
+    if m < 60:
+        whole, secondes = int(m), round((m - int(m)) * 60)
+        if secondes == 60:
+            whole, secondes = whole + 1, 0
+        if whole < 60:
+            return f"{whole}m {secondes}s" if secondes else f"{whole}m"
+    total = round(m)
+    heures, mins = divmod(total, 60)
+    if heures < 24:
+        return f"{heures}h {mins}m"
+    jours, heures = divmod(heures, 24)
+    return f"{jours}j {heures}h {mins}m"
+
+
+def fmt_pct(x) -> str:
+    """0.0812 -> '8.1%', 0.83 -> '83%'."""
+    if x == '' or x is None:
+        return ''
+    return f"{x * 100:.1f}".rstrip('0').rstrip('.') + '%'
+
+
+def fmt_instant(minutes, sim_start: datetime | None) -> str:
+    """A point in simulated time, as a real date when the start date is known."""
+    if minutes == '' or minutes is None:
+        return ''
+    if sim_start is None:
+        return fmt_duree(minutes)
+    return (sim_start + timedelta(minutes=float(minutes))).strftime('%d-%m-%Y %H:%M')
 
 
 # Work-in-progress level monitor: +1 when a piece is born (Piece.setup),
@@ -122,7 +159,9 @@ def task_kpis(task) -> dict:
         'cycle_moyen': round(task.cycle_times.mean(), 3) if lancements else '',
         'cycle_p90': round(task.cycle_times.percentile(90), 3) if lancements else '',
         'cycle_max': round(task.cycle_times.maximum(), 3) if lancements else '',
-        'debit_pieces_h': round(produites / tr * 60, 3) if tr else '',
+        'debit_pieces_j': round(produites / tr * 1440, 3) if tr else '',
+        'flux_entrant_j': round(task.pieces_in / tt * 1440, 3) if is_piece_task and tt else '',
+        'flux_sortant_j': round(produites / tt * 1440, 3) if tt else '',
         'attente_pieces': round(mode_total(collectors, 'wait_pieces'), 3),
         'attente_place': round(mode_total(collectors, 'wait_slot'), 3),
         'attente_operateurs': round(mode_total(carriers, 'wait_operators')
@@ -178,6 +217,8 @@ def buffer_kpis(buffer) -> dict:
         'sejour_max': round(buffer.length_of_stay.maximum(), 3) if sorties else '',
         'entrees': entrees,
         'sorties': sorties,
+        'flux_entrant_j': round(entrees / tt * 1440, 3) if tt else '',
+        'flux_sortant_j': round(sorties / tt * 1440, 3) if tt else '',
         'temps_moyen_entre_arrivees': round(tt / entrees, 3) if entrees else '',
     }
 
@@ -202,15 +243,25 @@ def lead_time_rows(buffers) -> list[dict]:
     return sorted(rows, key=lambda r: r['fin'])
 
 
+def _lead_stats(leads: list[float]) -> dict:
+    def pct(values, q):
+        return round(values[min(int(len(values) * q / 100), len(values) - 1)], 3) if values else ''
+    return {
+        'traversee_moyenne': round(sum(leads) / len(leads), 3) if leads else '',
+        'traversee_mediane': pct(leads, 50),
+        'traversee_p90': pct(leads, 90),
+        'traversee_max': round(leads[-1], 3) if leads else '',
+    }
+
+
 def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
     from .outlet import BufferType
     tt = env.now()
     exits = [p for b in buffers if b.buffer_type is BufferType.EXIT for p in b]
     scraps = [p for b in buffers if b.buffer_type is BufferType.SCRAP for p in b]
-    leads = sorted(p.enter_time(next(iter(p.queues()))) - p.creation_time() for p in exits)
 
-    def pct(values, q):
-        return round(values[min(int(len(values) * q / 100), len(values) - 1)], 3) if values else ''
+    def lead(piece):
+        return piece.enter_time(next(iter(piece.queues()))) - piece.creation_time()
 
     total = len(exits) + len(scraps)
     flux = {
@@ -218,11 +269,8 @@ def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
         'sorties': len(exits),
         'rebuts': len(scraps),
         'taux_rebut': ratio(len(scraps), total),
-        'debit_sorties_h': round(len(exits) / tt * 60, 3) if tt else '',
-        'traversee_moyenne': round(sum(leads) / len(leads), 3) if leads else '',
-        'traversee_mediane': pct(leads, 50),
-        'traversee_p90': pct(leads, 90),
-        'traversee_max': round(leads[-1], 3) if leads else '',
+        'debit_sorties_j': round(len(exits) / tt * 1440, 3) if tt else '',
+        **_lead_stats(sorted(lead(p) for p in exits)),
         'encours_moyen': round(WIP.mean(), 3),
         'encours_max': WIP.maximum(),
         'encours_final': WIP(),
@@ -230,41 +278,63 @@ def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
 
     par_modele = []
     if piece_generator is not None:
-        exits_par_modele = {}
+        exits_par_modele: dict = {}
         for p in exits:
-            exits_par_modele[p.model] = exits_par_modele.get(p.model, 0) + 1
-        scraps_par_modele = {}
+            exits_par_modele.setdefault(p.model, []).append(lead(p))
+        scraps_par_modele: dict = {}
         for p in scraps:
             scraps_par_modele[p.model] = scraps_par_modele.get(p.model, 0) + 1
         for model, objectif in zip(piece_generator.models, piece_generator.goals):
-            sorties = exits_par_modele.get(model, 0)
+            leads = sorted(exits_par_modele.get(model, []))
             rebuts = scraps_par_modele.get(model, 0)
             par_modele.append({
                 'modele': model.name,
                 'objectif': objectif,
-                'sorties': sorties,
+                'sorties': len(leads),
                 'rebuts': rebuts,
-                'taux_rebut': ratio(rebuts, sorties + rebuts),
-                'atteinte': ratio(sorties, objectif),
+                'taux_rebut': ratio(rebuts, len(leads) + rebuts),
+                'atteinte': ratio(len(leads), objectif),
+                **_lead_stats(leads),
             })
     return flux, par_modele
 
 
-def timeseries_rows(buffers) -> list[dict]:
-    rows = []
-    for buffer in buffers:
-        xs, ts = buffer.length.xt()
-        rows.extend({'serie': 'longueur_buffer', 'nom': buffer.name(),
-                     't': round(t, 3), 'valeur': x} for x, t in zip(xs, ts))
-    xs, ts = WIP.xt()
-    rows.extend({'serie': 'encours', 'nom': 'ligne',
-                 't': round(t, 3), 'valeur': x} for x, t in zip(xs, ts))
-    return rows
+# Presentation: durations become 'Xj Xh Xm', ratios become percentages and
+# instants become calendar dates at write time; the collectors above keep
+# returning raw minutes/fractions so they stay directly usable in code.
+DUREE_COLS = {
+    'temps_total', 'temps_ouverture', 'arrets_programmes', 'temps_requis',
+    'pannes', 'mtbf', 'mttr', 'gel', 'mise_en_route', 'temps_fonctionnement',
+    'cycle_moyen', 'cycle_p90', 'cycle_max',
+    'attente_pieces', 'attente_place', 'attente_operateurs', 'attente_matiere',
+    'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement',
+    'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees',
+    'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
+    'temps_traversee', 'tc_ideal', 'duree_simulee',
+}
+PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
+            'trs', 'trg', 'tre', 'taux_rebut', 'atteinte'}
+INSTANT_COLS = {'creation', 'fin'}
 
 
-def _write_csv(path: str, rows: list[dict]) -> None:
+def _format_row(row: dict, sim_start: datetime | None) -> dict:
+    out = {}
+    for key, value in row.items():
+        if key in DUREE_COLS:
+            out[key] = fmt_duree(value)
+        elif key in PCT_COLS:
+            out[key] = fmt_pct(value)
+        elif key in INSTANT_COLS:
+            out[key] = fmt_instant(value, sim_start)
+        else:
+            out[key] = value
+    return out
+
+
+def _write_csv(path: str, rows: list[dict], sim_start: datetime | None = None) -> None:
     if not rows:
         return
+    rows = [_format_row(row, sim_start) for row in rows]
     with open(path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
@@ -272,25 +342,26 @@ def _write_csv(path: str, rows: list[dict]) -> None:
 
 
 def write_report(directory: str, tasks: list, buffers: list, piece_generator=None,
-                 run_info: dict | None = None) -> str:
+                 run_info: dict | None = None, sim_start: datetime | None = None) -> str:
     os.makedirs(directory, exist_ok=True)
 
     run = {'genere_le': datetime.now().isoformat(timespec='seconds'),
            'graine': simulation.SEED,
-           'duree_simulee': round(env.now(), 3)}
+           'duree_simulee': fmt_duree(env.now())}
     run.update(run_info or {})
     _write_csv(os.path.join(directory, 'run.csv'),
                [{'cle': k, 'valeur': v} for k, v in run.items()])
 
-    _write_csv(os.path.join(directory, 'postes.csv'), [task_kpis(t) for t in tasks])
+    _write_csv(os.path.join(directory, 'postes.csv'),
+               [task_kpis(t) for t in tasks], sim_start)
     _write_csv(os.path.join(directory, 'postes_modeles.csv'),
-               [row for t in tasks for row in task_model_rows(t)])
-    _write_csv(os.path.join(directory, 'buffers.csv'), [buffer_kpis(b) for b in buffers])
+               [row for t in tasks for row in task_model_rows(t)], sim_start)
+    _write_csv(os.path.join(directory, 'buffers.csv'),
+               [buffer_kpis(b) for b in buffers], sim_start)
 
     flux, par_modele = flow_kpis(buffers, piece_generator)
     _write_csv(os.path.join(directory, 'flux.csv'),
-               [{'cle': k, 'valeur': v} for k, v in flux.items()])
-    _write_csv(os.path.join(directory, 'flux_modeles.csv'), par_modele)
-    _write_csv(os.path.join(directory, 'temps_traversee.csv'), lead_time_rows(buffers))
-    _write_csv(os.path.join(directory, 'series_temporelles.csv'), timeseries_rows(buffers))
+               [{'cle': k, 'valeur': v} for k, v in _format_row(flux, sim_start).items()])
+    _write_csv(os.path.join(directory, 'flux_modeles.csv'), par_modele, sim_start)
+    _write_csv(os.path.join(directory, 'temps_traversee.csv'), lead_time_rows(buffers), sim_start)
     return directory

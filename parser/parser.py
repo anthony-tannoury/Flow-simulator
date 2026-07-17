@@ -204,7 +204,8 @@ class Parser:
             tasks=list(self.tasks.values()),
             buffers=buffers,
             piece_generator=self.piece_generator,
-            run_info={'fichier': self.filename, 'debut': self.data['start_date']}
+            run_info={'fichier': self.filename, 'debut': self.data['start_date']},
+            sim_start=self.sim_start
         )
 
     def load_all(self) -> None:

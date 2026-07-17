@@ -105,6 +105,15 @@ seed in Python):
 * `parser` equivalent: object names passed to constructors; `report()` after
   the run (C++ side: same CSV format, same file names, same column names so
   the downstream tooling is shared).
+* Report presentation layer (second pass): durations rendered as
+  `Xj Xh Xm` (`3m 20s` under an hour), ratios as percentages, piece
+  creation/fin instants as real calendar dates from `sim_start`; flux columns
+  `flux_entrant_j`/`flux_sortant_j` on both `postes.csv` (fed by a
+  `Task.pieces_in` counter incremented at every piece take in the four
+  collector paths) and `buffers.csv`; débits are per day
+  (`debit_pieces_j`, `debit_sorties_j`); `flux_modeles.csv` carries per-model
+  traversée stats (moyenne/médiane/p90/max); `series_temporelles.csv` was
+  removed (graph data will be handled separately).
 
 ## Not needed in C++
 

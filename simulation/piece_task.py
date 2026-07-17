@@ -65,6 +65,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
                 return True
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
+            self.task.pieces_in += 1
         return False
 
     def ensure_one(self) -> None:
@@ -73,6 +74,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
             piece = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
+            self.task.pieces_in += 1
 
     def top_up(self, limit: int, piece_filter) -> None:
         while self.task.vacant_slots.available_quantity() > 0 and len(self.collected_pieces) < limit:
@@ -83,6 +85,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
+            self.task.pieces_in += 1
 
     def block_remainder(self, max_carrier_capacity: int) -> None:
         if not self.task.config.contiguous_carriers:
@@ -191,6 +194,7 @@ class AltruisticMixin:
                 for piece, buffer in valid_pieces:
                     piece.leave(buffer)
                     self.collected_pieces.append(piece)
+                    self.task.pieces_in += 1
 
                 if not self.task.config.contiguous_carriers:
                     self.request((self.task.vacant_slots, max_carrier_capacity - len(valid_pieces)), request_priority=self.task.request_priority, mode="wait_slot")
