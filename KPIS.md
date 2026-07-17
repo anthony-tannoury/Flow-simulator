@@ -198,17 +198,25 @@ période.
 ## graphes/ — les courbes et histogrammes
 
 Chaque figure existe en deux exemplaires : le PNG, et le CSV des données
-tracées (mêmes valeurs, pour refaire le graphe à votre façon).
+tracées (mêmes valeurs, pour refaire le graphe à votre façon). L'arborescence
+sépare d'abord par format, puis par type :
+
+```
+graphes/
+    png/   ressources/ buffers/ ligne/ postes/ operateurs/ modeles/
+    csv/   ressources/ buffers/ ligne/ postes/ operateurs/ modeles/
+```
 
 * `ressources/stock_*` — le stock de chaque ressource dans le temps.
 * `buffers/longueur_*` — la longueur de chaque buffer dans le temps.
 * `ligne/pieces_en_attente` — la somme des longueurs des buffers de passage ;
   `ligne/encours` — les pièces nées mais ni sorties ni rebutées.
-* `postes/occupation_*` — la part des places occupées (places prises ÷
-  capacité) dans le temps. Attention : avec des lots à empreinte fixe
+* `postes/occupation_*` — le nombre de places occupées (places prises =
+  capacité − places vacantes) dans le temps ; la capacité maximale du poste
+  est rappelée dans le titre. Attention : avec des lots à empreinte fixe
   (`contiguous = non`), les places réservées par un lot entamé comptent.
 * `operateurs/disponibles_*` — les opérateurs libres de chaque équipe dans le
-  temps (0 hors horaire, par construction).
+  temps (effectif maximal dans le titre, 0 hors horaire par construction).
 * `modeles/trajectoires_<modele>` — le parcours du modèle : une barre par
   trajectoire distincte observée (les pièces d'un même modèle peuvent suivre
   des chemins différents : reprises, prisons…), triées de la plus fréquente à
