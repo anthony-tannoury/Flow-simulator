@@ -195,6 +195,32 @@ création et date de fin (en dates réelles du calendrier), temps de traversée.
 C'est le fichier à pivoter dans Excel pour des histogrammes par modèle ou par
 période.
 
+## graphes/ — les courbes et histogrammes
+
+Chaque figure existe en deux exemplaires : le PNG, et le CSV des données
+tracées (mêmes valeurs, pour refaire le graphe à votre façon).
+
+* `ressources/stock_*` — le stock de chaque ressource dans le temps.
+* `buffers/longueur_*` — la longueur de chaque buffer dans le temps.
+* `ligne/pieces_en_attente` — la somme des longueurs des buffers de passage ;
+  `ligne/encours` — les pièces nées mais ni sorties ni rebutées.
+* `postes/occupation_*` — la part des places occupées (places prises ÷
+  capacité) dans le temps. Attention : avec des lots à empreinte fixe
+  (`contiguous = non`), les places réservées par un lot entamé comptent.
+* `operateurs/disponibles_*` — les opérateurs libres de chaque équipe dans le
+  temps (0 hors horaire, par construction).
+* `modeles/trajectoires_<modele>` — le parcours du modèle : une barre par
+  trajectoire distincte observée (les pièces d'un même modèle peuvent suivre
+  des chemins différents : reprises, prisons…), triées de la plus fréquente à
+  la plus rare, avec `n` et sa part. Chaque barre empile les étapes dans
+  l'ordre ; la longueur d'un segment est le temps **moyen** passé à cette
+  étape (bleu = attente en buffer, orange = poste). On voit d'un coup d'œil
+  où le modèle perd son temps, branche par branche. Seules les pièces
+  arrivées au bout (sortie ou rebut) sont comptées ; le détail exact est dans
+  le CSV.
+* `modeles/production` — par modèle, trois barres : objectif du générateur,
+  pièces générées (refabrications comprises), pièces produites (sorties).
+
 ## run.csv — la carte d'identité de l'exécution
 
 Fichier source, dates de début et de **fin** du calendrier simulé, durée

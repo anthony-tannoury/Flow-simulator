@@ -115,6 +115,21 @@ seed in Python):
   traversée stats (moyenne/médiane/p90/max); `series_temporelles.csv` was
   removed (graph data will be handled separately).
 
+## 5. Graphs support (data-side hooks only)
+
+The plotting itself (`simulation/graphs.py`, matplotlib) stays in Python —
+the C++ port only needs to produce the same *data*:
+
+* `piece.py`: `Piece.journal` — `('in'|'out'|'task', name, t)` entries
+  appended on every buffer enter/leave and at deposit (the `task` stamp is
+  added in `PieceCarrier.successfully_end_process` before `place`);
+  `Piece.leave(q)` override records the 'out'.
+* `piece.py`: `PieceGenerator.total_generated` per model (physical births,
+  never decremented — unlike `generated` which is scrap-aware).
+* Monitors read for the plots (already in salabim++): resource
+  `available_quantity`, store `length`, `vacant_slots.claimed_quantity`,
+  operator-group `available_quantity`, plus the WIP monitor from entry 4.
+
 ## Not needed in C++
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON

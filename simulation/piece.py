@@ -33,6 +33,7 @@ class Piece(sim.Component):
         self.model = model
         self.id = str(Piece.ID).zfill(6)
         Piece.ID += 1
+        self.journal: list[tuple[str, str, float]] = []  # ('in'|'out'|'task', name, t)
         WIP.tally(WIP() + 1)
 
     def enter(self, q, priority = None):
@@ -45,7 +46,14 @@ class Piece(sim.Component):
             q.piece_generator.generated[idx] -= 1
         if q.buffer_type in (BufferType.EXIT, BufferType.SCRAP):
             WIP.tally(WIP() - 1)
+        self.journal.append(('in', q.name(), env.now()))
         return super().enter(q, priority)
+
+    def leave(self, q=None):
+        from .outlet import Buffer
+        if isinstance(q, Buffer):
+            self.journal.append(('out', q.name(), env.now()))
+        return super().leave(q)
 
 
 class PickyPieceTaker:
@@ -90,6 +98,7 @@ class PieceGenerator(Component, PickyPieceTaker, HasShifts):
         self.goals = list(models_goals.values())
         self.probs = [0.0 for _ in range(len(self.models))]
         self.generated = [0 for _ in range(len(self.models))]
+        self.total_generated = [0 for _ in range(len(self.models))]  # physical births, scrap remakes included
 
         self.total_goal = sum(self.goals)
         self.gap = sum(shift.length for shift in shifts) / self.total_goal
@@ -121,3 +130,4 @@ class PieceGenerator(Component, PickyPieceTaker, HasShifts):
             piece = Piece(model=self.models[idx])
             place([piece], self.outlets)
             self.generated[idx] += 1
+            self.total_generated[idx] += 1
