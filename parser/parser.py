@@ -2,9 +2,10 @@ import json
 import os
 import salabim as sim
 
-from simulation import kpis
+from time import perf_counter
+from simulation import env, kpis
 
-from datetime import date, time, datetime
+from datetime import date, time, datetime, timedelta
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
 from simulation.resource_task import ResourceTask, ResourceTaskConfig, ResourceCollectorType
 from simulation.piece import Model, PieceGenerator
@@ -199,12 +200,22 @@ class Parser:
             stem = os.path.splitext(os.path.basename(self.filename))[0]
             directory = os.path.join('runs', f"{datetime.now():%Y-%m-%d_%H%M%S}_{stem}")
         buffers = [o for o in self.outlets.values() if isinstance(o, Buffer)]
+
+        criterion = self.data['stopping_criterion']
+        run_info = {
+            'fichier': self.filename,
+            'debut': self.data['start_date'],
+            'fin': (self.sim_start + timedelta(minutes=env.now())).strftime('%d-%m-%Y %H:%M'),
+            'temps_calcul': kpis.fmt_duree((perf_counter() - self.loaded_at) / 60),
+            'critere_arret': criterion['type'],
+            'critere_details': ', '.join(f"{k} = {v}" for k, v in criterion.items() if k != 'type'),
+        }
         return kpis.write_report(
             directory,
             tasks=list(self.tasks.values()),
             buffers=buffers,
             piece_generator=self.piece_generator,
-            run_info={'fichier': self.filename, 'debut': self.data['start_date']},
+            run_info=run_info,
             sim_start=self.sim_start
         )
 
@@ -224,6 +235,7 @@ class Parser:
         self.load_shutdowns()
         self.load_breakdowns()
         self.load_stopping_criterion()
+        self.loaded_at = perf_counter()
 
     def to_interval(self, interval: dict) -> Interval:
         return Interval(
