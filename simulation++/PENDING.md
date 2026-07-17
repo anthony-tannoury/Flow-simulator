@@ -163,13 +163,24 @@ Data hooks needed:
   (the machine warms up again each shift; `nb_mises_en_route` becomes per-shift
   instead of once per run). Note: this reduces throughput for tasks with a
   startup crew (they re-warm-up and wait for the crew every shift).
-* `task.py`: `Task.handle_startup` calls `self.release()` before re-requesting
-  the PER_TASK operators. Because `started_up` now resets every shift end,
-  `handle_startup` runs once per shift; without releasing first, a PER_TASK
-  task re-claimed its operator pools every shift and never let go, hoarding them
-  until the whole line deadlocked (operators permanently held, upstream tasks
-  starved, no scrap). Releasing the previously-held crew before re-acquiring
-  keeps the per-shift re-warm-up while holding at most one crew at a time.
+* `task.py`: the PER_TASK crew acquisition is decoupled from `started_up` (which
+  now resets every shift end) and given its own lifecycle, so one crew supervises
+  every carrier but hands off at operator-shift boundaries instead of being locked
+  to the run. New `Task.requested_per_task_operators` flag (init False). The
+  operator request moved out of `handle_startup` (now warm-up only) into
+  `request_task_operators()` (request + set flag; freeze on failure) and
+  `release_task_operators()` (release the held crew + clear flag, idempotent). In
+  `Task.process`, after the state wait: (1) if PER_TASK and a crew is held and no
+  carrier is active and any held group `is_in_downtime()`, release it (hand-off);
+  (2) warm up if needed; (3) if PER_TASK, started up, not frozen and no crew held,
+  `request_task_operators()`. Every task-level release now goes through
+  `release_task_operators()` (base `Carrier.process` freeze branch, `PieceTask`/
+  `ResourceTask.abort`) so the flag stays consistent. Reason: without this a
+  PER_TASK task claimed its pool once and never let go across operator-shift
+  boundaries — locked to one crew for the whole run and, with `started_up`
+  resetting each shift, re-claiming without releasing until the line deadlocked.
+  Now the crew is released the moment it goes off shift (after the current carrier)
+  and the next on-shift pool is picked up; at most one crew is held at a time.
 
 ## 8. Step time-function (`function_generator.py`)
 

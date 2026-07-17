@@ -242,5 +242,5 @@ class ResourceTask(Task):
     def abort(self, *args):
         for carrier in list(self.pending_carriers) + list(self.active_carriers):
             carrier.abort()
-        self.release()
+        self.release_task_operators()
         self.started_up = False
