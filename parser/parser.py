@@ -437,7 +437,8 @@ class Parser:
             case 'bypiecesproduced':
                 models_goals = {self.models[mg['model']]: mg['goal'] for mg in criterion['models_goals']}
                 self.piece_generator = GoalPieceGenerator(
-                    name=node['name'], models_goals=models_goals, shifts=shifts, outlets=outlets)
+                    name=node['name'], models_goals=models_goals, shifts=shifts, outlets=outlets,
+                    grace_period=float(criterion.get('grace_period', 0.0)))
             case 'bytime':
                 models = [self.models[mp['model']] for mp in criterion['models_probs']]
                 model_probs = [make_callable(mp['probability']) if mp['probability'] is not None else None

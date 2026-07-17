@@ -894,7 +894,7 @@ def closing_day_label(entry: dict) -> str:
     """Display text for a closing-day registry entry: the date, plus the optional label."""
     date = entry.get("date", "?")
     name = (entry.get("name") or "").strip()
-    return f"{date} — {name}" if name else date
+    return f"{date} - {name}" if name else date
 
 
 class ClosingDayPickerWidget(QtWidgets.QListWidget):
@@ -2073,6 +2073,11 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         goals = FixedGoalsWidget(self._leaf_models, src.get("models_goals", []))
         self._widgets["goals"] = goals
         self._add_row("Model goals (one goal per leaf model)", goals)
+        grace = QtWidgets.QLineEdit(str(src.get("grace_period", 0.0)))
+        grace.setMaximumWidth(90)
+        self._widgets["grace"] = grace
+        self._add_row("Grace period (minutes; the goals are paced over the generator's "
+                      "shifts minus this reserve, kept free for scrap remakes)", grace)
         timeout = InfFloatWidget(src.get("timeout", "inf"))
         self._widgets["timeout"] = timeout
         self._add_row("Timeout (minutes)", timeout)
@@ -2086,13 +2091,14 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self._add_row("Gap between pieces (minutes; constant or function of time)", gap)
         probs = FixedModelProbsWidget(self._leaf_models, src.get("models_probs", []))
         self._widgets["probs"] = probs
-        self._add_row("Model probabilities (one per leaf model; the freeloader gets 1 − sum of the others)", probs)
+        self._add_row("Model probabilities (one per leaf model; the freeloader gets 1 - sum of the others)", probs)
 
     def value(self):
         canonical = self.type.currentData()
         if canonical == "ByPiecesProduced":
             return {"type": "ByPiecesProduced",
                     "timeout": self._widgets["timeout"].get_value(),  # minutes | "inf"
+                    "grace_period": as_float(self._widgets["grace"].text()),
                     "models_goals": self._widgets["goals"].value()}
         return {"type": "ByTime",
                 "time": self._widgets["time"].get_value(),  # "dd-mm-yyyy hh:mm"
@@ -2466,14 +2472,19 @@ class RunSimulationDialog(QtWidgets.QDialog):
         form = QtWidgets.QFormLayout()
         self.elapsed_lbl = QtWidgets.QLabel("0:00:00")
         form.addRow("Elapsed time", self.elapsed_lbl)
-        self.sim_time_lbl = QtWidgets.QLabel("—")
+        self.sim_time_lbl = QtWidgets.QLabel("-")
         form.addRow("Simulated time", self.sim_time_lbl)
-        self.pieces_lbl = QtWidgets.QLabel("—")
+        self.pieces_lbl = QtWidgets.QLabel("-")
         self._pieces_row = form.rowCount()
         form.addRow("Pieces in exit buffer", self.pieces_lbl)
+        self.timeout_lbl = QtWidgets.QLabel("-")
+        self._timeout_row = form.rowCount()
+        form.addRow("Timeout", self.timeout_lbl)
         lay.addLayout(form)
         self._form = form
-        self._set_pieces_row_visible(False)
+        self._last_progress = {}
+        self._set_form_row_visible(self._pieces_row, self.pieces_lbl, False)
+        self._set_form_row_visible(self._timeout_row, self.timeout_lbl, False)
 
         self.caption_lbl = QtWidgets.QLabel("")
         self.caption_lbl.setAlignment(QtCore.Qt.AlignHCenter)
@@ -2544,7 +2555,17 @@ class RunSimulationDialog(QtWidgets.QDialog):
         if tag == "META":
             self._meta = info
             self._sim_start = parse_date_time(info.get("sim_start"))
-            self._set_pieces_row_visible(info.get("criterion") == "ByPiecesProduced")
+            is_pieces = info.get("criterion") == "ByPiecesProduced"
+            self._set_form_row_visible(self._pieces_row, self.pieces_lbl, is_pieces)
+            timeout = info.get("timeout")  # only present when finite
+            if is_pieces and timeout:
+                if self._sim_start is not None:
+                    deadline = self._sim_start + timedelta(minutes=timeout)
+                    self.timeout_lbl.setText(
+                        f"{deadline.strftime(PY_DATE_TIME_FORMAT)}  (after {timeout / 1440.0:g} days)")
+                else:
+                    self.timeout_lbl.setText(f"{timeout:g} minutes")
+                self._set_form_row_visible(self._timeout_row, self.timeout_lbl, True)
             self.status_lbl.setText("Simulation running...")
         elif tag == "PROGRESS":
             self._show_progress(info)
@@ -2558,6 +2579,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
         sim_now = info.get("sim_now")
         if sim_now is None:
             return
+        self._last_progress = info
         if self._sim_start is not None:
             date = self._sim_start + timedelta(minutes=sim_now)
             self.sim_time_lbl.setText(f"{date.strftime(PY_DATE_TIME_FORMAT)}  (day {int(sim_now // 1440) + 1})")
@@ -2578,13 +2600,31 @@ class RunSimulationDialog(QtWidgets.QDialog):
                 self.caption_lbl.setText(f"{sim_now / 1440.0:.1f} / {total / 1440.0:.1f} days simulated")
                 self.bar.setValue(min(self.BAR_STEPS, int(self.BAR_STEPS * sim_now / total)))
 
+    def _outcome_line(self) -> str:
+        """How the run ended, from the criterion's point of view: the goal was
+        met, the timeout cut in first, or the simulation simply ran out of work."""
+        meta = self._meta or {}
+        if meta.get("criterion") == "ByPiecesProduced":
+            pieces = self._last_progress.get("pieces")
+            goal = meta.get("goal")
+            if pieces is not None and goal:
+                if pieces >= goal:
+                    return f"Goal reached: {pieces} / {goal} pieces."
+                if meta.get("timeout"):
+                    return f"Timeout reached: {pieces} / {goal} pieces."
+                return (f"Goal not reached: {pieces} / {goal} pieces "
+                        f"(the simulation ran out of work; check the shifts).")
+        elif meta.get("criterion") == "ByTime":
+            return "Stop date reached."
+        return "Simulation finished."
+
     def _on_finished(self, exit_code, *args):
         self._finished = True
         self._tick.stop()
         self._update_elapsed()
         self.cancel_btn.setText("Close")
         if exit_code == 0 and self._report_dir:
-            self.status_lbl.setText(f"Simulation finished. Report written to:\n{self._report_dir}")
+            self.status_lbl.setText(f"{self._outcome_line()}\nReport written to:\n{self._report_dir}")
             self.open_report_btn.setVisible(True)
         elif self._error_message:
             self.status_lbl.setText(f"Simulation failed: {self._error_message}")
@@ -2592,16 +2632,16 @@ class RunSimulationDialog(QtWidgets.QDialog):
             tail = "\n".join(self._stderr_tail[-8:])
             self.status_lbl.setText(f"Simulation failed (exit code {exit_code}).\n{tail}")
         else:
-            self.status_lbl.setText("Simulation finished.")
+            self.status_lbl.setText(self._outcome_line())
 
     # --- UI helpers ---
 
-    def _set_pieces_row_visible(self, visible: bool):
+    def _set_form_row_visible(self, row: int, field_widget, visible: bool):
         try:
-            self._form.setRowVisible(self._pieces_row, visible)
+            self._form.setRowVisible(row, visible)
         except Exception:  # Qt < 6.4 fallback: hide the widgets themselves
-            self.pieces_lbl.setVisible(visible)
-            lbl = self._form.labelForField(self.pieces_lbl)
+            field_widget.setVisible(visible)
+            lbl = self._form.labelForField(field_widget)
             if lbl is not None:
                 lbl.setVisible(visible)
 
@@ -2656,7 +2696,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.resize(1400, 850)
 
         # Word-style session state: the file backing the canvas and whether the
-        # canvas has diverged from it. The title shows "name[*] — app"; Qt swaps
+        # canvas has diverged from it. The title shows "name[*] - app"; Qt swaps
         # the [*] marker in and out with setWindowModified.
         self.current_path = None
         self._dirty = False
@@ -2865,7 +2905,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         return os.path.basename(self.current_path) if self.current_path else "Untitled"
 
     def _update_title(self):
-        self.setWindowTitle(f"{self._display_name()}[*] — {APP_NAME}")
+        self.setWindowTitle(f"{self._display_name()}[*] - {APP_NAME}")
         self.setWindowModified(self._dirty)
 
     def maybe_save(self) -> bool:
@@ -3431,12 +3471,12 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                         mx = as_float(m.get("max_carrier_capacity", 1))
                         if cap < mn:
                             problems.append(f"Piece task '{name}': max_capacity {cap:g} is smaller than "
-                                            f"min_carrier_capacity {mn:g} (model '{m.get('model')}') — "
+                                            f"min_carrier_capacity {mn:g} (model '{m.get('model')}'); "
                                             f"carriers can never collect their minimum batch.")
                         elif not contiguous and cap < mx:
                             problems.append(f"Piece task '{name}': non-contiguous carriers reserve "
                                             f"max_carrier_capacity {mx:g} slots (model '{m.get('model')}') "
-                                            f"but max_capacity is {cap:g} — the collector deadlocks "
+                                            f"but max_capacity is {cap:g}; the collector deadlocks "
                                             f"waiting for slots that cannot exist.")
                     # non-discriminating collectors need uniform duration / carrier-capacity across models
                     ct = str(node.get_property("collector_type") if node.has_property("collector_type") else "")
@@ -3460,11 +3500,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 mx = as_float(node.get_property("max_carrier_capacity") if node.has_property("max_carrier_capacity") else 1.0, 1.0)
                 if cap < mn:
                     problems.append(f"Resource task '{name}': max_capacity {cap:g} is smaller than "
-                                    f"min_carrier_capacity {mn:g} — carriers can never collect "
+                                    f"min_carrier_capacity {mn:g}; carriers can never collect "
                                     f"their minimum batch.")
                 elif not contiguous and cap < mx:
                     problems.append(f"Resource task '{name}': non-contiguous carriers reserve "
-                                    f"max_carrier_capacity {mx:g} slots but max_capacity is {cap:g} — "
+                                    f"max_carrier_capacity {mx:g} slots but max_capacity is {cap:g}; "
                                     f"the collector deadlocks waiting for slots that cannot exist.")
                 outs = get_property_json(node, "resources_out", [])
                 if not outs:
@@ -3569,7 +3609,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     if duration <= 0:
                         problems.append(f"Shutdowns '{name}': duration must be > 0 minutes.")
                     if in_between > 0 and duration > in_between:
-                        problems.append(f"Shutdowns '{name}': duration exceeds 'in between' — "
+                        problems.append(f"Shutdowns '{name}': duration exceeds 'in between'; "
                                         f"consecutive shutdowns would overlap (the simulation "
                                         f"rejects overlapping intervals).")
                 else:
@@ -3636,6 +3676,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             if goals and sum(as_int(g.get("goal", 0)) for g in goals) <= 0:
                 problems.append("Stopping criterion 'By pieces produced': the total goal must be positive "
                                 "(give at least one model a goal above zero).")
+            if as_float(crit.get("grace_period", 0.0)) < 0:
+                problems.append("Stopping criterion 'By pieces produced': the grace period must be >= 0 "
+                                "minutes (the loader also rejects one longer than the generator's shifts).")
             if gen_node is not None:
                 self._check_flushability(gen_node, [g.get("model") for g in goals if g.get("model")],
                                          "bufs_out", "Piece generator", problems)
