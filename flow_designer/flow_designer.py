@@ -2859,6 +2859,39 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                             problems.append(f"'{name}': operators in one alternative of '{field}' "
                                             f"must share the same productivity.")
                             break
+            if kind == "Buffer":
+                # every model a passage buffer accepts must be takeable by at least one
+                # of the tasks consuming from it — otherwise pieces of that model enter
+                # and pile up forever (dead end the simulation cannot detect)
+                buffer_type = node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
+                if buffer_type == "PASSAGE":
+                    consumers = [t for t in connected_nodes_from_port(node, "to_task", "output")
+                                 if node_kind(t) == "Task"]
+                    if not consumers:
+                        problems.append(f"Buffer '{name}': no task consumes from this buffer (dead end).")
+                    else:
+                        parents = _model_parents(self.model_registry)
+                        children = {}
+                        for m in self.model_registry:
+                            children.setdefault(m.get("parent"), []).append(m["name"])
+
+                        def leaves_under(model_name):
+                            subs = children.get(model_name)
+                            if not subs:
+                                return [model_name]
+                            return [leaf for s in subs for leaf in leaves_under(s)]
+
+                        takeable = set()
+                        for t in consumers:
+                            takeable.update(mc.get("model") for mc in get_property_json(t, "models_configs", []))
+                        uncovered = []
+                        for model_name in get_property_json(node, "valid_models", []):
+                            for leaf in leaves_under(model_name):
+                                if leaf not in uncovered and not _taker_can_take(takeable, leaf, parents):
+                                    uncovered.append(leaf)
+                        for leaf in uncovered:
+                            problems.append(f"Buffer '{name}': model '{leaf}' can enter but no "
+                                            f"connected task can take it.")
             if kind == "Router":
                 # the simulation samples branch probabilities at run time; catch what is
                 # statically checkable (all-constant branches) at design time
