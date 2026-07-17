@@ -134,6 +134,22 @@ Data hooks needed:
   `available_quantity`, store `length`, `vacant_slots.claimed_quantity`,
   operator-group `available_quantity`, plus the WIP monitor from entry 4.
 
+## 6. KPI correctness fixes
+
+* `task.py`: startup time is tallied as the actual setup hold (the sampled
+  `startup_duration`) inside `TaskStarter` after its `hold(duration)`, NOT the
+  wall-clock span in `handle_startup` (which included waiting for the startup
+  crew). `handle_startup` no longer captures `startup_begin` or tallies.
+* `kpis.py`: `gel` is the overlap of `is_frozen == True` AND
+  `is_in_downtime == False` (frozen only during opening hours; a freeze that
+  spills into the night must not count the night). New helper
+  `overlap_duration(mon_a, val_a, mon_b, val_b)`.
+* `kpis.py`: OEE is `Do x Tp x Tq` with `Tp = TN / (loading + processing time
+  summed over every carrier)`, not `TN / TF_union` — the union undercounts
+  parallel carriers and pushed the rate over 100%. `TRS = Do*Tp*Tq`,
+  `TRG = TRS * (TR/TO)`, `TRE = TRS * (TR/TT)`; the old `TU`-based identity is
+  dropped. `Do = TF_union / TR` is unchanged.
+
 ## Not needed in C++
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON

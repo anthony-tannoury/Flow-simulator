@@ -77,8 +77,38 @@ def mode_total(components, tag: str) -> float:
     return sum(c.mode.value_duration(tag) for c in components)
 
 
+def overlap_duration(mon_a, val_a, mon_b, val_b) -> float:
+    """Time where level monitor a holds val_a AND b holds val_b (event-merged)."""
+    xa, ta = mon_a.xt(force_numeric=False)
+    xb, tb = mon_b.xt(force_numeric=False)
+    times = sorted(set(ta) | set(tb))
+    total, ia, ib = 0.0, 0, 0
+    for k in range(1, len(times)):
+        t0, t1 = times[k - 1], times[k]
+        while ia + 1 < len(ta) and ta[ia + 1] <= t0:
+            ia += 1
+        while ib + 1 < len(tb) and tb[ib + 1] <= t0:
+            ib += 1
+        if xa[ia] == val_a and xb[ib] == val_b:
+            total += t1 - t0
+    return total
+
+
 def ratio(num: float, den: float) -> float | str:
     return round(num / den, 4) if den else ''
+
+
+def _num(value) -> float | str:
+    return round(value, 4) if value is not None else ''
+
+
+def _product(*values):
+    result = 1.0
+    for value in values:
+        if value is None:
+            return None
+        result *= value
+    return result
 
 
 def ideal_cycle_times(task) -> dict:
@@ -105,9 +135,12 @@ def task_kpis(task) -> dict:
     mtbf = ''
     if len(debuts_pannes) > 1:
         mtbf = round(sum(b - a for a, b in zip(debuts_pannes, debuts_pannes[1:])) / (len(debuts_pannes) - 1), 3)
-    gel = task.is_frozen.value.value_duration(True)
+    # frozen only counts during opening hours: a task that freezes near a shift
+    # end stays frozen through the whole downtime until the next shift start, and
+    # that off-shift stretch is not "gel", it is just closed.
+    gel = overlap_duration(task.is_frozen.value, True, task.is_in_downtime.value, False)
     nc = task.active_carriers.num_carriers.value
-    tf = tt - nc.value_duration(0)
+    tf = tt - nc.value_duration(0)  # temps de fonctionnement: union, station has >=1 active carrier
 
     is_piece_task = isinstance(task, PieceTask)
     tc = ideal_cycle_times(task)
@@ -115,18 +148,33 @@ def task_kpis(task) -> dict:
         produites = sum(task.deposited.values())
         rebutees = sum(task.scrapped.values())
         tn = sum(tc[_config_key(task, m)] * n for m, n in task.deposited.items())
-        tu = tn - sum(tc[_config_key(task, m)] * n for m, n in task.scrapped.items())
     else:
         n = task.batch_sizes.number_of_entries()
         produites = round(task.batch_sizes.mean() * n, 3) if n else 0
         rebutees = 0
-        tn = tu = produites * tc[None]
+        tn = produites * tc[None]
     bonnes = produites - rebutees
 
     carriers = task.all_carriers
     collectors = [c.piece_collector if hasattr(c, 'piece_collector') else c.resource_collector
                   for c in carriers]
     lancements = task.batch_sizes.number_of_entries()
+
+    # OEE / TRS as availability x performance x quality (each in [0, 1]).
+    # Performance compares the ideal value-adding time (TN) with the actual
+    # value-adding machine time (loading + processing summed over every carrier).
+    # Summing over carriers is what makes it correct for stations that run several
+    # carriers in parallel (independent_carriers): the "union" temps_fonctionnement
+    # would undercount that work and push the rate above 100%.
+    t_loading = mode_total(carriers, 'loading')
+    t_processing = mode_total(carriers, 'processing')
+    value_add = t_loading + t_processing
+    do_val = tf / tr if tr else None
+    tp_val = tn / value_add if value_add else None
+    tq_val = bonnes / produites if produites else None
+    trs_val = _product(do_val, tp_val, tq_val)
+    trg_val = trs_val * (tr / to) if trs_val is not None and to else None
+    tre_val = trs_val * (tr / tt) if trs_val is not None and tt else None
 
     return {
         'poste': task.name(),
@@ -145,12 +193,12 @@ def task_kpis(task) -> dict:
         'nb_mises_en_route': task.startup_times.number_of_entries(),
         'temps_fonctionnement': round(tf, 3),
         'taux_de_charge': ratio(tr, to),
-        'disponibilite': ratio(tf, tr),
-        'performance': ratio(tn, tf),
-        'qualite': ratio(bonnes, produites),
-        'trs': ratio(tu, tr),
-        'trg': ratio(tu, to),
-        'tre': ratio(tu, tt),
+        'disponibilite': _num(do_val),
+        'performance': _num(tp_val),
+        'qualite': _num(tq_val),
+        'trs': _num(trs_val),
+        'trg': _num(trg_val),
+        'tre': _num(tre_val),
         'pieces_produites': produites,
         'pieces_bonnes': bonnes,
         'pieces_rebutees': rebutees,
@@ -169,8 +217,8 @@ def task_kpis(task) -> dict:
         'attente_matiere': round(mode_total(carriers, 'wait_materials'), 3),
         'attente_vague': round(mode_total(carriers, 'wait_dispatch'), 3),
         'temps_collecte': round(mode_total(carriers, 'collecting'), 3),
-        'temps_chargement': round(mode_total(carriers, 'loading'), 3),
-        'temps_traitement': round(mode_total(carriers, 'processing'), 3),
+        'temps_chargement': round(t_loading, 3),
+        'temps_traitement': round(t_processing, 3),
     }
 
 

@@ -198,6 +198,7 @@ class TaskStarter(Component, Donnable):
             return
         
         self.hold(duration)
+        self.task.startup_times.tally(duration)  # the setup work itself, not the wait for the crew
         self.done.set(True)
 
 
@@ -303,14 +304,12 @@ class Task(Component, HasShifts, ABC):
         return earliest_shutdown.start if earliest_shutdown is not None else float('inf')
 
     def handle_startup(self) -> None:
-        startup_begin = env.now()
         task_starter = TaskStarter(task=self)
         self.wait(task_starter.done)
         if self.is_frozen():
             return
 
         self.started_up = True
-        self.startup_times.tally(env.now() - startup_begin)
 
         if self.config.operator_scope is Scope.PER_TASK:
             deadline = min(self.non_flexible_shutdowns.get_deadline(), self.flexible_shutdowns.get_deadline())
