@@ -197,6 +197,9 @@ période.
 
 ## run.csv — la carte d'identité de l'exécution
 
-Fichier source, date de début du calendrier, graine aléatoire, durée simulée,
-date de génération. Deux exécutions avec la même graine et le même fichier
-donnent exactement les mêmes CSV.
+Fichier source, dates de début et de **fin** du calendrier simulé, durée
+simulée, graine aléatoire, date de génération, **temps de calcul** (le temps
+machine réel qu'a pris l'exécution), et le **critère d'arrêt** choisi avec ses
+paramètres (`critere_arret` = ByTime ou ByPiecesProduced, `critere_details` =
+ses réglages). Deux exécutions avec la même graine et le même fichier donnent
+exactement les mêmes CSV.
