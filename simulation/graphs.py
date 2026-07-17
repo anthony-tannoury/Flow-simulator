@@ -136,9 +136,10 @@ def task_graphs(base, tasks, sim_start):
         values, times = task.vacant_slots.claimed_quantity.xt()
         capacity = task.config.max_capacity
         cap_txt = f"{capacity:g}" if capacity != float('inf') else "illimitée"
+        # scale to the actual occupancy, not the (possibly huge) declared capacity
         _write_series(base, 'postes', f"occupation_{_safe(task.name())}", times, values, sim_start,
                       'places occupées', f"Occupation : {task.name()} (capacité max {cap_txt})",
-                      color=TASK_COLOR, ymax=capacity)
+                      color=TASK_COLOR)
 
 
 def operator_graphs(base, operator_groups, sim_start):
