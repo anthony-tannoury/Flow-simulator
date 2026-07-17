@@ -409,9 +409,10 @@ class Parser:
             if id_ not in self.outlets:
                 raise ValueError(f"piece generator outlet {id_} is (or routes into) a scrap buffer")
 
-        # the generator's behaviour is set by the stopping criterion: a fixed set of
-        # goals (ByPiecesProduced) or a stream at a given gap and mix (ByTime)
-        shifts = join_shifts([self.shifts[id_] for id_ in criterion['shifts']])
+        # the generator emits during its own shifts; what it emits is set by the
+        # stopping criterion: a fixed set of goals (ByPiecesProduced) or a stream at
+        # a given gap and mix (ByTime)
+        shifts = join_shifts([self.shifts[id_] for id_ in node['shifts']])
         outlets = [self.outlets[id_] for id_ in node['outlets']]
 
         match criterion['type']:

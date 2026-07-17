@@ -689,11 +689,6 @@
   "stopping_criterion": {
     "type": "ByPiecesProduced",
     "timeout": 525600.0,
-    "shifts": [
-      "shift_c01ba51b",
-      "shift_191d58b8",
-      "shift_43a68d28"
-    ],
     "models_goals": [
       {
         "model": "model_c1c20e4c",
@@ -735,6 +730,11 @@
       "id": "piecegenerator_97bcc3df",
       "kind": "PieceGenerator",
       "name": "Piece Generator",
+      "shifts": [
+        "shift_c01ba51b",
+        "shift_191d58b8",
+        "shift_43a68d28"
+      ],
       "outlets": [
         "buffer_8b98db8b",
         "buffer_8fb86b24"

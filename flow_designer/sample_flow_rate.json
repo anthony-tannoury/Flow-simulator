@@ -286,9 +286,6 @@
   "stopping_criterion": {
     "type": "ByTime",
     "time": "15-01-2026 00:00",
-    "shifts": [
-      "s_day"
-    ],
     "gap": {
       "kind": "linear",
       "x1": 0.0,
@@ -316,6 +313,9 @@
       "id": "gen",
       "kind": "PieceGenerator",
       "name": "Bodies In",
+      "shifts": [
+        "s_day"
+      ],
       "outlets": [
         "buf_raw"
       ],
