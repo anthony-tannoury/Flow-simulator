@@ -322,6 +322,10 @@ class Task(Component, HasShifts, ABC):
         self.started_up = True
 
         if self.config.operator_scope is Scope.PER_TASK:
+            # started_up resets at every shift end, so this runs once per shift. Drop
+            # the crew held from the previous shift before re-acquiring, otherwise the
+            # claims accumulate every shift and the task hoards its operator pools.
+            self.release()
             deadline = min(self.non_flexible_shutdowns.get_deadline(), self.flexible_shutdowns.get_deadline())
             self.task_operators = self.config.operators.request(demander=self, fail_at=deadline)
             self.set_mode("")

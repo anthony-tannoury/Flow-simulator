@@ -163,6 +163,13 @@ Data hooks needed:
   (the machine warms up again each shift; `nb_mises_en_route` becomes per-shift
   instead of once per run). Note: this reduces throughput for tasks with a
   startup crew (they re-warm-up and wait for the crew every shift).
+* `task.py`: `Task.handle_startup` calls `self.release()` before re-requesting
+  the PER_TASK operators. Because `started_up` now resets every shift end,
+  `handle_startup` runs once per shift; without releasing first, a PER_TASK
+  task re-claimed its operator pools every shift and never let go, hoarding them
+  until the whole line deadlocked (operators permanently held, upstream tasks
+  starved, no scrap). Releasing the previously-held crew before re-acquiring
+  keeps the per-shift re-warm-up while holding at most one crew at a time.
 
 ## 8. Step time-function (`function_generator.py`)
 
