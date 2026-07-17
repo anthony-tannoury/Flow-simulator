@@ -3,7 +3,7 @@ import os
 import salabim as sim
 
 from time import perf_counter
-from simulation import env, kpis
+from simulation import env, kpis, graphs
 
 from datetime import date, time, datetime, timedelta
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
@@ -210,7 +210,7 @@ class Parser:
             'critere_arret': criterion['type'],
             'critere_details': ', '.join(f"{k} = {v}" for k, v in criterion.items() if k != 'type'),
         }
-        return kpis.write_report(
+        kpis.write_report(
             directory,
             tasks=list(self.tasks.values()),
             buffers=buffers,
@@ -218,6 +218,16 @@ class Parser:
             run_info=run_info,
             sim_start=self.sim_start
         )
+        graphs.write_graphs(
+            os.path.join(directory, 'graphes'),
+            tasks=list(self.tasks.values()),
+            buffers=buffers,
+            resources=list(self.resources.values()),
+            operator_groups=list(self.operator_groups.values()),
+            piece_generator=self.piece_generator,
+            sim_start=self.sim_start
+        )
+        return directory
 
     def load_all(self) -> None:
         self.load_models()
