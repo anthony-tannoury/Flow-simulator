@@ -284,19 +284,29 @@
     }
   ],
   "stopping_criterion": {
-    "type": "ByPiecesProduced",
-    "timeout": "inf",
+    "type": "ByTime",
+    "time": "15-01-2026 00:00",
     "shifts": [
       "s_day"
     ],
-    "models_goals": [
+    "gap": {
+      "kind": "linear",
+      "x1": 0.0,
+      "y1": 8.0,
+      "x2": 10000.0,
+      "y2": 3.0
+    },
+    "models_probs": [
       {
         "model": "m_widgetA",
-        "goal": 120
+        "probability": {
+          "kind": "constant",
+          "value": 0.4
+        }
       },
       {
         "model": "m_widgetB",
-        "goal": 80
+        "probability": null
       }
     ]
   },

@@ -164,7 +164,67 @@ Data hooks needed:
   instead of once per run). Note: this reduces throughput for tasks with a
   startup crew (they re-warm-up and wait for the crew every shift).
 
+## 8. Step time-function (`function_generator.py`)
+
+* New `Step` class alongside `Linear`/`Exponential`/`Bathtub`:
+  `Step.generate(x1, y1, x2, y2, step_size)` returns a staircase that follows
+  the line through (x1,y1)-(x2,y2) but holds each value for `step_size` on the
+  x axis: `anchor = x1 + floor((t - x1) / step_size) * step_size`, value
+  `y1 + slope * (anchor - x1)` with `slope = (y2 - y1)/(x2 - x1)`. Raises on a
+  vertical span (`x1 == x2`) or `step_size <= 0`. (`function_generator.py`
+  gained `import math`.)
+
+## 9. Piece-generator split: goal vs rate (`piece.py`)
+
+The single `PieceGenerator` became an abstract base with two concrete flavours;
+the stopping criterion now drives which is built.
+
+* `PieceGenerator(Component, PickyPieceTaker, HasShifts, ABC)`: shared `setup`
+  (the one-generator guard, models/shifts/outlets, `generated` and the new
+  `total_generated` — physical births, never decremented), `emit(idx)` (build a
+  Piece, `place` it, bump both counters), `hold_within_shift(gap) -> bool` (hold
+  `gap`, or hold to the shift end and return False when it would spill past the
+  current shift), and an abstract `process`.
+* `GoalPieceGenerator(PieceGenerator)`: `setup(models_goals, shifts, outlets)`;
+  keeps `goals`, `probs`, `total_goal`, and `gap = sum(shift.length)/total_goal`.
+  `update_probs` weights the remaining goal per model; `process` is the old
+  goal-paced loop (wait downtime, respect the shift, `update_probs`, hold the
+  gap, sample, `emit`). This is the behaviour the pre-split generator had.
+* `RatePieceGenerator(PieceGenerator)`: `setup(models, shifts, outlets, gap,
+  model_probs)` where `gap` is a float or callable(t) and `model_probs` is a
+  list of float | callable(t) | None (exactly one None allowed = the freeloader,
+  whose probability is `1 - sum(others)`); raises if more than one None.
+  `current_gap()` / `current_probs()` evaluate the callables at `env.now()`,
+  fill the freeloader slot, and `check_probabilities`. `process`: wait downtime,
+  `hold_within_shift(current_gap())` (continue on a shift spill), sample with
+  `current_probs()`, `emit`. Runs until the ByTime stopper fires.
+
+## 10. Parser: generation lives in the stopping criterion (`parser.py`)
+
+* `make_callable` gains a `'step'` case ->
+  `Step.generate(x1, y1, x2, y2, step_size)`.
+* `load_piece_generator` reads `data['stopping_criterion']`: shifts + outlets are
+  shared; `ByPiecesProduced` -> `GoalPieceGenerator(models_goals=...)`,
+  `ByTime` -> `RatePieceGenerator(models=..., gap=make_callable(criterion['gap']),
+  model_probs=[make_callable(p) if p is not None else None ...])`. The generator
+  node in the JSON now carries only its wiring (id/kind/name/outlets/position);
+  `models_goals`/`shifts` moved under the criterion. `load_stopping_criterion`
+  totals `ByPiecesProduced` from `criterion['models_goals']`.
+
+## 11. KPI/graph handling for the rate generator (`kpis.py`, `graphs.py`)
+
+* `flow_kpis`: per-model rows use `getattr(piece_generator, 'goals', None)`; add
+  a `genere` column (`total_generated[i]`, both flavours). `objectif`/`atteinte`
+  are blank when there are no goals (rate generator).
+* `production_histogram`: with goals, the three-bar chart (objectif/générées/
+  produites) and CSV with an `objectif` column; without goals, a two-bar chart
+  (générées/produites) and a CSV without `objectif`.
+
 ## Not needed in C++
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON
   format — the C++ port never had them; nothing to do.
+* The flow-designer refactor that moved the generation parameters out of the
+  generator card into Simulation Settings (per stopping-criterion type, with a
+  freeloader picker for the rate mode) is a designer-only change; the C++ port
+  has no designer and reads the same criterion-based JSON described in §10.

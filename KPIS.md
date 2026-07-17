@@ -200,9 +200,13 @@ bonnes et rebutées de ce modèle. C'est le détail qui alimente TN.
   nées mais pas encore sorties ni rebutées, où qu'elles soient (buffers **et**
   machines). C'est pour ça qu'`encours_final` peut dépasser la somme des
   buffers.
-* `flux_modeles.csv` — par modèle : objectif du générateur, sorties, rebuts,
+* `flux_modeles.csv` — par modèle : `objectif` du générateur, `genere` (pièces
+  effectivement injectées, refabrications comprises), sorties, rebuts,
   `atteinte` = sorties ÷ objectif, et les temps de traversée
-  (moyenne / médiane / p90 / max) du modèle.
+  (moyenne / médiane / p90 / max) du modèle. `objectif` et `atteinte` ne sont
+  renseignés qu'en mode **objectifs** (critère « pièces produites ») ; en mode
+  **débit** (critère « temps »), le générateur n'a pas d'objectif par modèle et
+  ces deux colonnes restent vides, seul `genere` compte les injections.
 
 ## temps_traversee.csv — une ligne par pièce
 
@@ -242,8 +246,10 @@ graphes/
   où le modèle perd son temps, branche par branche. Seules les pièces
   arrivées au bout (sortie ou rebut) sont comptées ; le détail exact est dans
   le CSV.
-* `modeles/production` — par modèle, trois barres : objectif du générateur,
-  pièces générées (refabrications comprises), pièces produites (sorties).
+* `modeles/production` — par modèle : en mode objectifs, trois barres (objectif
+  du générateur, pièces générées refabrications comprises, pièces produites en
+  sortie) ; en mode débit, deux barres seulement (générées et produites), le
+  générateur n'ayant pas d'objectif.
 
 ## run.csv — la carte d'identité de l'exécution
 

@@ -5,10 +5,11 @@ import numpy as np
 
 from simulation import env
 from .component import Component
-from .helpers import check_outlet_validity, place
+from .helpers import check_outlet_validity, check_probabilities, place
 from .shift_manager import ShiftManager, HasShifts
 from .interval import Interval
-from typing import TYPE_CHECKING
+from abc import ABC, abstractmethod
+from typing import Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .outlet import Outlet
@@ -79,27 +80,54 @@ class PickyPieceTaker:
                     or any(other.can_take(model) for model in self.valid_models))
 
 
-class PieceGenerator(Component, PickyPieceTaker, HasShifts):
+class PieceGenerator(Component, PickyPieceTaker, HasShifts, ABC):
+    """Feeds pieces into the line during its shifts. Two flavours share this base:
+    GoalPieceGenerator (a fixed set of pieces to make, paced over the shifts) and
+    RatePieceGenerator (a stream at a given gap and per-model mix, until ByTime)."""
     COUNT = 0
 
-    def setup(self, models_goals: dict[Model, int], shifts: list[Interval], outlets: list[Outlet]) -> None:
+    def setup(self, models: list[Model], shifts: list[Interval], outlets: list[Outlet]) -> None:
         if PieceGenerator.COUNT > 0:
             raise ValueError("Cannot have more than one piece generator")
         PieceGenerator.COUNT += 1
-        
-        self.models = list(models_goals.keys())
+
+        self.models = list(models)
         PickyPieceTaker.__init__(self, self.models)
         HasShifts.__init__(self, shifts)
         check_outlet_validity(self, outlets)
 
         self.shift_manager = ShiftManager(entity=self)
-
         self.outlets = outlets
-        self.goals = list(models_goals.values())
-        self.probs = [0.0 for _ in range(len(self.models))]
         self.generated = [0 for _ in range(len(self.models))]
         self.total_generated = [0 for _ in range(len(self.models))]  # physical births, scrap remakes included
 
+    def emit(self, idx: int) -> None:
+        piece = Piece(model=self.models[idx])
+        place([piece], self.outlets)
+        self.generated[idx] += 1
+        self.total_generated[idx] += 1
+
+    def hold_within_shift(self, gap: float) -> bool:
+        """Hold for gap, unless it would spill past the current shift — then hold to
+        the shift end and report False so the caller re-checks at the next shift."""
+        current_shift = self.current_or_last_shift()
+        shift_time_left = current_shift.end - env.now() if current_shift is not None else float('inf')
+        if gap > shift_time_left:
+            self.hold(shift_time_left)
+            return False
+        self.hold(gap)
+        return True
+
+    @abstractmethod
+    def process(self):
+        pass
+
+
+class GoalPieceGenerator(PieceGenerator):
+    def setup(self, models_goals: dict[Model, int], shifts: list[Interval], outlets: list[Outlet]) -> None:
+        super().setup(list(models_goals.keys()), shifts, outlets)
+        self.goals = list(models_goals.values())
+        self.probs = [0.0 for _ in range(len(self.models))]
         self.total_goal = sum(self.goals)
         self.gap = sum(shift.length for shift in shifts) / self.total_goal
 
@@ -125,9 +153,37 @@ class PieceGenerator(Component, PickyPieceTaker, HasShifts):
             self.hold(self.gap)
             if sum(self.probs) == 0:
                 continue
-            
+
             idx = np.random.choice(len(self.models), p=self.probs)
-            piece = Piece(model=self.models[idx])
-            place([piece], self.outlets)
-            self.generated[idx] += 1
-            self.total_generated[idx] += 1
+            self.emit(idx)
+
+
+class RatePieceGenerator(PieceGenerator):
+    def setup(self, models: list[Model], shifts: list[Interval], outlets: list[Outlet],
+              gap: float | Callable[[float], float],
+              model_probs: list[float | Callable[[float], float] | None]) -> None:
+        if model_probs.count(None) > 1:
+            raise ValueError("At most one model can be the freeloader in a rate generator")
+        super().setup(models, shifts, outlets)
+        self.gap = gap
+        self.model_probs = model_probs
+        self.freeloader_index = model_probs.index(None) if None in model_probs else -1
+
+    def current_gap(self) -> float:
+        return self.gap if isinstance(self.gap, (int, float)) else self.gap(env.now())
+
+    def current_probs(self) -> list[float]:
+        probs = [0.0 if p is None else (p if isinstance(p, (int, float)) else p(env.now()))
+                 for p in self.model_probs]
+        if self.freeloader_index != -1:
+            probs[self.freeloader_index] = 1 - sum(probs)
+        check_probabilities(probs)
+        return probs
+
+    def process(self):
+        while True:
+            self.wait((self.is_in_downtime, False))
+            if not self.hold_within_shift(self.current_gap()):
+                continue
+            idx = np.random.choice(len(self.models), p=self.current_probs())
+            self.emit(idx)
