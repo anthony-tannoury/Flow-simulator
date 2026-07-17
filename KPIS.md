@@ -26,16 +26,17 @@ temps total (TT)            toute la durée simulée
 └─ temps d'ouverture (TO)   les horaires du poste (ses shifts)
    └─ temps requis (TR)     TO moins les arrêts programmés (maintenances)
       └─ temps de fonctionnement (TF)   il y a au moins un lot sur la machine
-         └─ temps net (TN)              reconstruit : tc idéal × pièces produites
-            └─ temps utile (TU)         reconstruit : tc idéal × bonnes pièces
+         └─ temps de valeur ajoutée      chargement + traitement réels
+            └─ temps net (TN)            reconstruit : tc idéal × pièces produites
 ```
 
 Deux choses importantes :
 
-**TN et TU ne sont pas des temps d'horloge.** Ce sont des temps *reconstruits* :
-« produire ce que le poste a produit, à la cadence nominale, aurait dû prendre
-TN minutes ». La différence entre TF et TN, ce sont les pertes de cadence ;
-entre TN et TU, les pertes de qualité.
+**TN n'est pas un temps d'horloge.** C'est un temps *reconstruit* : « produire
+ce que le poste a produit, à la cadence nominale, aurait dû prendre TN
+minutes ». On le compare au temps de valeur ajoutée réel (chargement +
+traitement) pour obtenir la performance ; l'écart, ce sont les pertes de
+cadence (cycles lents, lots incomplets).
 
 **Le tc idéal (temps de cycle idéal), pas à pas.** C'est le temps qu'il
 *faudrait* au poste pour produire **une** pièce si tout se passait
@@ -56,10 +57,10 @@ leur moyenne (évaluée à t = 0 si les paramètres varient dans le temps). C'es
 une **convention de référence**, pas une mesure — exactement comme la cadence
 nominale affichée sur la fiche d'une machine réelle.
 
-À quoi il sert : uniquement à construire TN (`tc × produites`) et TU
-(`tc × bonnes`), donc la performance et le TRS. Si le four tourne en fournées
-de 2 au lieu de 4, le temps machine est identique mais TN est divisé par
-deux : la performance chute, et le TRS montre la perte. Chaque modèle a sa
+À quoi il sert : uniquement à construire TN (`tc × produites`), donc la
+performance et le TRS. Si le four tourne en fournées de 2 au lieu de 4, le
+temps machine est identique mais TN est divisé par deux : la performance
+chute, et le TRS montre la perte. Chaque modèle a sa
 durée et sa taille de lot, donc **son** tc idéal : c'est la colonne
 `tc_ideal` de `postes_modeles.csv`.
 
@@ -81,11 +82,16 @@ durée et sa taille de lot, donc **son** tc idéal : c'est la colonne
   panne peut chevaucher une période hors horaire, donc `pannes` peut dépasser
   ce que la cascade laisse imaginer. Le MTBF n'est affiché qu'à partir de deux
   pannes observées.
-* `gel` — temps passé « figé » : le poste a fini ou évacué ses lots et attend
-  (un arrêt imminent, une reprise d'horaire, une condition de redémarrage).
+* `gel` — temps passé « figé » **pendant les heures d'ouverture** : le poste a
+  fini ou évacué ses lots et attend (un arrêt imminent, une condition de
+  redémarrage). Un poste qui se fige juste avant la fin d'un shift n'est
+  décongelé qu'au shift suivant ; la nuit qui suit n'est pas du gel, c'est de
+  la fermeture, et elle n'est donc pas comptée ici.
 * `mise_en_route`, `nb_mises_en_route` — temps total et nombre de démarrages
-  (chauffe, réglages) ; le poste redémarre après chaque interruption. Le temps
-  inclut l'attente de l'équipe de démarrage.
+  (chauffe, réglages) ; le poste redémarre après chaque interruption (panne,
+  arrêt, fin de shift). C'est le temps de réglage lui-même (la durée
+  configurée), **pas** l'attente de l'équipe de démarrage : cette attente est
+  une perte de disponibilité, comptée dans le TF plus bas, pas ici.
 * `temps_fonctionnement` — le temps avec au moins un lot actif sur le poste.
   C'est le TF de la cascade.
 
@@ -94,21 +100,28 @@ durée et sa taille de lot, donc **son** tc idéal : c'est la colonne
 * `taux_de_charge` = TR / TO. Quelle part de l'ouverture est réellement
   engagée (le reste part en arrêts programmés).
 * `disponibilite` (Do) = TF / TR. Quand le poste devait tourner, a-t-il
-  tourné ? Les pertes ici : pannes, démarrages, et toutes les attentes.
-* `performance` (Tp) = TN / TF. Quand il tournait, tournait-il à la cadence
-  nominale ? Les pertes ici : cycles plus lents que la moyenne, productivité
-  des équipes, et surtout **lots incomplets** — un gabarit qui tourne avec 2
-  pièces sur 4 possibles passe le même temps machine pour moitié moins de
-  production.
+  tourné ? Les pertes ici : pannes, démarrages, attente de l'équipe de
+  démarrage, gel, et surtout la **famine** (pas de pièces à traiter). Un poste
+  goulot très affamé aura un Do faible : c'est réel, pas une anomalie.
+* `performance` (Tp) = TN ÷ (temps de chargement + temps de traitement), soit
+  le temps de valeur ajoutée idéal rapporté au temps machine réellement passé
+  à charger et traiter (additionné sur **tous** les lots). Quand il tournait,
+  tournait-il à la cadence nominale ? Les pertes : cycles plus lents que la
+  moyenne, productivité des équipes, et surtout **lots incomplets** (un gabarit
+  qui tourne avec 2 pièces sur 4 possibles).
+  Pourquoi additionner sur tous les lots plutôt que diviser par TF ? Parce
+  qu'un poste peut traiter plusieurs lots **en parallèle** (`carriers
+  indépendants`, zones d'attente/stockage). Le TF « au moins un lot actif »
+  sous-compterait ce travail parallèle et ferait dépasser 100 %. Additionner le
+  temps de chaque lot corrige ça : Tp reste dans [0, 100 %].
 * `qualite` (Tq) = bonnes / produites. Les « bonnes » pièces d'un poste sont
   celles que son trieur aval n'a pas envoyées au rebut ; un poste sans routage
   vers le rebut a Tq = 1.
-* `trs` = TU / TR = Do × Tp × Tq. L'indicateur roi. Équivalent à
-  `bonnes ÷ (TR × cadence nominale)` : ce qu'on a produit de bon, rapporté à
-  ce que le temps requis aurait permis à cadence nominale.
-* `trg` = TU / TO : comme le TRS mais les arrêts programmés comptent en perte
-  (`trg = trs × taux_de_charge`).
-* `tre` = TU / TT : tout le calendrier compte, même les nuits fermées.
+* `trs` = Do × Tp × Tq. L'indicateur roi (c'est la définition standard du TRS :
+  disponibilité × performance × qualité), toujours dans [0, 100 %].
+* `trg` = TRS × taux_de_charge : comme le TRS mais les arrêts programmés
+  comptent en perte.
+* `tre` = TRS × (TR ÷ TT) : tout le calendrier compte, même les nuits fermées.
 
 ### La production (colonnes `pieces_*`, `nb_lancements`, `taille_lot_moyenne`, `cycle_*`, `debit_pieces_j`, `flux_*`)
 
@@ -154,7 +167,7 @@ Elles se comparent entre elles et entre postes.
 ## postes_modeles.csv — la production par modèle
 
 Pour chaque poste à pièces : le tc idéal du modèle, les pièces produites,
-bonnes et rebutées de ce modèle. C'est le détail qui alimente TN et TU.
+bonnes et rebutées de ce modèle. C'est le détail qui alimente TN.
 
 ## buffers.csv — un buffer par ligne
 
