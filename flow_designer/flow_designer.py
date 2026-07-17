@@ -2471,9 +2471,14 @@ class RunSimulationDialog(QtWidgets.QDialog):
         self.pieces_lbl = QtWidgets.QLabel("—")
         self._pieces_row = form.rowCount()
         form.addRow("Pieces in exit buffer", self.pieces_lbl)
+        self.timeout_lbl = QtWidgets.QLabel("—")
+        self._timeout_row = form.rowCount()
+        form.addRow("Timeout", self.timeout_lbl)
         lay.addLayout(form)
         self._form = form
-        self._set_pieces_row_visible(False)
+        self._last_progress = {}
+        self._set_form_row_visible(self._pieces_row, self.pieces_lbl, False)
+        self._set_form_row_visible(self._timeout_row, self.timeout_lbl, False)
 
         self.caption_lbl = QtWidgets.QLabel("")
         self.caption_lbl.setAlignment(QtCore.Qt.AlignHCenter)
@@ -2544,7 +2549,17 @@ class RunSimulationDialog(QtWidgets.QDialog):
         if tag == "META":
             self._meta = info
             self._sim_start = parse_date_time(info.get("sim_start"))
-            self._set_pieces_row_visible(info.get("criterion") == "ByPiecesProduced")
+            is_pieces = info.get("criterion") == "ByPiecesProduced"
+            self._set_form_row_visible(self._pieces_row, self.pieces_lbl, is_pieces)
+            timeout = info.get("timeout")  # only present when finite
+            if is_pieces and timeout:
+                if self._sim_start is not None:
+                    deadline = self._sim_start + timedelta(minutes=timeout)
+                    self.timeout_lbl.setText(
+                        f"{deadline.strftime(PY_DATE_TIME_FORMAT)}  (after {timeout / 1440.0:g} days)")
+                else:
+                    self.timeout_lbl.setText(f"{timeout:g} minutes")
+                self._set_form_row_visible(self._timeout_row, self.timeout_lbl, True)
             self.status_lbl.setText("Simulation running...")
         elif tag == "PROGRESS":
             self._show_progress(info)
@@ -2558,6 +2573,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
         sim_now = info.get("sim_now")
         if sim_now is None:
             return
+        self._last_progress = info
         if self._sim_start is not None:
             date = self._sim_start + timedelta(minutes=sim_now)
             self.sim_time_lbl.setText(f"{date.strftime(PY_DATE_TIME_FORMAT)}  (day {int(sim_now // 1440) + 1})")
@@ -2578,13 +2594,31 @@ class RunSimulationDialog(QtWidgets.QDialog):
                 self.caption_lbl.setText(f"{sim_now / 1440.0:.1f} / {total / 1440.0:.1f} days simulated")
                 self.bar.setValue(min(self.BAR_STEPS, int(self.BAR_STEPS * sim_now / total)))
 
+    def _outcome_line(self) -> str:
+        """How the run ended, from the criterion's point of view: the goal was
+        met, the timeout cut in first, or the simulation simply ran out of work."""
+        meta = self._meta or {}
+        if meta.get("criterion") == "ByPiecesProduced":
+            pieces = self._last_progress.get("pieces")
+            goal = meta.get("goal")
+            if pieces is not None and goal:
+                if pieces >= goal:
+                    return f"Goal reached — {pieces} / {goal} pieces."
+                if meta.get("timeout"):
+                    return f"Timeout reached — {pieces} / {goal} pieces."
+                return (f"Goal not reached — {pieces} / {goal} pieces "
+                        f"(the simulation ran out of work; check the shifts).")
+        elif meta.get("criterion") == "ByTime":
+            return "Stop date reached."
+        return "Simulation finished."
+
     def _on_finished(self, exit_code, *args):
         self._finished = True
         self._tick.stop()
         self._update_elapsed()
         self.cancel_btn.setText("Close")
         if exit_code == 0 and self._report_dir:
-            self.status_lbl.setText(f"Simulation finished. Report written to:\n{self._report_dir}")
+            self.status_lbl.setText(f"{self._outcome_line()}\nReport written to:\n{self._report_dir}")
             self.open_report_btn.setVisible(True)
         elif self._error_message:
             self.status_lbl.setText(f"Simulation failed: {self._error_message}")
@@ -2592,16 +2626,16 @@ class RunSimulationDialog(QtWidgets.QDialog):
             tail = "\n".join(self._stderr_tail[-8:])
             self.status_lbl.setText(f"Simulation failed (exit code {exit_code}).\n{tail}")
         else:
-            self.status_lbl.setText("Simulation finished.")
+            self.status_lbl.setText(self._outcome_line())
 
     # --- UI helpers ---
 
-    def _set_pieces_row_visible(self, visible: bool):
+    def _set_form_row_visible(self, row: int, field_widget, visible: bool):
         try:
-            self._form.setRowVisible(self._pieces_row, visible)
+            self._form.setRowVisible(row, visible)
         except Exception:  # Qt < 6.4 fallback: hide the widgets themselves
-            self.pieces_lbl.setVisible(visible)
-            lbl = self._form.labelForField(self.pieces_lbl)
+            field_widget.setVisible(visible)
+            lbl = self._form.labelForField(field_widget)
             if lbl is not None:
                 lbl.setVisible(visible)
 
