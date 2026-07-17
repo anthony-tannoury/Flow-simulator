@@ -117,8 +117,12 @@ seed in Python):
 
 ## 5. Graphs support (data-side hooks only)
 
-The plotting itself (`simulation/graphs.py`, matplotlib) stays in Python —
-the C++ port only needs to produce the same *data*:
+The plotting itself (`simulation/graphs.py`, matplotlib) stays in Python;
+the C++ port only needs to produce the same *data*. Output layout is
+`graphes/{png,csv}/<category>/<stem>.{png,csv}` (format first, then category);
+task occupation plots raw claimed slots (max_capacity - vacant) with capacity
+in the title, operator plots carry the group's max headcount in the title.
+Data hooks needed:
 
 * `piece.py`: `Piece.journal` — `('in'|'out'|'task', name, t)` entries
   appended on every buffer enter/leave and at deposit (the `task` stamp is

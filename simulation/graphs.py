@@ -46,10 +46,18 @@ def _dates(times, sim_start: datetime | None):
     return [sim_start + timedelta(minutes=t) for t in times]
 
 
-def _write_series(folder: str, stem: str, times, values, sim_start, ylabel: str,
-                  title: str, color: str = LINE_COLOR, ratio: bool = False) -> None:
+# Outputs are split by format at the top level, then by category, so every
+# figure lands at  <base>/csv/<category>/<stem>.csv  and  <base>/png/<category>/<stem>.png
+def _out_path(base: str, kind: str, category: str, stem: str, ext: str) -> str:
+    folder = os.path.join(base, kind, category)
     os.makedirs(folder, exist_ok=True)
-    with open(os.path.join(folder, stem + '.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+    return os.path.join(folder, f"{stem}.{ext}")
+
+
+def _write_series(base: str, category: str, stem: str, times, values, sim_start,
+                  ylabel: str, title: str, color: str = LINE_COLOR,
+                  ymax: float | None = None) -> None:
+    with open(_out_path(base, 'csv', category, stem, 'csv'), 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(['t', ylabel])
         for t, v in zip(_dates(times, sim_start), values):
@@ -62,15 +70,15 @@ def _write_series(folder: str, stem: str, times, values, sim_start, ylabel: str,
     ax.fill_between(xs, values, step='post', color=color, alpha=0.15)
     ax.set_title(title)
     ax.set_ylabel(ylabel)
-    if ratio:
-        ax.set_ylim(-0.02, 1.05)
-        ax.yaxis.set_major_formatter(lambda v, _: f"{v * 100:.0f}%")
+    ax.set_ylim(bottom=0)
+    if ymax is not None and ymax not in (float('inf'), 0):
+        ax.set_ylim(0, ymax * 1.05)
     if sim_start is None:
         ax.set_xlabel('jours simulés')
     ax.grid(alpha=0.25)
     fig.autofmt_xdate()
     fig.tight_layout()
-    fig.savefig(os.path.join(folder, stem + '.png'), dpi=130)
+    fig.savefig(_out_path(base, 'png', category, stem, 'png'), dpi=130)
     plt.close(fig)
 
 
@@ -97,46 +105,49 @@ def _sum_of_steps(series: list[tuple[list, list]]) -> tuple[list, list]:
 # time series
 # ---------------------------------------------------------------------------
 
-def resource_graphs(folder, resources, sim_start):
+def resource_graphs(base, resources, sim_start):
     for res in resources:
         values, times = res.available_quantity.xt()
-        _write_series(folder, f"stock_{_safe(res.name())}", times, values, sim_start,
-                      'stock', f"Stock — {res.name()}")
+        _write_series(base, 'ressources', f"stock_{_safe(res.name())}", times, values, sim_start,
+                      'stock', f"Stock : {res.name()}")
 
 
-def buffer_graphs(folder, buffers, sim_start):
+def buffer_graphs(base, buffers, sim_start):
     for buffer in buffers:
         values, times = buffer.length.xt()
-        _write_series(folder, f"longueur_{_safe(buffer.name())}", times, values, sim_start,
-                      'pieces', f"Longueur — {buffer.name()}")
+        _write_series(base, 'buffers', f"longueur_{_safe(buffer.name())}", times, values, sim_start,
+                      'pieces', f"Longueur : {buffer.name()}")
 
 
-def line_graphs(folder, buffers, sim_start):
+def line_graphs(base, buffers, sim_start):
     from .outlet import BufferType
     passage = [b for b in buffers if b.buffer_type is BufferType.PASSAGE]
     values, times = _sum_of_steps([b.length.xt() for b in passage])
-    _write_series(folder, 'pieces_en_attente', times, values, sim_start,
+    _write_series(base, 'ligne', 'pieces_en_attente', times, values, sim_start,
                   'pieces', 'Pièces en attente (somme des buffers de passage)')
     values, times = kpis.WIP.xt()
-    _write_series(folder, 'encours', times, values, sim_start,
+    _write_series(base, 'ligne', 'encours', times, values, sim_start,
                   'pieces', 'Encours (pièces ni sorties ni rebutées)')
 
 
-def task_graphs(folder, tasks, sim_start):
+def task_graphs(base, tasks, sim_start):
     for task in tasks:
+        # vacant_slots.claimed_quantity = places prises = max_capacity - places vacantes
         values, times = task.vacant_slots.claimed_quantity.xt()
         capacity = task.config.max_capacity
-        ratios = [v / capacity for v in values]
-        _write_series(folder, f"occupation_{_safe(task.name())}", times, ratios, sim_start,
-                      'occupation', f"Occupation — {task.name()} (capacité {capacity:g})",
-                      color=TASK_COLOR, ratio=True)
+        cap_txt = f"{capacity:g}" if capacity != float('inf') else "illimitée"
+        _write_series(base, 'postes', f"occupation_{_safe(task.name())}", times, values, sim_start,
+                      'places occupées', f"Occupation : {task.name()} (capacité max {cap_txt})",
+                      color=TASK_COLOR, ymax=capacity)
 
 
-def operator_graphs(folder, operator_groups, sim_start):
+def operator_graphs(base, operator_groups, sim_start):
     for group in operator_groups:
         values, times = group.available_quantity.xt()
-        _write_series(folder, f"disponibles_{_safe(group.name())}", times, values, sim_start,
-                      'operateurs libres', f"Opérateurs disponibles — {group.name()}")
+        _write_series(base, 'operateurs', f"disponibles_{_safe(group.name())}", times, values, sim_start,
+                      'operateurs libres',
+                      f"Opérateurs disponibles : {group.name()} (max {group.n_operators:g})",
+                      ymax=group.n_operators)
 
 
 # ---------------------------------------------------------------------------
@@ -174,12 +185,11 @@ def _duration_unit(max_minutes: float) -> tuple[float, str]:
     return 1.0, 'minutes'
 
 
-def trajectory_graphs(folder, buffers, piece_generator, sim_start, max_branches: int = 8):
+def trajectory_graphs(base, buffers, piece_generator, sim_start, max_branches: int = 8):
     from .outlet import BufferType
     finished = [p for b in buffers if b.buffer_type in (BufferType.EXIT, BufferType.SCRAP) for p in b]
     if piece_generator is None or not finished:
         return
-    os.makedirs(folder, exist_ok=True)
 
     for model in piece_generator.models:
         pieces = [p for p in finished if p.model is model]
@@ -207,7 +217,7 @@ def trajectory_graphs(folder, buffers, piece_generator, sim_start, max_branches:
                 })
 
         stem = f"trajectoires_{_safe(model.name)}"
-        with open(os.path.join(folder, stem + '.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+        with open(_out_path(base, 'csv', 'modeles', stem, 'csv'), 'w', newline='', encoding='utf-8-sig') as f:
             writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             writer.writeheader()
             writer.writerows(rows)
@@ -243,14 +253,14 @@ def trajectory_graphs(folder, buffers, piece_generator, sim_start, max_branches:
         ax.set_yticklabels([f"traj. {i + 1}" for i in range(len(plotted))])
         ax.invert_yaxis()
         ax.set_xlabel(f"durée moyenne cumulée ({unit})")
-        extra = f" — {len(ranked) - len(plotted)} trajectoires rares non tracées" if len(ranked) > len(plotted) else ""
-        ax.set_title(f"Trajectoires — {model.name} ({len(pieces)} pièces finies){extra}")
+        extra = f", {len(ranked) - len(plotted)} trajectoires rares non tracées" if len(ranked) > len(plotted) else ""
+        ax.set_title(f"Trajectoires : {model.name} ({len(pieces)} pièces finies{extra})")
         ax.grid(axis='x', alpha=0.25)
         handles = [plt.Rectangle((0, 0), 1, 1, color=WAIT_COLOR, alpha=0.55),
                    plt.Rectangle((0, 0), 1, 1, color=TASK_COLOR, alpha=0.9)]
         ax.legend(handles, ['attente (buffer)', 'poste'], loc='lower right', fontsize=8)
         fig.tight_layout()
-        fig.savefig(os.path.join(folder, stem + '.png'), dpi=130)
+        fig.savefig(_out_path(base, 'png', 'modeles', stem, 'png'), dpi=130)
         plt.close(fig)
 
 
@@ -258,11 +268,10 @@ def trajectory_graphs(folder, buffers, piece_generator, sim_start, max_branches:
 # production histogram
 # ---------------------------------------------------------------------------
 
-def production_histogram(folder, buffers, piece_generator):
+def production_histogram(base, buffers, piece_generator):
     from .outlet import BufferType
     if piece_generator is None:
         return
-    os.makedirs(folder, exist_ok=True)
     exits = Counter(p.model for b in buffers if b.buffer_type is BufferType.EXIT for p in b)
 
     names = [m.name for m in piece_generator.models]
@@ -270,7 +279,7 @@ def production_histogram(folder, buffers, piece_generator):
     generees = list(piece_generator.total_generated)
     produites = [exits.get(m, 0) for m in piece_generator.models]
 
-    with open(os.path.join(folder, 'production.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+    with open(_out_path(base, 'csv', 'modeles', 'production', 'csv'), 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(['modele', 'objectif', 'generees', 'produites'])
         for row in zip(names, objectifs, generees, produites):
@@ -287,22 +296,22 @@ def production_histogram(folder, buffers, piece_generator):
     ax.set_xticks(list(x))
     ax.set_xticklabels(names, rotation=20, ha='right')
     ax.set_ylabel('pieces')
-    ax.set_title('Production par modèle — objectif / générées / produites')
+    ax.set_title('Production par modèle : objectif / générées / produites')
     ax.legend()
     ax.grid(axis='y', alpha=0.25)
     fig.tight_layout()
-    fig.savefig(os.path.join(folder, 'production.png'), dpi=130)
+    fig.savefig(_out_path(base, 'png', 'modeles', 'production', 'png'), dpi=130)
     plt.close(fig)
 
 
 def write_graphs(directory: str, tasks: list, buffers: list, resources: list,
                  operator_groups: list, piece_generator=None,
                  sim_start: datetime | None = None) -> str:
-    resource_graphs(os.path.join(directory, 'ressources'), resources, sim_start)
-    buffer_graphs(os.path.join(directory, 'buffers'), buffers, sim_start)
-    line_graphs(os.path.join(directory, 'ligne'), buffers, sim_start)
-    task_graphs(os.path.join(directory, 'postes'), tasks, sim_start)
-    operator_graphs(os.path.join(directory, 'operateurs'), operator_groups, sim_start)
-    trajectory_graphs(os.path.join(directory, 'modeles'), buffers, piece_generator, sim_start)
-    production_histogram(os.path.join(directory, 'modeles'), buffers, piece_generator)
+    resource_graphs(directory, resources, sim_start)
+    buffer_graphs(directory, buffers, sim_start)
+    line_graphs(directory, buffers, sim_start)
+    task_graphs(directory, tasks, sim_start)
+    operator_graphs(directory, operator_groups, sim_start)
+    trajectory_graphs(directory, buffers, piece_generator, sim_start)
+    production_histogram(directory, buffers, piece_generator)
     return directory
