@@ -241,10 +241,35 @@ the stopping criterion now drives which is built.
   produites) and CSV with an `objectif` column; without goals, a two-bar chart
   (générées/produites) and a CSV without `objectif`.
 
+## 12. Parser: tolerant type-name matching (`parser.py`) — optional
+
+* `canon_name(value)` strips non-alphanumerics and lowercases; every type-name
+  lookup (`dist_type`, function `kind`, policy `type`, buffer/collector/scope/
+  shutdown types, shift/shutdown/mtbf `mode`, the stopping-criterion `type`)
+  now matches through it, so `"ByTime"`, `"By time"`, `"PER_BATCH"` and
+  `"Per batch"` all parse the same. Helpers: `lookup(table, value, what)` and
+  `same_name(a, b)`. Node `kind` stays strict (structural discriminator).
+* Optional to mirror: the designer still exports canonical identifiers
+  (`ByTime`, `PER_BATCH`, `AbortPendingCarriers`, ...), so the C++ parser keeps
+  working without this; it only matters for hand-edited files using the
+  designer's sentence-case display forms.
+
 ## Not needed in C++
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON
   format — the C++ port never had them; nothing to do.
+* Designer save flow (dirty tracking, Save / Save as, unsaved-changes prompts on
+  New/Open/exit) and the Run simulation dialog are designer-only. The dialog
+  spawns `flow_designer/sim_runner.py`, which parses the saved JSON, runs the
+  sim in slices and prints `@@META/@@PROGRESS/@@DONE/@@ERROR {json}` lines
+  (criterion type, total time or piece goal, sim clock, pieces in the exit
+  buffer); the popup renders elapsed/simulated time, an 'n / total' caption and
+  a progress bar from them. JSON format unchanged.
+* The designer UI now displays sentence-case labels (By time, Per batch,
+  Non discriminating greedy...) but keeps exporting canonical names — combos
+  carry the canonical value as item data. Only the Shutdowns card's on-node
+  combo stores the display label in its property; its `to_clean_json`
+  canonicalizes on export, so the JSON stays canonical there too.
 * The flow-designer refactor around generation is designer-only; the C++ port has
   no designer and reads the criterion-based JSON described in §10. For the record:
   the generation mix (goals or per-model rates) lives in Simulation Settings per
