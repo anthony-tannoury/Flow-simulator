@@ -2073,6 +2073,11 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         goals = FixedGoalsWidget(self._leaf_models, src.get("models_goals", []))
         self._widgets["goals"] = goals
         self._add_row("Model goals (one goal per leaf model)", goals)
+        grace = QtWidgets.QLineEdit(str(src.get("grace_period", 0.0)))
+        grace.setMaximumWidth(90)
+        self._widgets["grace"] = grace
+        self._add_row("Grace period (minutes; the goals are paced over the generator's "
+                      "shifts minus this reserve, kept free for scrap remakes)", grace)
         timeout = InfFloatWidget(src.get("timeout", "inf"))
         self._widgets["timeout"] = timeout
         self._add_row("Timeout (minutes)", timeout)
@@ -2093,6 +2098,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         if canonical == "ByPiecesProduced":
             return {"type": "ByPiecesProduced",
                     "timeout": self._widgets["timeout"].get_value(),  # minutes | "inf"
+                    "grace_period": as_float(self._widgets["grace"].text()),
                     "models_goals": self._widgets["goals"].value()}
         return {"type": "ByTime",
                 "time": self._widgets["time"].get_value(),  # "dd-mm-yyyy hh:mm"
@@ -3670,6 +3676,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             if goals and sum(as_int(g.get("goal", 0)) for g in goals) <= 0:
                 problems.append("Stopping criterion 'By pieces produced': the total goal must be positive "
                                 "(give at least one model a goal above zero).")
+            if as_float(crit.get("grace_period", 0.0)) < 0:
+                problems.append("Stopping criterion 'By pieces produced': the grace period must be >= 0 "
+                                "minutes (the loader also rejects one longer than the generator's shifts).")
             if gen_node is not None:
                 self._check_flushability(gen_node, [g.get("model") for g in goals if g.get("model")],
                                          "bufs_out", "Piece generator", problems)

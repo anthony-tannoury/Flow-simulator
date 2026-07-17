@@ -241,7 +241,28 @@ the stopping criterion now drives which is built.
   produites) and CSV with an `objectif` column; without goals, a two-bar chart
   (générées/produites) and a CSV without `objectif`.
 
-## 12. Parser: tolerant type-name matching (`parser.py`) — optional
+## 12. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
+
+* `PieceGenerator` is now `Triggerable` (gains a `trigger` state). `Piece.enter`
+  into a scrap buffer, right after decrementing `generated[idx]`, pulses
+  `piece_generator.trigger` so a sleeping goal generator wakes for the remake.
+* `GoalPieceGenerator.setup` gains `grace_period: float = 0.0` and paces with
+  `gap = (sum(shift.length) - grace_period) / total_goal` (raises when
+  `grace_period < 0` or `>= working_time`). The whole goal is therefore born
+  with `grace_period` of working time to spare; the reserve absorbs the
+  off-pace scrap remakes.
+* `GoalPieceGenerator.process` reordered: after the downtime wait it runs
+  `update_probs()` first and, when all probs are 0 (everything asked for is
+  out), does `wait(trigger)` instead of polling every gap; on wake it loops
+  (downtime -> probs -> shift check -> hold(gap) -> emit). The nonzero path is
+  unchanged (same holds, same single gap between update_probs and the RNG
+  draw), so runs are bit-identical until the goal is first exhausted.
+* Parser: `load_piece_generator` passes
+  `grace_period=float(criterion.get('grace_period', 0.0))`; the criterion JSON
+  gains an optional `grace_period` (minutes, default 0) written by the
+  designer's By-pieces-produced settings.
+
+## 13. Parser: tolerant type-name matching (`parser.py`) — optional
 
 * `canon_name(value)` strips non-alphanumerics and lowercases; every type-name
   lookup (`dist_type`, function `kind`, policy `type`, buffer/collector/scope/
