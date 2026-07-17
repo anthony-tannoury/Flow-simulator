@@ -1,0 +1,22 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,temps_moyen_entre_arrivees
+Entrée M88 ET Retouche / Prep noyaux,PASSAGE,95.556,458,140.34,1,34235.979,132226.44,1468,1467,358.038
+Prep noyaux / Injection manuelle,PASSAGE,18.358,141,38.896,0,7315.226,57723.529,1319,1319,398.484
+Entrée LEAP / Injection cire moule,PASSAGE,156.67,741,230.584,0,47986.891,155151.84,1716,1716,306.294
+Injection cire noyaux / Prison 1,PASSAGE,1.383,17,3.503,0,5506.75,17603.529,132,132,3981.818
+Injection cire / Attente 4h,PASSAGE,8.34,91,14.888,1,1439.513,68282.198,3046,3045,172.554
+Attente 4h / Marquage laser,PASSAGE,655.64,1671,508.592,1671,4794.197,71165.534,2859,1188,183.841
+Marquage laser / Stockage,PASSAGE,0.0,0,0.0,0,,,0,0,
+Marquage laser / Contrôle US,PASSAGE,1.046,45,3.697,1,374.167,57001.765,1470,1469,357.551
+Contrôle US / Contrôle RX,PASSAGE,0.088,5,0.526,0,41.683,2288.235,1110,1110,473.514
+Contrôle RX / Expertise cire,PASSAGE,7.867,43,13.679,0,3672.376,83056.692,1126,1126,466.785
+Expertise cire / Prison 3,PASSAGE,3.323,30,7.205,0,10334.204,28957.647,169,169,3110.059
+Expertise cire / Stockage,PASSAGE,1.29,61,6.047,0,657.685,57005.882,1031,1031,509.796
+Prison 1 / Rework,PASSAGE,0.0,0,0.0,0,0.0,0.0,39,39,13476.923
+Sorties,EXIT,337.031,988,297.649,988,,,988,0,531.984
+Prison 3 / Rework 3,PASSAGE,0.0,0,0.0,0,0.0,0.0,59,59,8908.475
+Prison 3 / Rework 2,PASSAGE,0.0,0,0.0,0,,,0,0,
+Contrôle US / Prison 2,PASSAGE,0.0,0,0.0,0,,,0,0,
+Rebuts 1,SCRAP,12.529,33,9.789,33,,,33,0,15927.273
+Rebuts 2,SCRAP,8.169,32,8.452,32,,,32,0,16425.0
+Rebuts 4,SCRAP,8.153,25,6.784,25,,,25,0,21024.0
+Rebuts 3,SCRAP,0.0,0,0.0,0,,,0,0,
