@@ -3431,10 +3431,18 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 # statically checkable (all-constant branches) at design time
                 if not connected_nodes_from_port(node, "to_buffers", "output"):
                     problems.append(f"Router '{name}' has no outlets.")
-                branches = list(get_property_json(node, "buffer_probs", {}).values())
+                branch_map = get_property_json(node, "buffer_probs", {})
+                branches = list(branch_map.values())
                 freeloaders = [p for p in branches if p is None]
                 if len(freeloaders) > 1:
                     problems.append(f"Router '{name}': at most one freeloader branch is allowed.")
+                # a constant-0 branch can never carry a piece: the wire exists but is dead
+                targets = {node_uid(b): b.name()
+                           for b in connected_nodes_from_port(node, "to_buffers", "output")}
+                for bid, p in branch_map.items():
+                    if isinstance(p, dict) and p.get("kind") == "constant" and as_float(p.get("value", 0.0)) == 0.0:
+                        problems.append(f"Router '{name}': branch '{targets.get(bid, bid)}' has "
+                                        f"probability 0 (dead branch; no piece can ever take it).")
                 consts = [p.get("value", 0.0) for p in branches
                           if isinstance(p, dict) and p.get("kind") == "constant"]
                 if any(not 0 <= v <= 1 for v in consts):
