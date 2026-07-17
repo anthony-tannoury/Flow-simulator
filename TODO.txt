@@ -23,10 +23,5 @@ Parameters that cannot be changed in from the excel inputs :
 
 
 TODO :
-- why no LEAP pieces produced ?
-- kpi per model
 - stress test performance (45 000 piece per year)
-- convert time from minutes to hours
-- convert ratios to percentages
-- ask about what some files do
-- ask how claude got the scraps directly after each task
+- question : is the gap in the piece generator estimated correctly or should it account for the temps de traversée ?
