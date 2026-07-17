@@ -81,6 +81,11 @@ def main(argv: list) -> int:
         while not criterion.done():
             slice_started = perf_counter()
             env.run(duration=stride)
+            if env.peek() == float("inf") and not criterion.done():
+                # nothing scheduled anymore: the factory can never move again
+                # (e.g. every shift ended with an unmet goal and no timeout), so
+                # a plain env.run() would have returned here; do the same
+                break
             now = perf_counter()
             if now - last_emit >= 0.1:
                 emit("PROGRESS", snapshot())
