@@ -255,7 +255,8 @@ the stopping criterion now drives which is built.
   machine time: the event-merged UNION of the carriers' loading + processing
   intervals via new helper `union_mode_duration(components, tags)`; a task is
   one physical machine, so parallel carriers inside it never multiply the
-  hours; the performance rate keeps the per-carrier SUM) and
+  hours; warm-up is NOT included, it stays in `mise_en_route`; the
+  performance rate keeps the per-carrier SUM) and
   `heures_main_oeuvre` (= `labor_minutes_total()`, which does sum: operators
   x duration).
 
