@@ -29,6 +29,7 @@ DUREE_COLS = {
     'cycle_moyen', 'cycle_p90', 'cycle_max',
     'attente_pieces', 'attente_place', 'attente_operateurs', 'attente_matiere',
     'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement',
+    'heures_machine', 'heures_main_oeuvre',
     'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee', 'sim_end_minutes',
@@ -46,6 +47,8 @@ LABEL_OVERRIDES = {
     'pieces_sorties': 'Pièces sorties', 'objectif_total': 'Objectif total',
     'objectif_atteint': 'Objectif atteint', 'source_file': 'Fichier source',
     'temps_calcul': 'Temps de calcul',
+    'heures_machine': 'Heures machine',
+    'heures_main_oeuvre': "Heures main-d'\u0153uvre",
 }
 
 
@@ -253,7 +256,8 @@ def _task_tabs(uid: str, results: ResultsData) -> list:
              'taille_lot_moyenne', 'cycle_moyen', 'cycle_p90', 'cycle_max',
              'debit_pieces_j', 'flux_entrant_j', 'flux_sortant_j',
              'attente_pieces', 'attente_place', 'attente_operateurs', 'attente_matiere',
-             'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement']
+             'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement',
+             'heures_machine', 'heures_main_oeuvre']
     pairs = [(pretty_label(k), fmt_value(k, raw[k])) for k in order if k in raw]
     pairs += [(pretty_label(k), fmt_value(k, v)) for k, v in raw.items()
               if k not in order and k != 'poste']
