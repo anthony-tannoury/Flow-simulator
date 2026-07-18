@@ -271,6 +271,22 @@ def buffer_kpis(buffer) -> dict:
     }
 
 
+def operator_kpis(group) -> dict:
+    tt = env.now()
+    posted = group.is_in_downtime.value.value_duration(False)
+    claimed_mean = group.claimed_quantity.mean()
+    return {
+        'groupe': group.name(),
+        'effectif': group.n_operators,
+        'temps_poste': round(posted, 3),
+        'occupation_moyenne': round(claimed_mean, 3),
+        'occupation_max': group.claimed_quantity.maximum(),
+        # mean claimed is averaged over the whole run; scale it back to the time
+        # the group was actually posted, against its full headcount
+        'taux_occupation': ratio(claimed_mean * tt, group.n_operators * posted),
+    }
+
+
 def lead_time_rows(buffers) -> list[dict]:
     from .outlet import BufferType
     rows = []
@@ -361,12 +377,12 @@ DUREE_COLS = {
     'cycle_moyen', 'cycle_p90', 'cycle_max',
     'attente_pieces', 'attente_place', 'attente_operateurs', 'attente_matiere',
     'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement',
-    'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees',
+    'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee',
 }
 PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
-            'trs', 'trg', 'tre', 'taux_rebut', 'atteinte'}
+            'trs', 'trg', 'tre', 'taux_rebut', 'atteinte', 'taux_occupation'}
 INSTANT_COLS = {'creation', 'fin'}
 
 
@@ -395,7 +411,8 @@ def _write_csv(path: str, rows: list[dict], sim_start: datetime | None = None) -
 
 
 def write_report(directory: str, tasks: list, buffers: list, piece_generator=None,
-                 run_info: dict | None = None, sim_start: datetime | None = None) -> str:
+                 run_info: dict | None = None, sim_start: datetime | None = None,
+                 operator_groups: list | None = None) -> str:
     os.makedirs(directory, exist_ok=True)
 
     run = {'genere_le': datetime.now().isoformat(timespec='seconds'),
@@ -411,6 +428,9 @@ def write_report(directory: str, tasks: list, buffers: list, piece_generator=Non
                [row for t in tasks for row in task_model_rows(t)], sim_start)
     _write_csv(os.path.join(directory, 'buffers.csv'),
                [buffer_kpis(b) for b in buffers], sim_start)
+
+    _write_csv(os.path.join(directory, 'operateurs.csv'),
+               [operator_kpis(g) for g in (operator_groups or [])], sim_start)
 
     flux, par_modele = flow_kpis(buffers, piece_generator)
     _write_csv(os.path.join(directory, 'flux.csv'),
