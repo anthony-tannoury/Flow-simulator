@@ -241,7 +241,21 @@ the stopping criterion now drives which is built.
   produites) and CSV with an `objectif` column; without goals, a two-bar chart
   (générées/produites) and a CSV without `objectif`.
 
-## 12. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
+## 12. Labor and machine hours (`task.py`, `kpis.py`)
+
+* `Task` gains `labor_minutes` (operator-minutes booked on the task by every
+  crew) filled at three points: `Carrier.handle_batch_operators` adds
+  `sum(counts) * duration` after each hold (loading + PER_BATCH processing);
+  `TaskStarter` adds the startup crew's `sum(counts) * duration` after the
+  warm-up hold; the PER_TASK crew accrues over its whole claim window
+  (`request_task_operators` stamps `_task_crew_since`, `release_task_operators`
+  adds `sum(counts) * (now - since)`), independent of how many carriers ran
+  under it. `Task.labor_minutes_total()` adds a still-held crew's open claim.
+* `kpis.task_kpis` gains two DUREE columns: `heures_machine` (= the existing
+  value-add, loading + processing summed over carriers) and
+  `heures_main_oeuvre` (= `labor_minutes_total()`).
+
+## 13. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
 
 * `PieceGenerator` is now `Triggerable` (gains a `trigger` state). `Piece.enter`
   into a scrap buffer, right after decrementing `generated[idx]`, pulses
@@ -267,7 +281,7 @@ the stopping criterion now drives which is built.
   By-pieces-produced settings write one or the other behind an
   automatic-gap toggle, never both.
 
-## 13. Machine-readable report (`kpis.py`, `parser.py`) — mirror-worthy
+## 14. Machine-readable report (`kpis.py`, `parser.py`) — mirror-worthy
 
 * `kpis.operator_kpis(group)`: name, headcount, posted time (downtime False),
   mean/max claimed operators, `taux_occupation = claimed_mean * TT /
@@ -286,7 +300,7 @@ the stopping criterion now drives which is built.
   The designer's results mode consumes exactly these two files; mirroring them
   in the C++ port makes its runs browsable in the same viewer.
 
-## 14. Parser: tolerant type-name matching (`parser.py`) — optional
+## 15. Parser: tolerant type-name matching (`parser.py`) — optional
 
 * `canon_name(value)` strips non-alphanumerics and lowercases; every type-name
   lookup (`dist_type`, function `kind`, policy `type`, buffer/collector/scope/
