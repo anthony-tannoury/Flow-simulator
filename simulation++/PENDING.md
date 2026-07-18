@@ -241,7 +241,26 @@ the stopping criterion now drives which is built.
   produites) and CSV with an `objectif` column; without goals, a two-bar chart
   (générées/produites) and a CSV without `objectif`.
 
-## 12. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
+## 12. Labor and machine hours (`task.py`, `kpis.py`)
+
+* `Task` gains `labor_minutes` (operator-minutes booked on the task by every
+  crew) filled at three points: `Carrier.handle_batch_operators` adds
+  `sum(counts) * duration` after each hold (loading + PER_BATCH processing);
+  `TaskStarter` adds the startup crew's `sum(counts) * duration` after the
+  warm-up hold; the PER_TASK crew accrues over its whole claim window
+  (`request_task_operators` stamps `_task_crew_since`, `release_task_operators`
+  adds `sum(counts) * (now - since)`), independent of how many carriers ran
+  under it. `Task.labor_minutes_total()` adds a still-held crew's open claim.
+* `kpis.task_kpis` gains two DUREE columns: `heures_machine` (wall-clock
+  machine time: the event-merged UNION of the carriers' loading + processing
+  intervals via new helper `union_mode_duration(components, tags)`; a task is
+  one physical machine, so parallel carriers inside it never multiply the
+  hours; warm-up is NOT included, it stays in `mise_en_route`; the
+  performance rate keeps the per-carrier SUM) and
+  `heures_main_oeuvre` (= `labor_minutes_total()`, which does sum: operators
+  x duration).
+
+## 13. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
 
 * `PieceGenerator` is now `Triggerable` (gains a `trigger` state). `Piece.enter`
   into a scrap buffer, right after decrementing `generated[idx]`, pulses
@@ -267,7 +286,7 @@ the stopping criterion now drives which is built.
   By-pieces-produced settings write one or the other behind an
   automatic-gap toggle, never both.
 
-## 13. Parser: tolerant type-name matching (`parser.py`) — optional
+## 14. Parser: tolerant type-name matching (`parser.py`) — optional
 
 * `canon_name(value)` strips non-alphanumerics and lowercases; every type-name
   lookup (`dist_type`, function `kind`, policy `type`, buffer/collector/scope/
