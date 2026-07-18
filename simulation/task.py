@@ -71,6 +71,7 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
             self.request_resources(fail_at=earliest_deadline - duration - (fail_before - ideal_duration))
 
         self.hold(duration, mode=work_mode)
+        self.task.labor_minutes += sum(count for _, count in recuperated) * duration
         self.release(*recuperated)
 
     def handle_task_operators(self, earliest_deadline: float, ideal_duration: float) -> None:
@@ -191,7 +192,7 @@ class TaskStarter(Component, Donnable):
             self.hold(till=next_shutdown.end)
         
         deadline = self.task.get_earliest_deadline()
-        self.task.config.startup_operators.request(demander=self, fail_at=deadline - duration)
+        recuperated = self.task.config.startup_operators.request(demander=self, fail_at=deadline - duration)
         if self.failed():
             self.task.is_frozen.set(True)
             self.done.set(True)
@@ -199,6 +200,7 @@ class TaskStarter(Component, Donnable):
         
         self.hold(duration)
         self.task.startup_times.tally(duration)  # the setup work itself, not the wait for the crew
+        self.task.labor_minutes += sum(count for _, count in (recuperated or [])) * duration
         self.done.set(True)
 
 
@@ -283,6 +285,8 @@ class Task(Component, HasShifts, ABC):
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
         self.started_up = False
         self.requested_per_task_operators = False  # whether the PER_TASK crew is currently held
+        self.labor_minutes = 0.0        # operator-minutes booked on this task, all crews
+        self._task_crew_since = None    # claim start of the held PER_TASK crew
         self.pending_carriers = CarrierTracker()
         self.active_carriers = CarrierTracker()
 
@@ -334,12 +338,26 @@ class Task(Component, HasShifts, ABC):
             self.is_frozen.set(True)
         else:
             self.requested_per_task_operators = True
+            self._task_crew_since = env.now()
 
     def release_task_operators(self) -> None:
+        if self.task_operators and self._task_crew_since is not None:
+            self.labor_minutes += (sum(count for _, count in self.task_operators)
+                                   * (env.now() - self._task_crew_since))
+        self._task_crew_since = None
         if self.task_operators:
             self.release(*self.task_operators)
         self.task_operators = []
         self.requested_per_task_operators = False
+
+    def labor_minutes_total(self) -> float:
+        """Booked operator-minutes on this task (loading, processing and startup
+        crews), a still-held PER_TASK crew's open claim included."""
+        total = self.labor_minutes
+        if self._task_crew_since is not None:
+            total += (sum(count for _, count in self.task_operators)
+                      * (env.now() - self._task_crew_since))
+        return total
 
     def process(self):
         while True:
