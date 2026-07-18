@@ -2073,11 +2073,40 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         goals = FixedGoalsWidget(self._leaf_models, src.get("models_goals", []))
         self._widgets["goals"] = goals
         self._add_row("Model goals (one goal per leaf model)", goals)
+
+        # Pacing: automatic (gap computed so the goals fill the shifts minus a grace
+        # period) or a hand-set gap. A saved criterion carrying "gap" is manual.
+        pacing = QtWidgets.QWidget()
+        pl = QtWidgets.QVBoxLayout(pacing)
+        pl.setContentsMargins(0, 0, 0, 0)
+        auto = QtWidgets.QCheckBox("Automatic (the goals are paced to fill the generator's shifts)")
+        auto.setChecked(src.get("gap") is None)
+        pl.addWidget(auto)
         grace = QtWidgets.QLineEdit(str(src.get("grace_period", 0.0)))
         grace.setMaximumWidth(90)
+        grace_row = QtWidgets.QWidget()
+        gl = QtWidgets.QHBoxLayout(grace_row); gl.setContentsMargins(0, 0, 0, 0)
+        gl.addWidget(QtWidgets.QLabel("Grace period (minutes; shift time kept free at the end for scrap remakes):"))
+        gl.addWidget(grace); gl.addStretch(1)
+        pl.addWidget(grace_row)
+        gap = QtWidgets.QLineEdit(str(src.get("gap", 60.0)))
+        gap.setMaximumWidth(90)
+        gap_row = QtWidgets.QWidget()
+        gpl = QtWidgets.QHBoxLayout(gap_row); gpl.setContentsMargins(0, 0, 0, 0)
+        gpl.addWidget(QtWidgets.QLabel("Gap (minutes between two pieces):"))
+        gpl.addWidget(gap); gpl.addStretch(1)
+        pl.addWidget(gap_row)
+        self._widgets["auto_gap"] = auto
         self._widgets["grace"] = grace
-        self._add_row("Grace period (minutes; the goals are paced over the generator's "
-                      "shifts minus this reserve, kept free for scrap remakes)", grace)
+        self._widgets["gap"] = gap
+
+        def _sync_pacing(*_):
+            grace_row.setVisible(auto.isChecked())
+            gap_row.setVisible(not auto.isChecked())
+        auto.toggled.connect(_sync_pacing)
+        _sync_pacing()
+        self._add_row("Gap between pieces", pacing)
+
         timeout = InfFloatWidget(src.get("timeout", "inf"))
         self._widgets["timeout"] = timeout
         self._add_row("Timeout (minutes)", timeout)
@@ -2096,10 +2125,14 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
     def value(self):
         canonical = self.type.currentData()
         if canonical == "ByPiecesProduced":
-            return {"type": "ByPiecesProduced",
-                    "timeout": self._widgets["timeout"].get_value(),  # minutes | "inf"
-                    "grace_period": as_float(self._widgets["grace"].text()),
-                    "models_goals": self._widgets["goals"].value()}
+            out = {"type": "ByPiecesProduced",
+                   "timeout": self._widgets["timeout"].get_value()}  # minutes | "inf"
+            if self._widgets["auto_gap"].isChecked():
+                out["grace_period"] = as_float(self._widgets["grace"].text())
+            else:
+                out["gap"] = as_float(self._widgets["gap"].text())
+            out["models_goals"] = self._widgets["goals"].value()
+            return out
         return {"type": "ByTime",
                 "time": self._widgets["time"].get_value(),  # "dd-mm-yyyy hh:mm"
                 "gap": self._widgets["gap"].get_value(),
@@ -3687,6 +3720,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             if as_float(crit.get("grace_period", 0.0)) < 0:
                 problems.append("Stopping criterion 'By pieces produced': the grace period must be >= 0 "
                                 "minutes (the loader also rejects one longer than the generator's shifts).")
+            if crit.get("gap") is not None and as_float(crit.get("gap"), 0.0) <= 0:
+                problems.append("Stopping criterion 'By pieces produced': the gap must be > 0 minutes "
+                                "(or switch back to the automatic gap).")
             if gen_node is not None:
                 self._check_flushability(gen_node, [g.get("model") for g in goals if g.get("model")],
                                          "bufs_out", "Piece generator", problems)

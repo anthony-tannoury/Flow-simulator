@@ -470,9 +470,15 @@ class Parser:
         match canon_name(criterion['type']):
             case 'bypiecesproduced':
                 models_goals = {self.models[mg['model']]: mg['goal'] for mg in criterion['models_goals']}
+                # a criterion carrying 'gap' fixes the pacing by hand; otherwise it is
+                # computed from the shifts and goals, minus the optional grace period
+                if criterion.get('gap') is not None:
+                    pacing = {'gap': float(criterion['gap'])}
+                else:
+                    pacing = {'grace_period': float(criterion.get('grace_period', 0.0))}
                 self.piece_generator = GoalPieceGenerator(
                     name=node['name'], models_goals=models_goals, shifts=shifts, outlets=outlets,
-                    grace_period=float(criterion.get('grace_period', 0.0)))
+                    **pacing)
             case 'bytime':
                 models = [self.models[mp['model']] for mp in criterion['models_probs']]
                 model_probs = [make_callable(mp['probability']) if mp['probability'] is not None else None

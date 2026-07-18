@@ -246,21 +246,26 @@ the stopping criterion now drives which is built.
 * `PieceGenerator` is now `Triggerable` (gains a `trigger` state). `Piece.enter`
   into a scrap buffer, right after decrementing `generated[idx]`, pulses
   `piece_generator.trigger` so a sleeping goal generator wakes for the remake.
-* `GoalPieceGenerator.setup` gains `grace_period: float = 0.0` and paces with
+* `GoalPieceGenerator.setup` gains `grace_period: float = 0.0` and
+  `gap: float | None = None`. With `gap=None` (automatic) it paces with
   `gap = (sum(shift.length) - grace_period) / total_goal` (raises when
-  `grace_period < 0` or `>= working_time`). The whole goal is therefore born
-  with `grace_period` of working time to spare; the reserve absorbs the
-  off-pace scrap remakes.
+  `grace_period < 0` or `>= working_time`); the whole goal is therefore born
+  with `grace_period` of working time to spare, a reserve that absorbs the
+  off-pace scrap remakes. A non-None `gap` fixes the pacing verbatim (raises
+  when `gap <= 0` or combined with a nonzero grace period).
 * `GoalPieceGenerator.process` reordered: after the downtime wait it runs
   `update_probs()` first and, when all probs are 0 (everything asked for is
   out), does `wait(trigger)` instead of polling every gap; on wake it loops
   (downtime -> probs -> shift check -> hold(gap) -> emit). The nonzero path is
   unchanged (same holds, same single gap between update_probs and the RNG
   draw), so runs are bit-identical until the goal is first exhausted.
-* Parser: `load_piece_generator` passes
-  `grace_period=float(criterion.get('grace_period', 0.0))`; the criterion JSON
-  gains an optional `grace_period` (minutes, default 0) written by the
-  designer's By-pieces-produced settings.
+* Parser: `load_piece_generator` passes `gap=float(criterion['gap'])` when the
+  criterion carries `gap`, otherwise
+  `grace_period=float(criterion.get('grace_period', 0.0))`. The criterion JSON
+  therefore carries either an optional `grace_period` (automatic pacing,
+  default 0) or a `gap` (manual pacing, minutes) — the designer's
+  By-pieces-produced settings write one or the other behind an
+  automatic-gap toggle, never both.
 
 ## 13. Parser: tolerant type-name matching (`parser.py`) — optional
 

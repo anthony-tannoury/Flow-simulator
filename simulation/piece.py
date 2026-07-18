@@ -130,21 +130,30 @@ class PieceGenerator(Component, PickyPieceTaker, HasShifts, Triggerable, ABC):
 
 class GoalPieceGenerator(PieceGenerator):
     def setup(self, models_goals: dict[Model, int], shifts: list[Interval], outlets: list[Outlet],
-              grace_period: float = 0.0) -> None:
+              grace_period: float = 0.0, gap: float | None = None) -> None:
         super().setup(list(models_goals.keys()), shifts, outlets)
         self.goals = list(models_goals.values())
         self.probs = [0.0 for _ in range(len(self.models))]
         self.total_goal = sum(self.goals)
-        # The goals are paced over the shifts minus the grace period, so the whole
-        # goal is born with `grace_period` of working time to spare; that reserve
-        # absorbs the scrap remakes (which arrive off-pace, trigger-driven).
-        working_time = sum(shift.length for shift in shifts)
-        if grace_period < 0:
-            raise ValueError("Grace period must be >= 0")
-        if grace_period >= working_time:
-            raise ValueError(f"Grace period ({grace_period}) must be smaller than the "
-                             f"generator's total shift time ({working_time})")
-        self.gap = (working_time - grace_period) / self.total_goal
+        if gap is not None:
+            # user-fixed pacing: the goals may complete early or spill past the shifts
+            if grace_period:
+                raise ValueError("Grace period only applies to the automatic gap")
+            if gap <= 0:
+                raise ValueError("Gap must be > 0")
+            self.gap = gap
+        else:
+            # Automatic: the goals are paced over the shifts minus the grace period,
+            # so the whole goal is born with `grace_period` of working time to spare;
+            # that reserve absorbs the scrap remakes (which arrive off-pace,
+            # trigger-driven).
+            working_time = sum(shift.length for shift in shifts)
+            if grace_period < 0:
+                raise ValueError("Grace period must be >= 0")
+            if grace_period >= working_time:
+                raise ValueError(f"Grace period ({grace_period}) must be smaller than the "
+                                 f"generator's total shift time ({working_time})")
+            self.gap = (working_time - grace_period) / self.total_goal
 
     def update_probs(self) -> None:
         total_generated = sum(self.generated)
