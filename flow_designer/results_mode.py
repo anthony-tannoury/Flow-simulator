@@ -108,7 +108,7 @@ class ResultsData:
         path = os.path.join(self.run_dir, 'report.json')
         if not os.path.isfile(path):
             raise FileNotFoundError(
-                f"No report.json in {run_dir} — this run predates interactive results; "
+                f"No report.json in {run_dir}: this run predates interactive results; "
                 f"re-run the simulation to browse it here.")
         with open(path, encoding='utf-8') as f:
             data = json.load(f)
@@ -153,7 +153,7 @@ class ResultsData:
         outcome = self.outcome_text()
         if outcome:
             parts.append(outcome)
-        return "  —  ".join(parts)
+        return "   |   ".join(parts)
 
 
 # ----------------------------------------------------------------------------
@@ -313,11 +313,11 @@ def _generator_tabs(results: ResultsData) -> list:
 def card_dialog(parent, kind: str, uid: str, name: str, results: ResultsData):
     """The stats dialog for a card, or None when the run has nothing for it."""
     if kind in ("Task", "ResourceTask") and uid in results.tasks:
-        return ResultsCardDialog(parent, f"Results — {name}", _task_tabs(uid, results))
+        return ResultsCardDialog(parent, f"Results: {name}", _task_tabs(uid, results))
     if kind == "Buffer" and uid in results.buffers:
-        return ResultsCardDialog(parent, f"Results — {name}", _buffer_tabs(uid, results))
+        return ResultsCardDialog(parent, f"Results: {name}", _buffer_tabs(uid, results))
     if kind == "PieceGenerator":
-        return ResultsCardDialog(parent, f"Results — {name}", _generator_tabs(results))
+        return ResultsCardDialog(parent, f"Results: {name}", _generator_tabs(results))
     return None
 
 
@@ -387,7 +387,7 @@ class ResultsDock(QtWidgets.QDockWidget):
                     return
                 uid = op_ids[row]
                 name = results.operators[uid].get('groupe', uid)
-                dlg = ResultsCardDialog(parent, f"Results — {name}",
+                dlg = ResultsCardDialog(parent, f"Results: {name}",
                                         [("Disponibilité", PngView(results.graph_path('operators', uid)))])
                 dlg.exec()
             show.clicked.connect(_show_selected)
@@ -433,18 +433,39 @@ def _get(raw, key):
     value = raw.get(key)
     return float(value) if value not in ('', None) else None
 
+
+def _diff(raw, key_a, key_b):
+    a, b = _get(raw, key_a), _get(raw, key_b)
+    return a - b if a is not None and b is not None else None
+
 # (label, section, value-fn, higher_is_better). Values are normalized over the
 # nodes that have one; higher_is_better inverts the color ramp (green = good).
+# When a metric is active, every card outside its section is greyed out so the
+# colored family reads at a glance.
 HEAT_METRICS = [
     ("Task: utilization (TF / TR)", 'tasks',
      lambda r: _safe_ratio(r.get('temps_fonctionnement'), r.get('temps_requis')), False),
     ("Task: TRS", 'tasks', lambda r: _get(r, 'trs'), True),
+    ("Task: net flux (in - out, / day)", 'tasks',
+     lambda r: _diff(r, 'flux_entrant_j', 'flux_sortant_j'), False),
+    ("Task: throughput (pieces / day)", 'tasks', lambda r: _get(r, 'debit_pieces_j'), True),
+    ("Task: scrap rate", 'tasks',
+     lambda r: _safe_ratio(r.get('pieces_rebutees'), r.get('pieces_produites')), False),
     ("Task: freeze share (gel / TR)", 'tasks',
      lambda r: _safe_ratio(r.get('gel'), r.get('temps_requis')), False),
     ("Task: waiting for pieces", 'tasks', lambda r: _get(r, 'attente_pieces'), False),
+    ("Task: waiting for operators", 'tasks', lambda r: _get(r, 'attente_operateurs'), False),
+    ("Buffer: net flux (in - out, / day)", 'buffers',
+     lambda r: _diff(r, 'flux_entrant_j', 'flux_sortant_j'), False),
     ("Buffer: average stock", 'buffers', lambda r: _get(r, 'longueur_moyenne'), False),
+    ("Buffer: max stock", 'buffers', lambda r: _get(r, 'longueur_max'), False),
+    ("Buffer: final stock", 'buffers', lambda r: _get(r, 'longueur_finale'), False),
     ("Buffer: average stay", 'buffers', lambda r: _get(r, 'sejour_moyen'), False),
 ]
+
+# Cards outside the active metric's family (and cards with no value) fade to
+# this neutral grey so the heat colors stand out.
+DIMMED_COLOR = (74, 77, 82)
 
 
 def heat_color(v01: float) -> tuple:

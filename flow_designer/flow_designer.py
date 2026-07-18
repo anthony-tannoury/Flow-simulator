@@ -3210,16 +3210,20 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 return
             colors = results_mode.heat_values(metric_index, self.results)
             for node in self.all_nodes():
+                if node_kind(node) in ("Backdrop", "BackdropNode"):
+                    continue
                 uid = node_uid(node)
-                if uid in colors:
-                    try:
-                        # SimNode's class attribute shadows BaseNode.color(); the
-                        # live value sits in the node property system
-                        current = node.get_property("color")
-                        self._saved_node_colors[uid] = tuple(current)[:3]
-                        node.set_color(*colors[uid])
-                    except Exception:
-                        pass
+                # heat color inside the metric's family, neutral grey everywhere
+                # else so the colored cards stand out
+                target = colors.get(uid, results_mode.DIMMED_COLOR)
+                try:
+                    # SimNode's class attribute shadows BaseNode.color(); the
+                    # live value sits in the node property system
+                    current = node.get_property("color")
+                    self._saved_node_colors[uid] = tuple(current)[:3]
+                    node.set_color(*target)
+                except Exception:
+                    pass
         finally:
             self._suspend_dirty = False
 
