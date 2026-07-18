@@ -442,6 +442,13 @@ def _diff(raw, key_a, key_b):
     a, b = _get(raw, key_a), _get(raw, key_b)
     return a - b if a is not None and b is not None else None
 
+
+def _passage_only(key):
+    # Exit and scrap buffers only ever fill, so mixing them into a stock or
+    # flux normalization drowns the passage buffers' signal; they stay dimmed
+    # and the scrap bins get their own dedicated metric instead.
+    return lambda raw: _get(raw, key) if raw.get('type') == 'PASSAGE' else None
+
 # (label, section, value-fn, higher_is_better). Values are normalized over the
 # nodes that have one; higher_is_better inverts the color ramp (green = good).
 # When a metric is active, every card outside its section is greyed out so the
@@ -459,12 +466,14 @@ HEAT_METRICS = [
      lambda r: _safe_ratio(r.get('gel'), r.get('temps_requis')), False),
     ("Task: waiting for pieces", 'tasks', lambda r: _get(r, 'attente_pieces'), False),
     ("Task: waiting for operators", 'tasks', lambda r: _get(r, 'attente_operateurs'), False),
-    ("Buffer: net flux (in - out, / day)", 'buffers',
-     lambda r: _diff(r, 'flux_entrant_j', 'flux_sortant_j'), False),
-    ("Buffer: average stock", 'buffers', lambda r: _get(r, 'longueur_moyenne'), False),
-    ("Buffer: max stock", 'buffers', lambda r: _get(r, 'longueur_max'), False),
-    ("Buffer: final stock", 'buffers', lambda r: _get(r, 'longueur_finale'), False),
-    ("Buffer: average stay", 'buffers', lambda r: _get(r, 'sejour_moyen'), False),
+    ("Buffer: net flux (in - out, / day, passage)", 'buffers',
+     lambda r: _diff(r, 'flux_entrant_j', 'flux_sortant_j') if r.get('type') == 'PASSAGE' else None, False),
+    ("Buffer: average stock (passage)", 'buffers', _passage_only('longueur_moyenne'), False),
+    ("Buffer: max stock (passage)", 'buffers', _passage_only('longueur_max'), False),
+    ("Buffer: final stock (passage)", 'buffers', _passage_only('longueur_finale'), False),
+    ("Buffer: average stay (passage)", 'buffers', _passage_only('sejour_moyen'), False),
+    ("Buffer: scrap collected (rebuts)", 'buffers',
+     lambda r: _get(r, 'entrees') if r.get('type') == 'SCRAP' else None, False),
 ]
 
 # Cards outside the active metric's family (and cards with no value) fade to
