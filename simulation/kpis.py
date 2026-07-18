@@ -77,6 +77,30 @@ def mode_total(components, tag: str) -> float:
     return sum(c.mode.value_duration(tag) for c in components)
 
 
+def union_mode_duration(components, tags: set) -> float:
+    """Wall-clock time where at least one component is in one of the given
+    modes (event-merged union; concurrent components never double-count)."""
+    now = env.now()
+    deltas = []
+    for component in components:
+        xs, ts = component.mode.xt(force_numeric=False)
+        for i, value in enumerate(xs):
+            if value in tags:
+                start = ts[i]
+                end = ts[i + 1] if i + 1 < len(ts) else now
+                if end > start:
+                    deltas.append((start, 1))
+                    deltas.append((end, -1))
+    deltas.sort()
+    total, active, prev = 0.0, 0, None
+    for t, delta in deltas:
+        if active > 0 and prev is not None:
+            total += t - prev
+        active += delta
+        prev = t
+    return total
+
+
 def overlap_duration(mon_a, val_a, mon_b, val_b) -> float:
     """Time where level monitor a holds val_a AND b holds val_b (event-merged)."""
     xa, ta = mon_a.xt(force_numeric=False)
@@ -219,11 +243,12 @@ def task_kpis(task) -> dict:
         'temps_collecte': round(mode_total(carriers, 'collecting'), 3),
         'temps_chargement': round(t_loading, 3),
         'temps_traitement': round(t_processing, 3),
-        # heures machine: value-adding machine time (loading + processing, summed
-        # over carriers); heures main-d'oeuvre: operator-minutes booked on the
-        # task by every crew (loading, processing PER_BATCH holds, the PER_TASK
-        # crew's whole claim window, startup)
-        'heures_machine': round(value_add, 3),
+        # heures machine: wall-clock machine time (union of loading + processing
+        # across carriers; a task is one physical machine, so parallel carriers
+        # inside it never multiply the hours). heures main-d'oeuvre:
+        # operator-minutes booked on the task by every crew (loading, processing
+        # PER_BATCH holds, the PER_TASK crew's whole claim window, startup).
+        'heures_machine': round(union_mode_duration(carriers, {'loading', 'processing'}), 3),
         'heures_main_oeuvre': round(task.labor_minutes_total(), 3),
     }
 

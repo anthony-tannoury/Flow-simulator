@@ -251,9 +251,13 @@ the stopping criterion now drives which is built.
   (`request_task_operators` stamps `_task_crew_since`, `release_task_operators`
   adds `sum(counts) * (now - since)`), independent of how many carriers ran
   under it. `Task.labor_minutes_total()` adds a still-held crew's open claim.
-* `kpis.task_kpis` gains two DUREE columns: `heures_machine` (= the existing
-  value-add, loading + processing summed over carriers) and
-  `heures_main_oeuvre` (= `labor_minutes_total()`).
+* `kpis.task_kpis` gains two DUREE columns: `heures_machine` (wall-clock
+  machine time: the event-merged UNION of the carriers' loading + processing
+  intervals via new helper `union_mode_duration(components, tags)`; a task is
+  one physical machine, so parallel carriers inside it never multiply the
+  hours; the performance rate keeps the per-carrier SUM) and
+  `heures_main_oeuvre` (= `labor_minutes_total()`, which does sum: operators
+  x duration).
 
 ## 13. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
 
