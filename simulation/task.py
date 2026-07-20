@@ -279,8 +279,11 @@ class Task(Component, HasShifts, ABC):
         self.task_operators: list[tuple[OperatorGroup, int]] = []
         self.carrier_type = carrier_type
         # so each operator group can unfreeze this task when it comes back on shift
+        # (dict.fromkeys, not a set: iteration must not depend on object addresses,
+        # or the shift-boundary wake-up order — and with it the whole run — would
+        # change from process to process)
         for alternative in (config.operators, config.loading_operators, config.startup_operators):
-            for group in {g for alt in alternative.alternatives for g, _ in alt}:
+            for group in dict.fromkeys(g for alt in alternative.alternatives for g, _ in alt):
                 group.dependent_tasks.append(self)
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
         self.started_up = False
