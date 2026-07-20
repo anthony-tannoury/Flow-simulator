@@ -101,6 +101,24 @@ def union_mode_duration(components, tags: set) -> float:
     return total
 
 
+def level_during(level_monitor, status_monitor, status_value) -> float:
+    """Integral of a level monitor over the time a status monitor holds a value
+    (event-merged, extended to now)."""
+    xl, tl = level_monitor.xt()
+    xs, ts = status_monitor.xt(force_numeric=False)
+    times = sorted(set(tl) | set(ts) | {env.now()})
+    total, il, is_ = 0.0, 0, 0
+    for k in range(1, len(times)):
+        t0, t1 = times[k - 1], times[k]
+        while il + 1 < len(tl) and tl[il + 1] <= t0:
+            il += 1
+        while is_ + 1 < len(ts) and ts[is_ + 1] <= t0:
+            is_ += 1
+        if xs[is_] == status_value:
+            total += xl[il] * (t1 - t0)
+    return total
+
+
 def overlap_duration(mon_a, val_a, mon_b, val_b) -> float:
     """Time where level monitor a holds val_a AND b holds val_b (event-merged)."""
     xa, ta = mon_a.xt(force_numeric=False)
@@ -303,18 +321,22 @@ def buffer_kpis(buffer) -> dict:
 
 
 def operator_kpis(group) -> dict:
-    tt = env.now()
     posted = group.is_in_downtime.value.value_duration(False)
-    claimed_mean = group.claimed_quantity.mean()
+    # Claims can outlive the shift that granted them (a batch finishing late, a
+    # PER_TASK crew held by a starving task): split the claimed operator-minutes
+    # into inside / outside the group's own posted hours. The occupation rate
+    # only counts the in-shift part, against headcount x posted time, so it
+    # stays in [0, 100%]; the out-of-shift part gets its own column.
+    en_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, False)
+    hors_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, True)
     return {
         'groupe': group.name(),
         'effectif': group.n_operators,
         'temps_poste': round(posted, 3),
-        'occupation_moyenne': round(claimed_mean, 3),
+        'heures_en_poste': round(en_poste, 3),
+        'heures_hors_poste': round(hors_poste, 3),
         'occupation_max': group.claimed_quantity.maximum(),
-        # mean claimed is averaged over the whole run; scale it back to the time
-        # the group was actually posted, against its full headcount
-        'taux_occupation': ratio(claimed_mean * tt, group.n_operators * posted),
+        'taux_occupation': ratio(en_poste, group.n_operators * posted),
     }
 
 
@@ -408,7 +430,7 @@ DUREE_COLS = {
     'cycle_moyen', 'cycle_p90', 'cycle_max',
     'attente_pieces', 'attente_place', 'attente_operateurs', 'attente_matiere',
     'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement',
-    'heures_machine', 'heures_main_oeuvre',
+    'heures_machine', 'heures_main_oeuvre', 'heures_en_poste', 'heures_hors_poste',
     'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee',

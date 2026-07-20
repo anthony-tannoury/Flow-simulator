@@ -29,7 +29,7 @@ DUREE_COLS = {
     'cycle_moyen', 'cycle_p90', 'cycle_max',
     'attente_pieces', 'attente_place', 'attente_operateurs', 'attente_matiere',
     'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement',
-    'heures_machine', 'heures_main_oeuvre',
+    'heures_machine', 'heures_main_oeuvre', 'heures_en_poste', 'heures_hors_poste',
     'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee', 'sim_end_minutes',
@@ -48,6 +48,7 @@ LABEL_OVERRIDES = {
     'objectif_atteint': 'Objectif atteint', 'source_file': 'Fichier source',
     'temps_calcul': 'Temps de calcul',
     'heures_machine': 'Heures machine',
+    'heures_en_poste': 'Heures en poste', 'heures_hors_poste': 'Heures hors poste',
     'heures_main_oeuvre': "Heures main-d'\u0153uvre",
 }
 

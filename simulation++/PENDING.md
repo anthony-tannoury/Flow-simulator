@@ -289,9 +289,15 @@ the stopping criterion now drives which is built.
 ## 14. Machine-readable report (`kpis.py`, `parser.py`) — mirror-worthy
 
 * `kpis.operator_kpis(group)`: name, headcount, posted time (downtime False),
-  mean/max claimed operators, `taux_occupation = claimed_mean * TT /
-  (headcount * posted)`. `write_report` gains `operator_groups` and writes
-  `operateurs.csv`; `temps_poste` joined DUREE_COLS, `taux_occupation` PCT_COLS.
+  max claimed, and the claimed operator-minutes SPLIT by the group's own
+  shifts via new helper `level_during(level_monitor, status_monitor, value)`
+  (integral of a level over the time a status holds a value):
+  `heures_en_poste` (claims inside the shifts) / `heures_hors_poste` (claims
+  outliving the shift that granted them — late batches, PER_TASK crews held by
+  starving tasks). `taux_occupation = heures_en_poste / (headcount * posted)`,
+  always in [0, 1]. `write_report` gains `operator_groups` and writes
+  `operateurs.csv`; the heures columns joined DUREE_COLS, `taux_occupation`
+  PCT_COLS.
 * `Parser.write_machine_report(directory, run_info)` (called at the end of
   `report()`) writes two extra artifacts next to the CSVs:
   - `report.json`: the same collector dicts (`task_kpis`, `task_model_rows`,
