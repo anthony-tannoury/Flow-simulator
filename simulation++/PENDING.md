@@ -355,7 +355,7 @@ the stopping criterion now drives which is built.
   off-shift "ghost work" disappears (atelier exits moved 2629 -> 2568; the
   difference was work done by crews whose operators had gone home).
 
-## 16. Shift-fit re-checked after the materials step (`task.py`)
+## 17. Shift-fit re-checked after the materials step (`task.py`)
 
 * Gap fixed: `ConstrainedByShift` approved a work hold BEFORE `handle_restock`
   + `request_resources`. A restock-order hold or a stock-out wait between the
