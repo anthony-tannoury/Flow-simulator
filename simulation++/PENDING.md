@@ -325,6 +325,16 @@ the stopping criterion now drives which is built.
   working without this; it only matters for hand-edited files using the
   designer's sentence-case display forms.
 
+## 15b. Parser reads the flow JSON as UTF-8 (`parser.py`) — mirror-worthy
+
+* `Parser.__init__` now opens the flow JSON with `encoding='utf-8'`. Without it
+  Python uses the locale code page (cp1252 on Western Windows, the default up to
+  3.14), which reads UTF-8 accents as mojibake ('Entrée' -> 'Entrée'); that
+  corrupted string then flows into every KPI report CSV. The report CSVs
+  themselves were already correct (utf-8-sig); the corruption was purely on the
+  read side. The C++ port must likewise read the JSON as UTF-8 explicitly, never
+  via a locale-dependent default.
+
 ## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
 
 * Bug fixed: a PER_TASK crew stayed claimed across its own shift end whenever
@@ -354,6 +364,36 @@ the stopping criterion now drives which is built.
   main d'oeuvre) no longer books phantom out-of-shift supervision, and
   off-shift "ghost work" disappears (atelier exits moved 2629 -> 2568; the
   difference was work done by crews whose operators had gone home).
+
+## 17. Shift-fit re-checked after the materials step (`task.py`)
+
+* Gap fixed: `ConstrainedByShift` approved a work hold BEFORE `handle_restock`
+  + `request_resources`. A restock-order hold or a stock-out wait between the
+  approval and the hold could then carry already-approved work past the crew's
+  shift end (atelier year: one batch worked 8.7 minutes past the crew's shift
+  because its material arrived 10 minutes late).
+* `Carrier.handle_operators` is split: the decision logic moved to
+  `check_shift_fit(operators, duration)` (same decisions in the same order:
+  task constraint only when no crew, operator + task constraints otherwise);
+  new helper `operator_fit_deadline(operators)` returns
+  `operator_shift_constraint.deadline(crew's current_or_last_shift)`
+  (inf when no crew).
+* `handle_batch_operators` (its restock branch) and `handle_task_operators`:
+  - the materials request's `fail_at` is tightened by
+    `operator_fit_deadline - duration`: a stock-out wait that cannot end in
+    time to still fit gives up, and frees the crew, the moment success becomes
+    impossible - BEFORE the shift boundary, not when the materials show up;
+  - `check_shift_fit(crew, duration)` re-runs after the materials step, right
+    before the hold: it catches the uninterruptible restock-order hold (a
+    demander mid-`hold` cannot be failed, so its delay is only seen at its
+    end) and guards any future protocol whose `deadline`/`decide` disagree.
+* Net effect: under ConstrainedByShift the work itself can no longer run past
+  the crew's shift end; the only residual out-of-shift claim is a restock
+  ORDER hold straddling the boundary, bounded by the order duration. Behavior
+  is unchanged under NotConstrainedByShift (deadline inf, decide LAUNCH) and
+  for runs without materials delays (re-check at an unchanged instant decides
+  the same). Startup holds (`TaskStarter`) remain outside the shift
+  constraint, as before.
 
 ## Not needed in C++
 
