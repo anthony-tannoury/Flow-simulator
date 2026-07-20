@@ -13,6 +13,11 @@ from Qt import QtCore, QtGui, QtWidgets
 from NodeGraphQt import BaseNode, NodeGraph, PropertiesBinWidget
 
 try:
+    from . import results_mode
+except ImportError:
+    import results_mode
+
+try:
     from NodeGraphQt import BackdropNode
 except Exception:
     BackdropNode = None
@@ -31,7 +36,7 @@ DISTRIBUTION_SPECS = {
     "Normal": [("mean", float, 0.0), ("std", float, 1.0)],
     "Exponential": [("mean", float, 1.0)],
     "Triangular": [("low", float, 0.0), ("mode", float, 0.5), ("high", float, 1.0)],
-    "LogNormal": [("mean", float, 0.0), ("sigma", float, 1.0)],
+    "LogNormal": [("mean", float, 1.0), ("sigma", float, 1.0)],   # mean & std of the values (mean > 0)
 }
 
 # A distribution parameter (or productivity / router probability) is either constant or a
@@ -408,6 +413,7 @@ class TaskNode(SimNode):
         self.create_property("independent_carriers", False)
         self.create_property("timeout", 1000000000.0)
         self.create_property("priority", 5)
+        self.create_property("admin", False)   # administrative task: reporting classification only
         self.create_property("collector_type", "NON_DISCRIMINATING_GREEDY")
 
     def to_clean_json(self) -> dict:
@@ -431,6 +437,7 @@ class TaskNode(SimNode):
             "independent_carriers": bool(self.get_property("independent_carriers")),
             "timeout": self.get_property("timeout"),  # number of minutes | "inf"
             "priority": as_int(self.get_property("priority"), 5),
+            "admin": bool(self.get_property("admin")),
             "collector_type": self.get_property("collector_type"),
             "bufs_in": connected_refs_from_port(self, "bufs_in", "input"),
             "bufs_out": get_output_refs(self, "bufs_out"),
@@ -474,6 +481,7 @@ class ResourceTaskNode(SimNode):
         self.create_property("independent_carriers", False)
         self.create_property("timeout", 1000000000.0)
         self.create_property("priority", 5)
+        self.create_property("admin", False)   # administrative task: reporting classification only
 
     def to_clean_json(self) -> dict:
         return {
@@ -502,6 +510,7 @@ class ResourceTaskNode(SimNode):
             "independent_carriers": bool(self.get_property("independent_carriers")),
             "timeout": self.get_property("timeout"),  # number of minutes | "inf"
             "priority": as_int(self.get_property("priority"), 5),
+            "admin": bool(self.get_property("admin")),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),
             "breakdowns": connected_refs_from_port(self, "breakdowns", "input"),
             "position": [self.x_pos(), self.y_pos()],
@@ -2263,8 +2272,12 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
     f.addWidget(QtWidgets.QLabel("Startup operators:")); acc["startup_operators"] = AlternativesWidget(operator_names, get_property_json(node, "startup_operators", [])); f.addWidget(acc["startup_operators"])
     tabs.append(("Operators", _scroll(t)))
 
-    # carriers
+    # carriers (also the general task-settings tab)
     t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
+    acc["admin"] = QtWidgets.QCheckBox(); acc["admin"].setChecked(bool(node.get_property("admin")))
+    acc["admin"].setToolTip("Administrative task (inspection, waiting, storage, ...). Does not change "
+                            "the simulation; the report aggregates admin vs productive tasks separately.")
+    f.addRow("Admin task", acc["admin"])
     acc["min_carriers"] = QtWidgets.QLineEdit(str(node.get_property("min_carriers"))); f.addRow("Min carriers", acc["min_carriers"])
     acc["max_capacity"] = QtWidgets.QLineEdit(str(node.get_property("max_capacity"))); f.addRow("Max capacity", acc["max_capacity"])
     acc["timeout"] = InfFloatWidget(node.get_property("timeout") if node.has_property("timeout") else "inf")
@@ -2324,6 +2337,7 @@ def _apply_carrier_common(node, acc):
     node.set_property("priority", as_int(acc["priority"].text(), 5))
     node.set_property("contiguous_carriers", acc["contiguous_carriers"].isChecked())
     node.set_property("independent_carriers", acc["independent_carriers"].isChecked())
+    node.set_property("admin", acc["admin"].isChecked())
     set_property_json(node, "policies", acc["policies"].get_value())
     set_property_json(node, "task_shifts", acc["task_shifts"].chosen())
 
@@ -2492,6 +2506,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
         self._meta = None
         self._sim_start = None
         self._report_dir = None
+        self.view_results_requested = False
         self._error_message = None
         self._stderr_tail = []
         self._stdout_buffer = ""
@@ -2532,10 +2547,15 @@ class RunSimulationDialog(QtWidgets.QDialog):
         lay.addWidget(self.status_lbl)
 
         buttons = QtWidgets.QHBoxLayout()
+        self.view_results_btn = QtWidgets.QPushButton("View results")
+        self.view_results_btn.setVisible(False)
+        self.view_results_btn.setDefault(True)
+        self.view_results_btn.clicked.connect(self._on_view_results)
         self.open_report_btn = QtWidgets.QPushButton("Open report folder")
         self.open_report_btn.setVisible(False)
         self.open_report_btn.clicked.connect(self._open_report)
         buttons.addStretch(1)
+        buttons.addWidget(self.view_results_btn)
         buttons.addWidget(self.open_report_btn)
         self.cancel_btn = QtWidgets.QPushButton("Cancel")
         self.cancel_btn.clicked.connect(self._on_cancel_clicked)
@@ -2659,6 +2679,8 @@ class RunSimulationDialog(QtWidgets.QDialog):
         if exit_code == 0 and self._report_dir:
             self.status_lbl.setText(f"{self._outcome_line()}\nReport written to:\n{self._report_dir}")
             self.open_report_btn.setVisible(True)
+            self.view_results_btn.setVisible(
+                os.path.isfile(os.path.join(self._report_dir, "report.json")))
         elif self._error_message:
             self.status_lbl.setText(f"Simulation failed: {self._error_message}")
         elif exit_code != 0:
@@ -2687,6 +2709,14 @@ class RunSimulationDialog(QtWidgets.QDialog):
     def _open_report(self):
         if self._report_dir:
             QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(self._report_dir))
+
+    def _on_view_results(self):
+        self.view_results_requested = True
+        self.accept()
+
+    @property
+    def report_dir(self):
+        return self._report_dir
 
     def _confirm_abort(self) -> bool:
         answer = QtWidgets.QMessageBox.question(
@@ -2734,6 +2764,13 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.current_path = None
         self._dirty = False
         self._suspend_dirty = False  # True while (re)loading, so restores stay clean
+
+        # Results mode: a finished run's report shown on the (locked) graph.
+        self.results = None            # results_mode.ResultsData | None
+        self._last_run_dir = None
+        self._results_toolbar = None
+        self._results_dock = None
+        self._saved_node_colors = {}   # uid -> (r, g, b), for heat-map restore
         self._update_title()
 
         self.graph = NodeGraph()
@@ -2785,16 +2822,24 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.statusBar().showMessage("Ready. Use the Create menu to add nodes.")
 
     def _build_menus(self):
+        # every action that edits the session lands in _edit_actions, so results
+        # mode can disable them in one sweep and restore them on exit
+        self._edit_actions = []
+
+        def editing(action):
+            self._edit_actions.append(action)
+            return action
+
         file_menu = self.menuBar().addMenu("File")
-        act_new = file_menu.addAction("New")
+        act_new = editing(file_menu.addAction("New"))
         act_new.setShortcut(QtGui.QKeySequence.New)
-        act_open = file_menu.addAction("Open...")
+        act_open = editing(file_menu.addAction("Open..."))
         act_open.setShortcut(QtGui.QKeySequence.Open)
-        act_import = file_menu.addAction("Import clean JSON (add)...")
+        act_import = editing(file_menu.addAction("Import clean JSON (add)..."))
         file_menu.addSeparator()
-        act_save = file_menu.addAction("Save")
+        act_save = editing(file_menu.addAction("Save"))
         act_save.setShortcut(QtGui.QKeySequence.Save)
-        act_save_as = file_menu.addAction("Save as...")
+        act_save_as = editing(file_menu.addAction("Save as..."))
         act_save_as.setShortcut(QtGui.QKeySequence.SaveAs)
         act_new.triggered.connect(lambda checked=False: self.new_graph())
         act_open.triggered.connect(lambda checked=False: self.open_file_dialog())
@@ -2803,33 +2848,45 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         act_save_as.triggered.connect(lambda checked=False: self.save_file_as())
 
         registries_menu = self.menuBar().addMenu("Registries")
-        registries_menu.addAction("Edit models...").triggered.connect(self.edit_models)
-        registries_menu.addAction("Edit resources...").triggered.connect(self.edit_resources)
-        registries_menu.addAction("Edit operators...").triggered.connect(self.edit_operators)
-        registries_menu.addAction("Edit closing days...").triggered.connect(self.edit_closing_days)
-        registries_menu.addAction("Edit shifts...").triggered.connect(self.edit_shifts)
+        editing(registries_menu.addAction("Edit models...")).triggered.connect(self.edit_models)
+        editing(registries_menu.addAction("Edit resources...")).triggered.connect(self.edit_resources)
+        editing(registries_menu.addAction("Edit operators...")).triggered.connect(self.edit_operators)
+        editing(registries_menu.addAction("Edit closing days...")).triggered.connect(self.edit_closing_days)
+        editing(registries_menu.addAction("Edit shifts...")).triggered.connect(self.edit_shifts)
 
         simulation_menu = self.menuBar().addMenu("Simulation")
-        simulation_menu.addAction("Settings...").triggered.connect(self.edit_simulation_settings)
-        act_run = simulation_menu.addAction("Run simulation...")
+        editing(simulation_menu.addAction("Settings...")).triggered.connect(self.edit_simulation_settings)
+        act_run = editing(simulation_menu.addAction("Run simulation..."))
         act_run.setShortcut("F5")
         act_run.triggered.connect(lambda checked=False: self.run_simulation())
 
+        results_menu = self.menuBar().addMenu("Results")
+        self.act_view_last_results = results_menu.addAction("View last run results")
+        self.act_view_last_results.setEnabled(False)
+        self.act_view_last_results.triggered.connect(
+            lambda checked=False: self._last_run_dir and self.enter_results_mode(self._last_run_dir))
+        results_menu.addAction("Open run results...").triggered.connect(
+            lambda checked=False: self.open_results_dialog())
+        results_menu.addSeparator()
+        self.act_exit_results = results_menu.addAction("Exit results mode")
+        self.act_exit_results.setEnabled(False)
+        self.act_exit_results.triggered.connect(lambda checked=False: self.exit_results_mode())
+
         edit_menu = self.menuBar().addMenu("Edit")
-        copy_action = edit_menu.addAction("Copy cards")
+        copy_action = editing(edit_menu.addAction("Copy cards"))
         copy_action.setShortcut(QtGui.QKeySequence.Copy)  # Ctrl+C / Cmd+C on macOS
         copy_action.triggered.connect(lambda: self.copy_selected_cards())
-        cut_action = edit_menu.addAction("Cut cards")
+        cut_action = editing(edit_menu.addAction("Cut cards"))
         cut_action.setShortcut(QtGui.QKeySequence.Cut)  # Ctrl+X / Cmd+X on macOS
         cut_action.triggered.connect(lambda: self.cut_selected_cards())
-        paste_action = edit_menu.addAction("Paste cards")
+        paste_action = editing(edit_menu.addAction("Paste cards"))
         paste_action.setShortcut(QtGui.QKeySequence.Paste)  # Ctrl+V / Cmd+V on macOS
         paste_action.triggered.connect(self.paste_cards)
-        dup_action = edit_menu.addAction("Duplicate cards")
+        dup_action = editing(edit_menu.addAction("Duplicate cards"))
         dup_action.setShortcut("Ctrl+D")  # Qt maps Ctrl to Cmd on macOS
         dup_action.triggered.connect(lambda: self.duplicate_selected_cards())
         edit_menu.addSeparator()
-        delete_action = edit_menu.addAction("Delete selected")
+        delete_action = editing(edit_menu.addAction("Delete selected"))
         delete_action.setShortcut("Delete")
         delete_action.triggered.connect(self.delete_selected_nodes)
 
@@ -2838,7 +2895,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         tools_menu.addAction("Frame all").triggered.connect(self.frame_all)
 
         templates_menu = self.menuBar().addMenu("Templates")
-        templates_menu.addAction("Add backdrop around selection").triggered.connect(self.add_backdrop_around_selection)
+        editing(templates_menu.addAction("Add backdrop around selection")).triggered.connect(
+            self.add_backdrop_around_selection)
 
         create_menu = self.menuBar().addMenu("Create")
         for label, cls_name in [
@@ -2850,7 +2908,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             ("Resource task", "simulation.flow.ResourceTaskNode"),
             ("Breakdown", "simulation.flow.BreakdownNode"),
         ]:
-            action = create_menu.addAction(label)
+            action = editing(create_menu.addAction(label))
             action.triggered.connect(lambda checked=False, t=cls_name: self.create_node(t))
 
     def _install_context_menus(self):
@@ -2914,6 +2972,12 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 getattr(self.graph, signal_name).connect(self.mark_dirty)
             except Exception:
                 pass
+        for signal_name in ("node_created", "nodes_deleted", "port_connected",
+                            "port_disconnected"):
+            try:
+                getattr(self.graph, signal_name).connect(self._results_mutation_guard)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------
     # Dirty tracking + Word-style save flow. The canvas belongs to a file
@@ -2922,7 +2986,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------------
 
     def mark_dirty(self, *args, **kwargs):
-        if self._suspend_dirty or self._dirty:
+        if self._suspend_dirty or self._dirty or self.results is not None:
             return
         self._dirty = True
         self.setWindowModified(True)
@@ -2938,7 +3002,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         return os.path.basename(self.current_path) if self.current_path else "Untitled"
 
     def _update_title(self):
-        self.setWindowTitle(f"{self._display_name()}[*] - {APP_NAME}")
+        suffix = "  [results]" if self.results is not None else ""
+        self.setWindowTitle(f"{self._display_name()}{suffix}[*] - {APP_NAME}")
         self.setWindowModified(self._dirty)
 
     def maybe_save(self) -> bool:
@@ -3023,6 +3088,174 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         else:
             event.ignore()
 
+    # ------------------------------------------------------------------
+    # Results mode: show a finished run's KPIs on the graph. The canvas is
+    # locked (no card edits, moves, wires or registry changes); double-click
+    # opens a card's stats, the bottom dock carries the run-wide tables, and
+    # the toolbar offers a heat-map metric plus the exit button.
+    # ------------------------------------------------------------------
+
+    def open_results_dialog(self):
+        start_dir = "runs" if os.path.isdir("runs") else ""
+        run_dir = QtWidgets.QFileDialog.getExistingDirectory(self, "Open run results", start_dir)
+        if run_dir:
+            self.enter_results_mode(run_dir)
+
+    def enter_results_mode(self, run_dir: str):
+        try:
+            results = results_mode.ResultsData(run_dir)
+        except Exception as error:
+            qmessage(self, "Open results failed", str(error), QtWidgets.QMessageBox.Warning)
+            return
+        if self.results is not None:
+            self.exit_results_mode()
+
+        # The canvas must be the graph that ran. If it already is (same ids,
+        # nothing unsaved), keep it — view, selection and file identity survive.
+        # Otherwise load the run's flow.json snapshot; it is a copy, so the
+        # session becomes Untitled and later edits go through Save as.
+        canvas_ids = {node_uid(n) for n in self.all_nodes()}
+        if self._dirty or not results.node_ids() <= canvas_ids:
+            if not self.maybe_save():
+                return
+            snapshot = results.snapshot_path()
+            try:
+                with open(snapshot, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as error:
+                qmessage(self, "Open results failed",
+                         f"Could not load the run's flow snapshot:\n{error}",
+                         QtWidgets.QMessageBox.Warning)
+                return
+            self._suspend_dirty = True
+            try:
+                self.reset_session()
+                self.import_clean_json(data, remap_ids=False)
+            finally:
+                self._suspend_dirty = False
+            self.current_path = None
+            self.set_clean()
+
+        self.results = results
+        self._last_run_dir = run_dir
+        self.act_view_last_results.setEnabled(True)
+        self._lock_for_results(True)
+        self._build_results_toolbar()
+        self._results_dock = results_mode.ResultsDock(self, results)
+        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self._results_dock)
+        self._apply_results_tooltips(True)
+        self.properties_dock.setVisible(False)  # its editors would bypass the lock
+        self._update_title()
+        self.statusBar().showMessage(
+            "Results mode: cards are locked; double-click one for its stats.")
+
+    def exit_results_mode(self):
+        if self.results is None:
+            return
+        self._apply_heatmap(-1)  # restore original card colors
+        self._apply_results_tooltips(False)
+        self._lock_for_results(False)
+        if self._results_toolbar is not None:
+            self.removeToolBar(self._results_toolbar)
+            self._results_toolbar.deleteLater()
+            self._results_toolbar = None
+        if self._results_dock is not None:
+            self.removeDockWidget(self._results_dock)
+            self._results_dock.deleteLater()
+            self._results_dock = None
+        self.properties_dock.setVisible(True)
+        self.results = None
+        self._update_title()
+        self.statusBar().showMessage("Left results mode.")
+
+    def _lock_for_results(self, lock: bool):
+        for action in self._edit_actions:
+            action.setEnabled(not lock)
+        self.act_exit_results.setEnabled(lock)
+        for node in self.all_nodes():
+            try:  # NodeGraphQt has no node lock; freezing the graphics item works
+                flag = getattr(QtWidgets.QGraphicsItem, "GraphicsItemFlag",
+                               QtWidgets.QGraphicsItem).ItemIsMovable
+                node.view.setFlag(flag, not lock)
+            except Exception:
+                pass
+
+    def _build_results_toolbar(self):
+        bar = QtWidgets.QToolBar("Results")
+        bar.setObjectName("results_toolbar")
+        bar.setMovable(False)
+        label = QtWidgets.QLabel("  " + self.results.run_label() + "  ")
+        label.setStyleSheet("font-weight: bold;")
+        bar.addWidget(label)
+        spacer = QtWidgets.QWidget()
+        spacer.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        bar.addWidget(spacer)
+        bar.addWidget(QtWidgets.QLabel("Color by: "))
+        combo = QtWidgets.QComboBox()
+        combo.addItem("None", -1)
+        for i, (metric_label, *_rest) in enumerate(results_mode.HEAT_METRICS):
+            combo.addItem(metric_label, i)
+        combo.currentIndexChanged.connect(lambda _i: self._apply_heatmap(combo.currentData()))
+        bar.addWidget(combo)
+        exit_btn = QtWidgets.QPushButton("Exit results mode")
+        exit_btn.clicked.connect(self.exit_results_mode)
+        bar.addWidget(exit_btn)
+        self.addToolBar(QtCore.Qt.TopToolBarArea, bar)
+        self._results_toolbar = bar
+
+    def _apply_heatmap(self, metric_index: int):
+        self._suspend_dirty = True
+        try:
+            # restore first, so switching metrics never stacks tints
+            for node in self.all_nodes():
+                uid = node_uid(node)
+                if uid in self._saved_node_colors:
+                    try:
+                        node.set_color(*self._saved_node_colors[uid])
+                    except Exception:
+                        pass
+            self._saved_node_colors = {}
+            if metric_index is None or metric_index < 0 or self.results is None:
+                return
+            colors = results_mode.heat_values(metric_index, self.results)
+            for node in self.all_nodes():
+                if node_kind(node) in ("Backdrop", "BackdropNode"):
+                    continue
+                uid = node_uid(node)
+                # heat color inside the metric's family, neutral grey everywhere
+                # else so the colored cards stand out
+                target = colors.get(uid, results_mode.DIMMED_COLOR)
+                try:
+                    # SimNode's class attribute shadows BaseNode.color(); the
+                    # live value sits in the node property system
+                    current = node.get_property("color")
+                    self._saved_node_colors[uid] = tuple(current)[:3]
+                    node.set_color(*target)
+                except Exception:
+                    pass
+        finally:
+            self._suspend_dirty = False
+
+    def _apply_results_tooltips(self, on: bool):
+        for node in self.all_nodes():
+            try:
+                tip = results_mode.card_tooltip(node_kind(node), node_uid(node), self.results) if on else None
+                node.view.setToolTip(tip or "")
+            except Exception:
+                pass
+
+    def _results_mutation_guard(self, *args, **kwargs):
+        if self.results is not None and not self._suspend_dirty:
+            self._on_results_mutation()
+
+    def _on_results_mutation(self):
+        """Structural change while locked (a stray wire or delete slipping past
+        the disabled menus): the report no longer matches, so drop the overlay."""
+        self.exit_results_mode()
+        self.mark_dirty()
+        self.statusBar().showMessage("Graph changed: left results mode (the report "
+                                     "no longer matches the canvas).")
+
     def run_simulation(self):
         """Save (the run executes the file on disk), warn about validation
         problems, then run the parser + simulation in a subprocess behind a
@@ -3049,7 +3282,13 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 + "\n".join(problems[:12]))
             if answer != QtWidgets.QMessageBox.Yes:
                 return
-        RunSimulationDialog(self, self.current_path).exec()
+        dlg = RunSimulationDialog(self, self.current_path)
+        dlg.exec()
+        if dlg.report_dir:
+            self._last_run_dir = dlg.report_dir
+            self.act_view_last_results.setEnabled(True)
+            if dlg.view_results_requested:
+                self.enter_results_mode(dlg.report_dir)
 
     def all_nodes(self) -> List[BaseNode]:
         try:
@@ -3192,6 +3431,13 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
     def on_node_double_clicked(self, node):
         kind = node_kind(node)
+        if self.results is not None:
+            dlg = results_mode.card_dialog(self, kind, node_uid(node), node.name(), self.results)
+            if dlg is None:
+                self.statusBar().showMessage(f"No run stats for {kind} cards.")
+            else:
+                dlg.exec()
+            return
         dlg = None
         if kind == "Shutdowns":
             dlg = ShutdownsMenuDialog(self, node)
@@ -4061,10 +4307,10 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         "Shutdowns": ["shutdown_type", "mode"],
         "Buffer": ["buffer_type"],
         "Task": ["operator_scope", "resource_scope", "min_carriers", "max_capacity",
-                 "contiguous_carriers", "independent_carriers", "timeout", "priority", "collector_type"],
+                 "contiguous_carriers", "independent_carriers", "timeout", "priority", "admin", "collector_type"],
         "ResourceTask": ["resource_scope", "operator_scope", "resource_collector_type",
                          "min_carriers", "max_capacity", "min_carrier_capacity", "max_carrier_capacity",
-                         "contiguous_carriers", "independent_carriers", "timeout", "priority"],
+                         "contiguous_carriers", "independent_carriers", "timeout", "priority", "admin"],
     }
 
     def apply_clean_json_to_node(self, node, node_data: dict):

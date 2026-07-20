@@ -101,6 +101,24 @@ def union_mode_duration(components, tags: set) -> float:
     return total
 
 
+def level_during(level_monitor, status_monitor, status_value) -> float:
+    """Integral of a level monitor over the time a status monitor holds a value
+    (event-merged, extended to now)."""
+    xl, tl = level_monitor.xt()
+    xs, ts = status_monitor.xt(force_numeric=False)
+    times = sorted(set(tl) | set(ts) | {env.now()})
+    total, il, is_ = 0.0, 0, 0
+    for k in range(1, len(times)):
+        t0, t1 = times[k - 1], times[k]
+        while il + 1 < len(tl) and tl[il + 1] <= t0:
+            il += 1
+        while is_ + 1 < len(ts) and ts[is_ + 1] <= t0:
+            is_ += 1
+        if xs[is_] == status_value:
+            total += xl[il] * (t1 - t0)
+    return total
+
+
 def overlap_duration(mon_a, val_a, mon_b, val_b) -> float:
     """Time where level monitor a holds val_a AND b holds val_b (event-merged)."""
     xa, ta = mon_a.xt(force_numeric=False)
@@ -203,6 +221,7 @@ def task_kpis(task) -> dict:
     return {
         'poste': task.name(),
         'type': 'piece' if is_piece_task else 'resource',
+        'admin': bool(task.config.admin),
         'temps_total': round(tt, 3),
         'temps_ouverture': round(to, 3),
         'arrets_programmes': round(arrets, 3),
@@ -302,6 +321,30 @@ def buffer_kpis(buffer) -> dict:
     }
 
 
+def operator_kpis(group) -> dict:
+    tt = env.now()
+    posted = group.is_in_downtime.value.value_duration(False)
+    claimed_mean = group.claimed_quantity.mean()
+    # Diagnostic split of the claimed operator-minutes by the group's own posted
+    # hours. The simulation releases a PER_TASK crew at its shift boundary (and
+    # on a freeze-abort), so heures_hors_poste should stay near zero; anything
+    # sizeable left is a batch legitimately finishing past the shift end.
+    en_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, False)
+    hors_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, True)
+    return {
+        'groupe': group.name(),
+        'effectif': group.n_operators,
+        'temps_poste': round(posted, 3),
+        'occupation_moyenne': round(claimed_mean, 3),
+        'heures_en_poste': round(en_poste, 3),
+        'heures_hors_poste': round(hors_poste, 3),
+        'occupation_max': group.claimed_quantity.maximum(),
+        # mean claimed is averaged over the whole run; scale it back to the time
+        # the group was actually posted, against its full headcount
+        'taux_occupation': ratio(claimed_mean * tt, group.n_operators * posted),
+    }
+
+
 def lead_time_rows(buffers) -> list[dict]:
     from .outlet import BufferType
     rows = []
@@ -383,6 +426,92 @@ def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
     return flux, par_modele
 
 
+# Administrative vs productive (non-admin) task split. Each task carries an
+# `admin` flag (reporting only, no effect on the simulation); this rolls the
+# postes rows up into the two groups and reports each group's share of the
+# whole plus the admin-to-productive ratio, per indicator.
+ADMIN_INDICATEURS = [
+    ('nb_taches', False),            # (metric key, is a duration)
+    ('temps_fonctionnement', True),  # machine running time (>=1 active carrier)
+    ('cycle_total', True),           # sum over batches of their cycle time
+    ('heures_machine', True),        # wall-clock machine hours
+    ('heures_main_oeuvre', True),    # operator-minutes, all crews
+]
+ADMIN_LABELS = {
+    'nb_taches': 'Nombre de postes',
+    'temps_fonctionnement': 'Temps de fonctionnement',
+    'cycle_total': 'Temps de cycle total',
+    'heures_machine': 'Heures machine',
+    'heures_main_oeuvre': "Heures main-d'œuvre",
+}
+
+
+def _task_admin_metrics(row: dict) -> dict:
+    """The admin-summary metrics for one postes row (raw minutes / counts)."""
+    launches = row.get('nb_lancements') or 0
+    cycle_mean = row.get('cycle_moyen')
+    cycle_mean = cycle_mean if isinstance(cycle_mean, (int, float)) else 0
+    return {
+        'nb_taches': 1,
+        'temps_fonctionnement': row.get('temps_fonctionnement') or 0,
+        'cycle_total': cycle_mean * launches,
+        'heures_machine': row.get('heures_machine') or 0,
+        'heures_main_oeuvre': row.get('heures_main_oeuvre') or 0,
+    }
+
+
+def admin_summary(task_rows: list[dict]) -> dict:
+    """Roll the postes rows up into administrative vs productive groups: absolute
+    totals, each group's share of the whole, and the admin-to-productive ratio,
+    per indicator. Raw values (minutes / counts / fractions), for report.json."""
+    keys = [k for k, _ in ADMIN_INDICATEURS]
+    admin = {k: 0.0 for k in keys}
+    productif = {k: 0.0 for k in keys}
+    for row in task_rows:
+        bucket = admin if row.get('admin') else productif
+        for k, v in _task_admin_metrics(row).items():
+            bucket[k] += v
+    total = {k: admin[k] + productif[k] for k in keys}
+    return {
+        'indicateurs': keys,
+        'administratives': admin,
+        'productives': productif,
+        'total': total,
+        'part_administratives': {k: (admin[k] / total[k]) if total[k] else '' for k in keys},
+        'part_productives': {k: (productif[k] / total[k]) if total[k] else '' for k in keys},
+        'ratio_admin_sur_productif': {k: (admin[k] / productif[k]) if productif[k] else '' for k in keys},
+    }
+
+
+def admin_synthese_rows(summary: dict) -> list[dict]:
+    """The admin summary as a CSV table, one row per indicator. Cells are
+    pre-formatted (durations / counts / percentages / ratio) so the columns can
+    carry mixed units; the column names stay out of the DUREE/PCT sets so the
+    writer leaves them untouched."""
+    def fmt(value, is_duration):
+        if value == '' or value is None:
+            return ''
+        if is_duration:
+            return fmt_duree(value)
+        return int(value) if float(value).is_integer() else round(value, 3)
+
+    rows = []
+    for key, is_duration in ADMIN_INDICATEURS:
+        r = summary['ratio_admin_sur_productif'][key]
+        pa = summary['part_administratives'][key]
+        pp = summary['part_productives'][key]
+        rows.append({
+            'indicateur': ADMIN_LABELS[key],
+            'administratives': fmt(summary['administratives'][key], is_duration),
+            'productives': fmt(summary['productives'][key], is_duration),
+            'total': fmt(summary['total'][key], is_duration),
+            'part_admin': fmt_pct(pa) if pa != '' else '',
+            'part_productif': fmt_pct(pp) if pp != '' else '',
+            'ratio_admin_productif': round(r, 3) if r != '' else '',
+        })
+    return rows
+
+
 # Presentation: durations become 'Xj Xh Xm', ratios become percentages and
 # instants become calendar dates at write time; the collectors above keep
 # returning raw minutes/fractions so they stay directly usable in code.
@@ -392,14 +521,15 @@ DUREE_COLS = {
     'cycle_moyen', 'cycle_p90', 'cycle_max',
     'attente_pieces', 'attente_place', 'attente_operateurs', 'attente_matiere',
     'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement',
-    'heures_machine', 'heures_main_oeuvre',
-    'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees',
+    'heures_machine', 'heures_main_oeuvre', 'heures_en_poste', 'heures_hors_poste',
+    'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee',
 }
 PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
-            'trs', 'trg', 'tre', 'taux_rebut', 'atteinte'}
+            'trs', 'trg', 'tre', 'taux_rebut', 'atteinte', 'taux_occupation'}
 INSTANT_COLS = {'creation', 'fin'}
+BOOL_COLS = {'admin'}  # rendered oui/non in the CSVs; report.json keeps the raw bool
 
 
 def _format_row(row: dict, sim_start: datetime | None) -> dict:
@@ -411,6 +541,8 @@ def _format_row(row: dict, sim_start: datetime | None) -> dict:
             out[key] = fmt_pct(value)
         elif key in INSTANT_COLS:
             out[key] = fmt_instant(value, sim_start)
+        elif key in BOOL_COLS:
+            out[key] = 'oui' if value else 'non'
         else:
             out[key] = value
     return out
@@ -427,7 +559,8 @@ def _write_csv(path: str, rows: list[dict], sim_start: datetime | None = None) -
 
 
 def write_report(directory: str, tasks: list, buffers: list, piece_generator=None,
-                 run_info: dict | None = None, sim_start: datetime | None = None) -> str:
+                 run_info: dict | None = None, sim_start: datetime | None = None,
+                 operator_groups: list | None = None) -> str:
     os.makedirs(directory, exist_ok=True)
 
     run = {'genere_le': datetime.now().isoformat(timespec='seconds'),
@@ -437,12 +570,18 @@ def write_report(directory: str, tasks: list, buffers: list, piece_generator=Non
     _write_csv(os.path.join(directory, 'run.csv'),
                [{'cle': k, 'valeur': v} for k, v in run.items()])
 
-    _write_csv(os.path.join(directory, 'postes.csv'),
-               [task_kpis(t) for t in tasks], sim_start)
+    task_rows = [task_kpis(t) for t in tasks]
+    _write_csv(os.path.join(directory, 'postes.csv'), task_rows, sim_start)
     _write_csv(os.path.join(directory, 'postes_modeles.csv'),
                [row for t in tasks for row in task_model_rows(t)], sim_start)
+    if task_rows:  # administrative vs productive roll-up (rows pre-formatted)
+        _write_csv(os.path.join(directory, 'synthese_admin.csv'),
+                   admin_synthese_rows(admin_summary(task_rows)))
     _write_csv(os.path.join(directory, 'buffers.csv'),
                [buffer_kpis(b) for b in buffers], sim_start)
+
+    _write_csv(os.path.join(directory, 'operateurs.csv'),
+               [operator_kpis(g) for g in (operator_groups or [])], sim_start)
 
     flux, par_modele = flow_kpis(buffers, piece_generator)
     _write_csv(os.path.join(directory, 'flux.csv'),

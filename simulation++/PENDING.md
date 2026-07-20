@@ -286,7 +286,33 @@ the stopping criterion now drives which is built.
   By-pieces-produced settings write one or the other behind an
   automatic-gap toggle, never both.
 
-## 14. Parser: tolerant type-name matching (`parser.py`) — optional
+## 14. Machine-readable report (`kpis.py`, `parser.py`) — mirror-worthy
+
+* `kpis.operator_kpis(group)`: name, headcount, posted time (downtime False),
+  mean/max claimed operators, `taux_occupation = claimed_mean * TT /
+  (headcount * posted)` (with the §16 hand-off fix the claims stop at the
+  shift boundary, so this stays under 100% up to a batch's legitimate
+  overrun), plus two diagnostic columns splitting the claimed
+  operator-minutes by the group's own shifts via helper
+  `level_during(level_monitor, status_monitor, value)` (integral of a level
+  over the time a status holds a value): `heures_en_poste` /
+  `heures_hors_poste` (the latter should be near zero now). `write_report`
+  gains `operator_groups` and writes `operateurs.csv`; `temps_poste` and the
+  heures columns joined DUREE_COLS, `taux_occupation` PCT_COLS.
+* `Parser.write_machine_report(directory, run_info)` (called at the end of
+  `report()`) writes two extra artifacts next to the CSVs:
+  - `report.json`: the same collector dicts (`task_kpis`, `task_model_rows`,
+    `buffer_kpis`, `operator_kpis`, `flow_kpis`) but RAW (minutes/fractions,
+    unformatted) and keyed by node/registry id, plus a `run` block (source
+    file, seed, sim end, criterion, pieces_sorties / objectif_total /
+    objectif_atteint) and a `graphs` map of node id -> relative PNG path
+    (only entries whose file exists).
+  - `flow.json`: a byte copy of the flow that ran, so any run folder can be
+    reopened standalone.
+  The designer's results mode consumes exactly these two files; mirroring them
+  in the C++ port makes its runs browsable in the same viewer.
+
+## 15. Parser: tolerant type-name matching (`parser.py`) — optional
 
 * `canon_name(value)` strips non-alphanumerics and lowercases; every type-name
   lookup (`dist_type`, function `kind`, policy `type`, buffer/collector/scope/
@@ -299,8 +325,129 @@ the stopping criterion now drives which is built.
   working without this; it only matters for hand-edited files using the
   designer's sentence-case display forms.
 
+## 15b. Parser reads the flow JSON as UTF-8 (`parser.py`) — mirror-worthy
+
+* `Parser.__init__` now opens the flow JSON with `encoding='utf-8'`. Without it
+  Python uses the locale code page (cp1252 on Western Windows, the default up to
+  3.14), which reads UTF-8 accents as mojibake ('Entrée' -> 'Entrée'); that
+  corrupted string then flows into every KPI report CSV. The report CSVs
+  themselves were already correct (utf-8-sig); the corruption was purely on the
+  read side. The C++ port must likewise read the JSON as UTF-8 explicitly, never
+  via a locale-dependent default.
+
+## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
+
+* Bug fixed: a PER_TASK crew stayed claimed across its own shift end whenever
+  the task could not cycle its loop — parked on an empty carrier (starving for
+  pieces) or frozen after a `ConstrainedByShift` abort. The claim survived
+  `set_capacity(0)` for days (atelier: POOL_CIRE_SAM booked 115,800 of its
+  146,525 claimed operator-minutes outside its Saturday shifts, a 146.8%
+  occupation).
+* `Task` gains `_awaiting_carrier` (the pending carrier the process is parked
+  on). The plain `wait(new_carrier.loaded)` became an interruptible loop:
+  `while not loaded: wait(loaded)`, and on every wake it releases the crew if
+  it is held, no carrier is active and the crew's group is in downtime. After
+  the loop, a crew handed off during the wait is re-requested before
+  dispatching (whichever alternative is on shift now); a failed re-request
+  freezes as usual.
+* `OperatorShiftManager.on_leave` (after `set_capacity(0)`) wakes — via
+  `activate()`, which breaks the wait — every dependent task that has
+  `_awaiting_carrier` set, holds this group PER_TASK and `iswaiting()`, so the
+  hand-off happens AT the shift boundary instead of at the next piece arrival.
+* `PieceCarrier.abort` / `ResourceCarrier.abort`: between the carrier-tracker
+  removes and `self.cancel()`, when `active_carriers` just emptied, call
+  `task.release_task_operators()` — a freeze-abort must not keep the crew
+  reserved through the frozen wait. (Double release is harmless: the release
+  helper no-ops on an empty claim.)
+* Net effect: claimed operator-minutes for a PER_TASK crew now stop at the
+  earlier of its shift end and the task's freeze; `labor_minutes` (heures
+  main d'oeuvre) no longer books phantom out-of-shift supervision, and
+  off-shift "ghost work" disappears (atelier exits moved 2629 -> 2568; the
+  difference was work done by crews whose operators had gone home).
+
+## 17. Shift-fit re-checked after the materials step (`task.py`)
+
+* Gap fixed: `ConstrainedByShift` approved a work hold BEFORE `handle_restock`
+  + `request_resources`. A restock-order hold or a stock-out wait between the
+  approval and the hold could then carry already-approved work past the crew's
+  shift end (atelier year: one batch worked 8.7 minutes past the crew's shift
+  because its material arrived 10 minutes late).
+* `Carrier.handle_operators` is split: the decision logic moved to
+  `check_shift_fit(operators, duration)` (same decisions in the same order:
+  task constraint only when no crew, operator + task constraints otherwise);
+  new helper `operator_fit_deadline(operators)` returns
+  `operator_shift_constraint.deadline(crew's current_or_last_shift)`
+  (inf when no crew).
+* `handle_batch_operators` (its restock branch) and `handle_task_operators`:
+  - the materials request's `fail_at` is tightened by
+    `operator_fit_deadline - duration`: a stock-out wait that cannot end in
+    time to still fit gives up, and frees the crew, the moment success becomes
+    impossible - BEFORE the shift boundary, not when the materials show up;
+  - `check_shift_fit(crew, duration)` re-runs after the materials step, right
+    before the hold: it catches the uninterruptible restock-order hold (a
+    demander mid-`hold` cannot be failed, so its delay is only seen at its
+    end) and guards any future protocol whose `deadline`/`decide` disagree.
+* Net effect: under ConstrainedByShift the work itself can no longer run past
+  the crew's shift end; the only residual out-of-shift claim is a restock
+  ORDER hold straddling the boundary, bounded by the order duration. Behavior
+  is unchanged under NotConstrainedByShift (deadline inf, decide LAUNCH) and
+  for runs without materials delays (re-check at an unchanged instant decides
+  the same). Startup holds (`TaskStarter`) remain outside the shift
+  constraint, as before.
+
+## 18. LogNormal distribution (`sampler.py`, `parser.py`) — mirror-worthy
+
+* The flow designer offered `LogNormal` (fields `mean`, `sigma`) but the parser
+  never mapped it, so any flow using it raised "unknown distribution type".
+* `sampler.py` gains a `LogNormal` class parameterised by the mean and standard
+  deviation of the VALUES themselves (real-space), NOT the log-space mu/sigma of
+  numpy.random.lognormal. `LogNormal(120, 30)` draws positive values averaging
+  120 with std 30 — same reading as `Normal(120, 30)` and consistent with every
+  other distribution in the tool (all real, physical parameters). It converts
+  `(mean, std)` to the underlying normal via `sigma^2 = ln(1 + (std/mean)^2)`,
+  `mu = ln(mean) - sigma^2/2`, then exponentiates a salabim `Normal` draw (so it
+  stays on the shared seeded stream). `mean()` returns the real mean; `mean`
+  must be > 0. (The first cut used log-space params, so an MTTR entered as
+  `mean=120` meant `exp(120) ~ 1e52` minutes and never ended — a task stayed
+  broken for the whole run. This is the fix.)
+* `parser.DISTR_TYPE_TO_CLASS` maps `'LogNormal'` to it, so both
+  `make_distribution` (Distribution wrapper) and `make_salabim_distribution`
+  (output-resource `sim.Bounded`) accept it like any other distribution. The
+  designer's JSON keys stay `mean` / `sigma` (sigma = the real std), so existing
+  files are read correctly; the designer's default `mean` is 1.0 (must be > 0).
+* C++ port: salabim++ has Normal/Uniform/Exponential/Triangular but no
+  LogNormal. Add a `LogNormal` distribution there with the SAME real-space
+  (mean, std) parameterisation (convert to mu/sigma as above, exp of a Normal
+  draw, `mean()` = the real mean) and map `"LogNormal"` in the C++ parser's
+  distribution table. This is the full designer distribution set (Constant,
+  Uniform, Normal, Exponential, Triangular, LogNormal); the two sides now match.
+
+## 19. Administrative task flag + admin/productive roll-up (`task.py`, `kpis.py`, `parser.py`) — mirror-worthy
+
+* `TaskConfig` gains a boolean `admin` field (reporting classification only, no
+  effect on the simulation). The parser reads `pt.get('admin', False)` for both
+  task kinds. The task JSON carries a top-level `"admin"` bool.
+* `kpis.task_kpis` adds an `admin` column (raw bool; rendered `oui`/`non` in the
+  CSVs via a new `BOOL_COLS` set, kept raw in report.json).
+* `kpis.admin_summary(task_rows)` rolls the postes rows into administrative vs
+  productive groups over five indicators — `nb_taches`, `temps_fonctionnement`,
+  `cycle_total` (Σ cycle_moyen × nb_lancements), `heures_machine`,
+  `heures_main_oeuvre` — returning each group's totals, its share of the whole
+  (`part_administratives` / `part_productives`), and the admin/productive ratio.
+  `write_report` writes it as `synthese_admin.csv` (one row per indicator, via
+  `admin_synthese_rows`, cells pre-formatted); `parser.write_machine_report`
+  adds it to report.json under `admin_summary`.
+* C++ port: add the `admin` field to its TaskConfig/JSON read, the `admin`
+  column to the postes output, and the same admin/productive roll-up
+  (`synthese_admin.csv` + `admin_summary` in report.json) so the two reports
+  stay column-for-column identical.
+
 ## Not needed in C++
 
+* Designer: the per-task "Admin task" checkbox (on the Carriers tab, both task
+  kinds, persisted through export/import) and the results-mode "Admin" tab that
+  renders `admin_summary` are designer/viewer-only. The JSON just carries the
+  `admin` bool, already covered above.
 * Buffer monitor checkboxes were removed from the flow designer and the JSON
   format — the C++ port never had them; nothing to do.
 * Designer save flow (dirty tracking, Save / Save as, unsaved-changes prompts on
@@ -315,6 +462,11 @@ the stopping criterion now drives which is built.
   carry the canonical value as item data. Only the Shutdowns card's on-node
   combo stores the display label in its property; its `to_clean_json`
   canonicalizes on export, so the JSON stays canonical there too.
+* Results mode (`flow_designer/results_mode.py` + window hooks) is
+  designer-only: it locks the canvas on the run's flow.json snapshot, routes
+  double-clicks to per-card KPI dialogs, shows the Run/Flux/Opérateurs/Ligne
+  dock, tooltips and the color-by-metric heat map — all read from report.json
+  (entry 13); no simulation-side behavior involved.
 * The flow-designer refactor around generation is designer-only; the C++ port has
   no designer and reads the criterion-based JSON described in §10. For the record:
   the generation mix (goals or per-model rates) lives in Simulation Settings per

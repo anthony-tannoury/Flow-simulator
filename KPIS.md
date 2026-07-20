@@ -66,6 +66,11 @@ durée et sa taille de lot, donc **son** tc idéal : c'est la colonne
 
 ## postes.csv — un poste par ligne
 
+La colonne `admin` (oui/non) indique si le poste est **administratif** (contrôle,
+attente, prison, stockage...) plutôt que productif. C'est une simple étiquette,
+réglée par la case « Admin task » du poste dans le flow designer ; elle ne change
+rien à la simulation, elle sert uniquement à la synthèse `synthese_admin.csv`.
+
 ### Les temps (colonnes `temps_*`, `arrets_programmes`, `pannes`, `gel`, `mise_en_route`)
 
 * `temps_total` — la durée simulée totale.
@@ -218,6 +223,28 @@ bonnes et rebutées de ce modèle. C'est le détail qui alimente TN.
   goulot en aval.
 * `temps_moyen_entre_arrivees` — durée simulée ÷ entrées.
 
+## operateurs.csv — un groupe d'opérateurs par ligne
+
+* `effectif` — la taille du groupe ; `temps_poste` — son temps posté total (la
+  somme de ses shifts sur la durée simulée).
+* `occupation_moyenne` — le nombre moyen d'opérateurs réquisitionnés,
+  moyenné sur toute la durée simulée (shifts et hors shifts confondus).
+* `heures_en_poste` / `heures_hors_poste` — les minutes-opérateur
+  réquisitionnées pendant / en dehors des shifts du groupe (2 opérateurs pris
+  90 minutes = 180). Colonnes de diagnostic : la simulation libère une équipe
+  PER_TASK à la fin de son shift (même si le poste attend des pièces) et sur
+  un abandon de lot, et re-vérifie l'ajustement au shift après l'attente de
+  matière, donc `heures_hors_poste` doit rester proche de zéro. Avec des
+  opérateurs contraints par leur shift, ce qui reste n'est jamais du travail :
+  c'est une commande de réapprovisionnement (lancée en fin de shift, elle
+  retient l'équipe jusqu'à son terme) ou, sans contrainte de shift, un lot
+  qui se termine légitimement après.
+* `taux_occupation` — le total réquisitionné (`occupation_moyenne` × durée
+  simulée) ÷ (`effectif` × `temps_poste`) : la part du temps posté réellement
+  passée réquisitionné. Comme les équipes sont relâchées en fin de shift, il
+  reste naturellement sous 100 % (au débordement d'un lot près).
+* `occupation_max` — le pic d'opérateurs réquisitionnés simultanément.
+
 ## flux.csv et flux_modeles.csv — la ligne entière
 
 * `sorties`, `rebuts`, `taux_rebut` — le verdict global. Grâce au générateur
@@ -238,6 +265,36 @@ bonnes et rebutées de ce modèle. C'est le détail qui alimente TN.
   renseignés qu'en mode **objectifs** (critère « pièces produites ») ; en mode
   **débit** (critère « temps »), le générateur n'a pas d'objectif par modèle et
   ces deux colonnes restent vides, seul `genere` compte les injections.
+
+## synthese_admin.csv — administratif contre productif
+
+Un tableau qui répond à « quelle part du process partent dans les postes
+administratifs ? », une ligne par indicateur, des colonnes pour les deux
+groupes (postes `admin` = oui contre = non), leurs parts et leur rapport :
+
+* `administratives`, `productives`, `total` — la valeur cumulée de l'indicateur
+  pour chaque groupe, et l'ensemble.
+* `part_admin`, `part_productif` — la part de chaque groupe dans le total (les
+  deux somment à 100 %). C'est le pourcentage recherché : « les postes
+  administratifs représentent X % du temps de fonctionnement ».
+* `ratio_admin_productif` — le rapport administratif ÷ productif du même
+  indicateur (0,25 = les postes admin en pèsent un quart de ce que pèsent les
+  productifs).
+
+Les cinq indicateurs (lignes) :
+
+* `Nombre de postes` — combien de postes dans chaque groupe.
+* `Temps de fonctionnement` — le temps machine occupé (TF) cumulé : le temps où
+  chaque poste tournait (au moins un lot actif).
+* `Temps de cycle total` — la somme, sur tous les lots, de leur temps de cycle
+  (cycle_moyen × nb_lancements) : le temps total passé « dans » les postes.
+* `Heures machine` — les heures machine (horloge) cumulées.
+* `Heures main-d'œuvre` — les minutes-opérateur cumulées, toutes équipes.
+
+Exemple de lecture : des postes d'attente/stockage marqués admin peuvent peser
+la majorité du `Temps de fonctionnement` (les pièces y séjournent longtemps)
+tout en ne consommant presque pas d'`Heures main-d'œuvre` (personne ne les
+surveille). Le tableau chiffre exactement ce déséquilibre.
 
 ## temps_traversee.csv — une ligne par pièce
 

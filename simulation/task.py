@@ -38,25 +38,35 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
     def freeze_abort_if(self, condition: bool) -> None:
         pass
 
-    def handle_operators(self, operators: list[tuple[OperatorGroup, int]], ideal_duration: float) -> float:
+    def check_shift_fit(self, operators: list[tuple[OperatorGroup, int]], duration: float) -> None:
+        """Shift-fit decision for a work hold of `duration` starting now. Also
+        re-run after the materials step: a restock order or a stock-out wait can
+        outdate the first approval, and what fit then may not fit anymore."""
+        task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), duration)
         if not operators:
-            task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), ideal_duration)
             self.freeze_abort_if(task_shift_constraint_decision is Action.ABORT)
-            return ideal_duration
-        
-        productivity = operators[0][0].productivity
-
-        match self.task.config.protocols.operators_self_conscious.decide():
-            case ConsciousnessState.CONSCIOUS:
-                duration = ideal_duration / productivity.sample_now()
-            case ConsciousnessState.UNCONSCIOUS:
-                duration = ideal_duration
+            return
 
         current_operator_shift = operators[0][0].current_or_last_shift()
         operator_shift_constraint_decision = self.task.config.protocols.operator_shift_constraint.decide(current_operator_shift, duration)
-        task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), duration)
-
         self.freeze_abort_if(operator_shift_constraint_decision is Action.ABORT or task_shift_constraint_decision is Action.ABORT)
+
+    def operator_fit_deadline(self, operators: list[tuple[OperatorGroup, int]]) -> float:
+        return (self.task.config.protocols.operator_shift_constraint.deadline(operators[0][0].current_or_last_shift())
+                if operators else float('inf'))
+
+    def handle_operators(self, operators: list[tuple[OperatorGroup, int]], ideal_duration: float) -> float:
+        if not operators:
+            duration = ideal_duration
+        else:
+            productivity = operators[0][0].productivity
+            match self.task.config.protocols.operators_self_conscious.decide():
+                case ConsciousnessState.CONSCIOUS:
+                    duration = ideal_duration / productivity.sample_now()
+                case ConsciousnessState.UNCONSCIOUS:
+                    duration = ideal_duration
+
+        self.check_shift_fit(operators, duration)
         return duration
 
     def handle_batch_operators(self, operators: Alternative, earliest_deadline: float, ideal_duration: float, fail_before: float, handle_restock: bool, work_mode: str) -> None:
@@ -68,7 +78,12 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
 
         if handle_restock:
             self.handle_restock()
-            self.request_resources(fail_at=earliest_deadline - duration - (fail_before - ideal_duration))
+            # a materials wait that cannot end before the crew's fit deadline can
+            # never pass the re-check below: give up (and free the crew) as soon
+            # as success becomes impossible, not when the materials show up
+            self.request_resources(fail_at=min(earliest_deadline - duration - (fail_before - ideal_duration),
+                                               self.operator_fit_deadline(recuperated) - duration))
+            self.check_shift_fit(recuperated, duration)
 
         self.hold(duration, mode=work_mode)
         self.task.labor_minutes += sum(count for _, count in recuperated) * duration
@@ -77,7 +92,8 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
     def handle_task_operators(self, earliest_deadline: float, ideal_duration: float) -> None:
         duration = self.handle_operators(self.task.task_operators, ideal_duration)
         self.handle_restock()
-        self.request_resources(fail_at=earliest_deadline - duration)
+        self.request_resources(fail_at=min(earliest_deadline, self.operator_fit_deadline(self.task.task_operators)) - duration)
+        self.check_shift_fit(self.task.task_operators, duration)
         self.hold(duration, mode="processing")
 
     @abstractmethod
@@ -245,6 +261,7 @@ class TaskConfig:
     independent_carriers: bool
     timeout: float
     priority: int
+    admin: bool          # administrative task: a reporting classification only, no behaviour
 
     protocols: Protocols
 
@@ -279,14 +296,18 @@ class Task(Component, HasShifts, ABC):
         self.task_operators: list[tuple[OperatorGroup, int]] = []
         self.carrier_type = carrier_type
         # so each operator group can unfreeze this task when it comes back on shift
+        # (dict.fromkeys, not a set: iteration must not depend on object addresses,
+        # or the shift-boundary wake-up order — and with it the whole run — would
+        # change from process to process)
         for alternative in (config.operators, config.loading_operators, config.startup_operators):
-            for group in {g for alt in alternative.alternatives for g, _ in alt}:
+            for group in dict.fromkeys(g for alt in alternative.alternatives for g, _ in alt):
                 group.dependent_tasks.append(self)
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
         self.started_up = False
         self.requested_per_task_operators = False  # whether the PER_TASK crew is currently held
         self.labor_minutes = 0.0        # operator-minutes booked on this task, all crews
         self._task_crew_since = None    # claim start of the held PER_TASK crew
+        self._awaiting_carrier = None   # the pending carrier the process is parked on
         self.pending_carriers = CarrierTracker()
         self.active_carriers = CarrierTracker()
 
@@ -389,7 +410,26 @@ class Task(Component, HasShifts, ABC):
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
             self.all_carriers.append(new_carrier)
-            self.wait(new_carrier.loaded)
+            # While parked here waiting for the collector, a held PER_TASK crew
+            # must still hand off at its shift end: the operator shift manager
+            # wakes this task (activate breaks the wait), the crew is released,
+            # and the wait resumes until the carrier actually loads.
+            self._awaiting_carrier = new_carrier
+            while not new_carrier.loaded():
+                self.wait(new_carrier.loaded)
+                if (self.config.operator_scope is Scope.PER_TASK
+                        and self.requested_per_task_operators and not self.active_carriers
+                        and any(group.is_in_downtime() for group, _ in self.task_operators)):
+                    self.release_task_operators()
+            self._awaiting_carrier = None
+
+            # a crew handed off during the wait is re-acquired before dispatching
+            # (whichever group is on shift now); a failed request freezes as usual
+            if (self.config.operator_scope is Scope.PER_TASK and self.started_up
+                    and not self.is_frozen() and not self.requested_per_task_operators):
+                self.request_task_operators()
+                if self.is_frozen() and not self.skip_frozen_check:
+                    continue
 
             if len(self.pending_carriers) >= self.config.min_carriers:
                 dispatched = []
