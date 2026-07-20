@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import platform
 import re
 import sys
 import uuid
@@ -21,6 +22,28 @@ try:
     from NodeGraphQt import BackdropNode
 except Exception:
     BackdropNode = None
+
+
+# --- simulation engine selection (Python vs bundled C++) --------------------
+def app_settings() -> QtCore.QSettings:
+    return QtCore.QSettings("FlowSimulator", "FlowDesigner")
+
+
+def cpp_engine_filename() -> str:
+    """The bundled flow_sim binary name for this platform (see engines/)."""
+    system = platform.system()
+    if system == "Windows":
+        return "flow_sim-windows-x86_64.exe"
+    if system == "Darwin":
+        return "flow_sim-macos-universal"
+    return "flow_sim-linux-x86_64"
+
+
+def bundled_cpp_engine() -> str | None:
+    """Path to the bundled binary for this platform under engines/, if present."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(repo_root, "engines", cpp_engine_filename())
+    return path if os.path.isfile(path) else None
 
 
 # ============================================================
@@ -2498,11 +2521,12 @@ class RunSimulationDialog(QtWidgets.QDialog):
 
     BAR_STEPS = 1000  # progress bar resolution (fractions map to 0..BAR_STEPS)
 
-    def __init__(self, parent, json_path: str):
+    def __init__(self, parent, json_path: str, cpp_exe: str | None = None):
         super().__init__(parent)
         self.setWindowTitle("Run simulation")
         self.setMinimumWidth(460)
         self._json_path = json_path
+        self._cpp_exe = cpp_exe  # None -> Python sim_runner.py; else the native engine
         self._meta = None
         self._sim_start = None
         self._report_dir = None
@@ -2581,7 +2605,13 @@ class RunSimulationDialog(QtWidgets.QDialog):
         self._proc.readyReadStandardOutput.connect(self._on_stdout)
         self._proc.readyReadStandardError.connect(self._on_stderr)
         self._proc.finished.connect(self._on_finished)
-        self._proc.start(sys.executable, ["-u", runner, json_path])
+        # Both engines honour the same <exe> <flow.json> -> @@TAG contract, so the
+        # native binary is a drop-in for the Python runner.
+        if self._cpp_exe:
+            file_lbl.setText(f"Running {os.path.basename(json_path)}  (C++ engine)")
+            self._proc.start(self._cpp_exe, [json_path])
+        else:
+            self._proc.start(sys.executable, ["-u", runner, json_path])
 
     # --- subprocess plumbing ---
 
@@ -2859,6 +2889,19 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         act_run = editing(simulation_menu.addAction("Run simulation..."))
         act_run.setShortcut("F5")
         act_run.triggered.connect(lambda checked=False: self.run_simulation())
+
+        # Engine picker: Python (sim_runner.py) or the bundled native binary.
+        engine_menu = simulation_menu.addMenu("Engine")
+        backend = app_settings().value("engine/backend", "python")
+        self._act_engine_py = engine_menu.addAction("Python")
+        self._act_engine_cpp = engine_menu.addAction("C++ (native)")
+        for act, name in ((self._act_engine_py, "python"), (self._act_engine_cpp, "cpp")):
+            act.setCheckable(True)
+            act.setChecked(backend == name)
+            act.triggered.connect(lambda checked=False, n=name: self._choose_engine(n))
+        engine_menu.addSeparator()
+        engine_menu.addAction("Select C++ executable...").triggered.connect(
+            lambda checked=False: self._pick_cpp_executable())
 
         results_menu = self.menuBar().addMenu("Results")
         self.act_view_last_results = results_menu.addAction("View last run results")
@@ -3282,13 +3325,64 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 + "\n".join(problems[:12]))
             if answer != QtWidgets.QMessageBox.Yes:
                 return
-        dlg = RunSimulationDialog(self, self.current_path)
+        cpp_exe = None
+        if app_settings().value("engine/backend", "python") == "cpp":
+            cpp_exe = self._resolve_cpp_engine()
+            if cpp_exe is None:
+                return  # no engine chosen; the user was already told
+        dlg = RunSimulationDialog(self, self.current_path, cpp_exe=cpp_exe)
         dlg.exec()
         if dlg.report_dir:
             self._last_run_dir = dlg.report_dir
             self.act_view_last_results.setEnabled(True)
             if dlg.view_results_requested:
                 self.enter_results_mode(dlg.report_dir)
+
+    # --- C++ engine selection (M4) ------------------------------------------
+    def _resolve_cpp_engine(self) -> str | None:
+        """The native engine to run: a user-selected executable if one is set and
+        still exists, else the bundled binary for this platform. When neither is
+        available, offer to pick one; returns None if the user declines."""
+        settings = app_settings()
+        custom = settings.value("engine/cpp_path", "")
+        if custom and os.path.isfile(custom):
+            return custom
+        bundled = bundled_cpp_engine()
+        if bundled:
+            return bundled
+        answer = QtWidgets.QMessageBox.question(
+            self, "C++ engine not found",
+            f"No bundled C++ engine for this platform (expected "
+            f"engines/{cpp_engine_filename()}).\n\nSelect an executable to use?",
+            QtWidgets.QMessageBox.Open | QtWidgets.QMessageBox.Cancel)
+        if answer == QtWidgets.QMessageBox.Open:
+            return self._pick_cpp_executable()
+        return None
+
+    def _pick_cpp_executable(self) -> str | None:
+        """Point at a flow_sim binary by hand (persisted for next time)."""
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select the C++ engine executable")
+        if path:
+            app_settings().setValue("engine/cpp_path", path)
+        return path or None
+
+    def _choose_engine(self, backend: str) -> None:
+        app_settings().setValue("engine/backend", backend)
+        self._act_engine_py.setChecked(backend == "python")
+        self._act_engine_cpp.setChecked(backend == "cpp")
+        if backend == "cpp" and self._resolve_cpp_engine_quiet() is None:
+            QtWidgets.QMessageBox.information(
+                self, "C++ engine",
+                f"No bundled engine found (engines/{cpp_engine_filename()}). Use "
+                "“Engine → Select C++ executable...” to point at one, or you'll "
+                "be asked when you run.")
+
+    def _resolve_cpp_engine_quiet(self) -> str | None:
+        settings = app_settings()
+        custom = settings.value("engine/cpp_path", "")
+        if custom and os.path.isfile(custom):
+            return custom
+        return bundled_cpp_engine()
 
     def all_nodes(self) -> List[BaseNode]:
         try:
