@@ -44,21 +44,21 @@ with Clang (Linux/macOS) and MSVC (Windows).
 
 - **M1 — harness** ✅ argument handling, the `@@` protocol, the slicing loop, the
   run folder, and JSON read/write.
-- **M2 — engine** 🚧 in progress:
-  - `simulation.hpp` caught up to the current Python on all behavior-significant
-    entries (piece exit-order + focus-model policies, the PER_TASK crew lifecycle
-    + shift-fit, the generator goal/rate split + grace period + scrap remakes,
-    and the sim-side KPI tallies). See `simulation++/PENDING.md`.
-  - `parser++` (`engine/parser.hpp`) ✅ flow JSON → a live simulation. `main.cpp`
-    parses and runs real flows and slices the run exactly like `sim_runner.py`.
-    Verified statistically equivalent to the Python engine (seed 0) on
-    `sample_flow`, `sample_flow_rate` and `atelier_injection` — the `generated`
-    count matches exactly; exit/scrap land within RNG-stream tolerance.
-  - `kpis++` ⬜ collectors + CSVs + the rich `report.json`. Until it lands,
-    `main.cpp` writes a minimal `report.json` (every such site tagged
-    `TODO(kpis++)`). NOTE: salabim++ has no mode-over-time monitor, so machine
-    hours / `attente_*` will be recorded as explicit intervals, not integrated
-    from `mode.value_duration()`.
+- **M2 — engine** ✅ the C++ engine parses a real flow, runs the simulation, and
+  writes the same run folder the Python engine does.
+  - `simulation.hpp` caught up to the current Python on every behavior-significant
+    entry (see `simulation++/PENDING.md`).
+  - `parser++` (`engine/parser.hpp`) — flow JSON → a live simulation. `main.cpp`
+    slices the run exactly like `sim_runner.py`.
+  - `kpis++` (`engine/kpis.hpp`) — the collectors, the utf-8-sig CSVs and the
+    rich `report.json`. salabim++ gained a mode-over-time timeline so the
+    machine-hours / `attente_*` columns read `mode_log()` the way Python reads
+    `mode.xt()`.
+  - Verified statistically equivalent to the Python engine (seed 0) on
+    `sample_flow`, `sample_flow_rate` and `atelier_injection`: `generated` matches
+    exactly, exit/scrap and every KPI column land within RNG-stream tolerance.
+  - Not ported: `Piece.journal` and the matplotlib graphs stay in Python, so the
+    `graphs` map in report.json is empty for a C++ run.
 - **M3 — distribution** ⬜ per-platform static builds via GitHub Actions, committed
   into `engines/`.
 - **M4 — designer** ⬜ the Python/C++ engine picker + auto-select of the bundled
