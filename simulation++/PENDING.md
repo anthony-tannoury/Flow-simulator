@@ -325,6 +325,16 @@ the stopping criterion now drives which is built.
   working without this; it only matters for hand-edited files using the
   designer's sentence-case display forms.
 
+## 15b. Parser reads the flow JSON as UTF-8 (`parser.py`) — mirror-worthy
+
+* `Parser.__init__` now opens the flow JSON with `encoding='utf-8'`. Without it
+  Python uses the locale code page (cp1252 on Western Windows, the default up to
+  3.14), which reads UTF-8 accents as mojibake ('Entrée' -> 'Entrée'); that
+  corrupted string then flows into every KPI report CSV. The report CSVs
+  themselves were already correct (utf-8-sig); the corruption was purely on the
+  read side. The C++ port must likewise read the JSON as UTF-8 explicitly, never
+  via a locale-dependent default.
+
 ## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
 
 * Bug fixed: a PER_TASK crew stayed claimed across its own shift end whenever
@@ -355,7 +365,7 @@ the stopping criterion now drives which is built.
   off-shift "ghost work" disappears (atelier exits moved 2629 -> 2568; the
   difference was work done by crews whose operators had gone home).
 
-## 16. Shift-fit re-checked after the materials step (`task.py`)
+## 17. Shift-fit re-checked after the materials step (`task.py`)
 
 * Gap fixed: `ConstrainedByShift` approved a work hold BEFORE `handle_restock`
   + `request_resources`. A restock-order hold or a stock-out wait between the

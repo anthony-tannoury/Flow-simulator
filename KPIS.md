@@ -228,9 +228,12 @@ bonnes et rebutées de ce modèle. C'est le détail qui alimente TN.
   réquisitionnées pendant / en dehors des shifts du groupe (2 opérateurs pris
   90 minutes = 180). Colonnes de diagnostic : la simulation libère une équipe
   PER_TASK à la fin de son shift (même si le poste attend des pièces) et sur
-  un abandon de lot, donc `heures_hors_poste` doit rester proche de zéro. Ce
-  qui reste, c'est un lot commencé avant la fin du shift qui se termine
-  légitimement après.
+  un abandon de lot, et re-vérifie l'ajustement au shift après l'attente de
+  matière, donc `heures_hors_poste` doit rester proche de zéro. Avec des
+  opérateurs contraints par leur shift, ce qui reste n'est jamais du travail :
+  c'est une commande de réapprovisionnement (lancée en fin de shift, elle
+  retient l'équipe jusqu'à son terme) ou, sans contrainte de shift, un lot
+  qui se termine légitimement après.
 * `taux_occupation` — le total réquisitionné (`occupation_moyenne` × durée
   simulée) ÷ (`effectif` × `temps_poste`) : la part du temps posté réellement
   passée réquisitionné. Comme les équipes sont relâchées en fin de shift, il
