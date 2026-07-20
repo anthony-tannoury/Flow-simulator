@@ -315,6 +315,7 @@ class Parser:
         safe = graphs._safe
         flux, flux_modeles = kpis.flow_kpis(
             [b for b in self.outlets.values() if isinstance(b, Buffer)], self.piece_generator)
+        task_kpi_rows = {id_: kpis.task_kpis(t) for id_, t in self.tasks.items()}
         data = {
             'format': 'flow-simulator-report',
             'version': 1,
@@ -330,7 +331,8 @@ class Parser:
                 'objectif_total': goal_total,
                 'objectif_atteint': goal_reached,
             },
-            'tasks': {id_: kpis.task_kpis(t) for id_, t in self.tasks.items()},
+            'tasks': task_kpi_rows,
+            'admin_summary': kpis.admin_summary(list(task_kpi_rows.values())),
             'tasks_models': {id_: rows for id_, t in self.tasks.items()
                              if (rows := kpis.task_model_rows(t))},
             'buffers': {id_: kpis.buffer_kpis(b) for id_, b in self.outlets.items()
@@ -592,6 +594,7 @@ class Parser:
                 max_capacity=pt['max_capacity'],
                 timeout=float(pt['timeout']),
                 priority=pt['priority'],
+                admin=bool(pt.get('admin', False)),
                 contiguous_carriers=pt['contiguous_carriers'],
                 independent_carriers=pt['independent_carriers'],
                 protocols=make_piece_protocols(pt['policies']),
@@ -620,6 +623,7 @@ class Parser:
                 max_capacity=rt['max_capacity'],
                 timeout=float(rt['timeout']),
                 priority=rt['priority'],
+                admin=bool(rt.get('admin', False)),
                 contiguous_carriers=rt['contiguous_carriers'],
                 independent_carriers=rt['independent_carriers'],
                 protocols=make_protocols(rt['policies']),

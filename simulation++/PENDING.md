@@ -416,8 +416,32 @@ the stopping criterion now drives which is built.
   distribution table. This is the full designer distribution set (Constant,
   Uniform, Normal, Exponential, Triangular, LogNormal); the two sides now match.
 
+## 19. Administrative task flag + admin/productive roll-up (`task.py`, `kpis.py`, `parser.py`) — mirror-worthy
+
+* `TaskConfig` gains a boolean `admin` field (reporting classification only, no
+  effect on the simulation). The parser reads `pt.get('admin', False)` for both
+  task kinds. The task JSON carries a top-level `"admin"` bool.
+* `kpis.task_kpis` adds an `admin` column (raw bool; rendered `oui`/`non` in the
+  CSVs via a new `BOOL_COLS` set, kept raw in report.json).
+* `kpis.admin_summary(task_rows)` rolls the postes rows into administrative vs
+  productive groups over five indicators — `nb_taches`, `temps_fonctionnement`,
+  `cycle_total` (Σ cycle_moyen × nb_lancements), `heures_machine`,
+  `heures_main_oeuvre` — returning each group's totals, its share of the whole
+  (`part_administratives` / `part_productives`), and the admin/productive ratio.
+  `write_report` writes it as `synthese_admin.csv` (one row per indicator, via
+  `admin_synthese_rows`, cells pre-formatted); `parser.write_machine_report`
+  adds it to report.json under `admin_summary`.
+* C++ port: add the `admin` field to its TaskConfig/JSON read, the `admin`
+  column to the postes output, and the same admin/productive roll-up
+  (`synthese_admin.csv` + `admin_summary` in report.json) so the two reports
+  stay column-for-column identical.
+
 ## Not needed in C++
 
+* Designer: the per-task "Admin task" checkbox (on the Carriers tab, both task
+  kinds, persisted through export/import) and the results-mode "Admin" tab that
+  renders `admin_summary` are designer/viewer-only. The JSON just carries the
+  `admin` bool, already covered above.
 * Buffer monitor checkboxes were removed from the flow designer and the JSON
   format — the C++ port never had them; nothing to do.
 * Designer save flow (dirty tracking, Save / Save as, unsaved-changes prompts on

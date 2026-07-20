@@ -261,6 +261,7 @@ class TaskConfig:
     independent_carriers: bool
     timeout: float
     priority: int
+    admin: bool          # administrative task: a reporting classification only, no behaviour
 
     protocols: Protocols
 
