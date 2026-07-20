@@ -78,9 +78,17 @@ timeline (`mode_log()`). Verified on sample_flow: the timeline carries
 loading/processing/wait_dispatch/wait_materials/wait_operators/collecting and WIP
 moves (mean 1.44, max 6).
 
-STILL PENDING: `Piece.journal` (§5, graph-only) and the kpis++ READER — the
-`mode_total` / `union_mode_duration` helpers over `mode_log()`, the collectors,
-the CSV writer and the rich report.json.
+READER DONE: `engine/kpis.hpp` mirrors kpis.py — the monitor-timeline helpers
+(`mode_total` / `union_mode_duration` / `rising_edges` / `level_during` /
+`overlap_duration` over `x_raw()`/`t_raw()`/`mode_log()`), all the collectors
+(`task_kpis`, `task_model_rows`, `buffer_kpis`, `operator_kpis`, `flow_kpis`,
+`admin_summary`), the utf-8-sig CSV writer, and `main.cpp` builds the rich
+report.json. Verified vs Python (seed 0) on sample_flow @60000: every column
+lands within statistical equivalence — e.g. Paint Line produites 932 vs 918,
+TRS 0.937 vs 0.931; Weld heures_machine 183 vs 191.
+
+STILL PENDING: `Piece.journal` (§5) is graph-only (graphs stay in Python; the
+C++ engine emits no PNGs, so report.json's `graphs` map is empty).
 
 
 New module `simulation/kpis.py`: post-run collectors + CSV writer

@@ -19,6 +19,7 @@
 // Build with Clang or MSVC — salabim.hpp uses C++20 coroutines that GCC<=13
 // miscompiles (internal compiler error).
 
+#include "kpis.hpp"
 #include "parser.hpp"
 
 #include <algorithm>
@@ -126,19 +127,73 @@ int main(int argc, char** argv) {
             fs::current_path() / "runs" / (timestamp() + "_" + json_path.stem().string());
         fs::create_directories(out_dir);
 
-        // TODO(kpis++): the full report — postes/buffers/flux/operateurs CSVs and
-        // the rich report.json (raw KPI dicts, admin_summary, graphs map). For now
-        // a minimal, well-formed report.json so results mode has a run block.
+        // Ordered task/operator lists (task_order for stable columns).
+        std::vector<Task*> tasks_ordered;
+        for (const std::string& id : p.task_order) tasks_ordered.push_back(p.tasks.at(id));
+        std::vector<OperatorGroup*> op_groups;
+        for (auto& [id, g] : p.operator_groups) op_groups.push_back(g);
+        std::vector<Buffer*> buffers = p.buffer_list();
+
+        const json& crit = p.data.at("stopping_criterion");
         int exit_pieces = static_cast<int>(exit_buffer ? exit_buffer->size() : 0);
-        json report;
+
+        // The CSV report (postes/buffers/flux/operateurs/... utf-8-sig).
+        kpis::ojson run_info;
+        run_info["fichier"] = json_path.string();
+        run_info["debut"] = p.data.value("start_date", "");
+        run_info["critere_arret"] = crit.value("type", "");
+        kpis::write_report(out_dir, tasks_ordered, buffers, p.piece_generator, op_groups, run_info,
+                           p.sim_start);
+
+        // report.json: the raw (unformatted) KPI dicts keyed by node id, plus a run
+        // block — everything the designer's results mode reads (mirror of
+        // Parser.write_machine_report; graphs stay a Python concern, so empty here).
+        std::optional<int> goal_total;
+        std::optional<bool> goal_reached;
+        if (parser::same_name(crit.value("type", ""), "ByPiecesProduced")) {
+            int g = 0;
+            for (const auto& mg : crit.at("models_goals")) g += mg.at("goal").get<int>();
+            goal_total = g;
+            goal_reached = exit_pieces >= g;
+        }
+        std::vector<kpis::ojson> task_rows;
+        kpis::ojson tasks_j = kpis::ojson::object(), tasks_models_j = kpis::ojson::object();
+        for (const std::string& id : p.task_order) {
+            kpis::ojson r = kpis::task_kpis(p.tasks.at(id));
+            task_rows.push_back(r);
+            tasks_j[id] = r;
+            auto mrows = kpis::task_model_rows(p.tasks.at(id));
+            if (!mrows.empty()) tasks_models_j[id] = mrows;
+        }
+        kpis::ojson buffers_j = kpis::ojson::object(), ops_j = kpis::ojson::object();
+        for (const auto& [id, o] : p.outlets)
+            if (auto* b = dynamic_cast<Buffer*>(o)) buffers_j[id] = kpis::buffer_kpis(b);
+        for (const auto& [id, g] : p.operator_groups) ops_j[id] = kpis::operator_kpis(g);
+        auto [flux, flux_modeles] = kpis::flow_kpis(buffers, p.piece_generator);
+
+        kpis::ojson report;
         report["format"] = "flow-simulator-report";
         report["version"] = 1;
-        report["run"] = {{"engine", "cpp"},
-                         {"source_file", json_path.string()},
-                         {"flow_snapshot", "flow.json"},
-                         {"sim_end_minutes", e.now()},
-                         {"criterion", p.data.at("stopping_criterion")},
-                         {"pieces_sorties", exit_pieces}};
+        kpis::ojson run;
+        run["engine"] = "cpp";
+        run["source_file"] = json_path.string();
+        run["flow_snapshot"] = "flow.json";
+        run["sim_end_minutes"] = kpis::roundn(e.now(), 3);
+        run["graine"] = simulation::SEED;
+        run["criterion"] = crit;
+        run["critere_arret"] = crit.value("type", "");
+        run["pieces_sorties"] = exit_pieces;
+        run["objectif_total"] = goal_total ? kpis::ojson(*goal_total) : kpis::ojson(nullptr);
+        run["objectif_atteint"] = goal_reached ? kpis::ojson(*goal_reached) : kpis::ojson(nullptr);
+        report["run"] = run;
+        report["tasks"] = tasks_j;
+        report["admin_summary"] = kpis::admin_summary(task_rows);
+        report["tasks_models"] = tasks_models_j;
+        report["buffers"] = buffers_j;
+        report["operators"] = ops_j;
+        report["flux"] = flux;
+        report["flux_modeles"] = flux_modeles;
+        report["graphs"] = kpis::ojson::object();  // C++ engine produces no graphs
         std::ofstream(out_dir / "report.json") << report.dump(1);
         std::ofstream(out_dir / "flow.json") << flow_text;  // byte copy of the flow that ran
 

@@ -3063,11 +3063,15 @@ inline sim::Process ResourceCarrier::request_resources(double fail_at) {
 }
 
 inline sim::Process ResourceCarrier::successfully_end_process() {
-    set_mode("");  // §4: stop the last work mode accruing to now
     for (const auto& [resource_out, distr] : rtask_()->rconfig()->resources_out_distr)
         co_await call(resource_out->replenish(this, distr.sample() * resource_collector->requested_quantity));
 
+    task->batch_sizes.tally(resource_collector->requested_quantity);  // §4
+    task->cycle_times.tally(env->now() - creation_time());            // §4
+
+    resource_collector->set_mode("");  // §4: stop accruing modes to now
     resource_collector->cancel();
+    set_mode("");  // §4
     done.set(true);
     task->pending_carriers.remove(this);
     task->active_carriers.remove(this);
