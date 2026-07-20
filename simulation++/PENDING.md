@@ -10,7 +10,7 @@ Last sync: the port matches the Python simulation as it was just before commit
 the RNG simplification are already in. Commits `b48db69..ecc1b5e` are covered
 by the entries below.
 
-## 1. Piece exit-order policy (`protocols.py`, `piece_task.py`)
+## 1. Piece exit-order policy (`protocols.py`, `piece_task.py`)  — ✅ ported to simulation.hpp
 
 * `protocols.py`: `ExitOrder` enum (`FIRST_IN_FIRST_OUT`, `FIRST_CREATED_FIRST_OUT`),
   `PieceExitOrder` protocol, `FirstInFirstOut` / `FirstCreatedFirstOut` classes.
@@ -31,8 +31,14 @@ by the entries below.
   stores — mirror this snapshot approach instead.
 * `AltruisticMixin.collect_batch`: `valid_pieces` are `(piece, buffer)` pairs,
   sorted by the same policy key before truncation to `truncate`.
+* C++ note: TaskConfig stores `protocols` by value, so a `PieceProtocols`
+  subclass would slice. The two piece-only protocols (`piece_exit_order`,
+  `batch_model_choice`) therefore live as `shared_ptr` fields on
+  `PieceTaskConfig` itself (defaults FirstInFirstOut / MostPresent); the shared
+  five stay on the base `protocols`. `collect_batch`'s sort uses `std::stable_sort`
+  to match Python's stable `list.sort` (first-in-snapshot wins on ties).
 
-## 2. Focus-model policy for discriminating collectors (`protocols.py`, `piece_task.py`)
+## 2. Focus-model policy for discriminating collectors (`protocols.py`, `piece_task.py`)  — ✅ ported to simulation.hpp
 
 * `protocols.py`: `ModelChoice` enum (`MOST_PRESENT`, `FASTEST_TASK_DURATION`,
   `SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY`), `ModelChoiceCriteria` protocol,

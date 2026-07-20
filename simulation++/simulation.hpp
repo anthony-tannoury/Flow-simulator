@@ -1095,6 +1095,8 @@ class Alternative {
 
 enum class Action { ABORT, WAIT, LAUNCH };
 enum class ConsciousnessState { CONSCIOUS, UNCONSCIOUS };
+enum class ExitOrder { FIRST_IN_FIRST_OUT, FIRST_CREATED_FIRST_OUT };
+enum class ModelChoice { MOST_PRESENT, FASTEST_TASK_DURATION, SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY };
 
 struct PendingCarriers {
     virtual ~PendingCarriers() = default;
@@ -1161,6 +1163,36 @@ struct Conscious : SelfConsciousness {
 
 struct Unconscious : SelfConsciousness {
     ConsciousnessState decide() const override { return ConsciousnessState::UNCONSCIOUS; }
+};
+
+struct PieceExitOrder {
+    virtual ~PieceExitOrder() = default;
+    virtual ExitOrder decide() const = 0;
+};
+
+struct FirstInFirstOut : PieceExitOrder {
+    ExitOrder decide() const override { return ExitOrder::FIRST_IN_FIRST_OUT; }
+};
+
+struct FirstCreatedFirstOut : PieceExitOrder {
+    ExitOrder decide() const override { return ExitOrder::FIRST_CREATED_FIRST_OUT; }
+};
+
+struct ModelChoiceCriteria {
+    virtual ~ModelChoiceCriteria() = default;
+    virtual ModelChoice decide() const = 0;
+};
+
+struct MostPresent : ModelChoiceCriteria {
+    ModelChoice decide() const override { return ModelChoice::MOST_PRESENT; }
+};
+
+struct FastestTaskDuration : ModelChoiceCriteria {
+    ModelChoice decide() const override { return ModelChoice::FASTEST_TASK_DURATION; }
+};
+
+struct SmallestGapToMinCarrierCapacity : ModelChoiceCriteria {
+    ModelChoice decide() const override { return ModelChoice::SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY; }
 };
 
 // ============================================================================
@@ -1743,6 +1775,14 @@ struct PieceTaskConfig : TaskConfig {
     std::vector<std::pair<Model*, ModelConfig>> models_configs;  // dict, insertion-ordered
     PieceCollectorType piece_collector_type = PieceCollectorType::NON_DISCRIMINATING_GREEDY;
 
+    // Python has `PieceProtocols(Protocols)` — piece tasks carry two extra
+    // protocols on top of the shared five in `protocols`. C++ stores TaskConfig's
+    // `protocols` by value (would slice a derived struct), so the two piece-only
+    // protocols live here on the config instead. Defaults mirror the parser's
+    // (FirstInFirstOut / MostPresent) so scenario tests that don't set them build.
+    std::shared_ptr<PieceExitOrder> piece_exit_order = std::make_shared<FirstInFirstOut>();
+    std::shared_ptr<ModelChoiceCriteria> batch_model_choice = std::make_shared<MostPresent>();
+
     const ModelConfig& get_model_config(const Model* model) const {
         const Model* m = model;
         while (m != nullptr) {
@@ -1767,6 +1807,11 @@ class PieceCollector : public Component, public Dispatchable, public Donnable {
     std::vector<sim::Store*> inlet_stores();    // the task's inlets as stores
     sim::Resource& vacant_slots();
 
+    // snapshot the inlets, pick one piece by the exit-order policy, take it via
+    // from_store (result in *out; check failed() after). Replaces the direct
+    // from_store calls so FIFO/FCFO ordering is honored.
+    sim::Process pick_piece(PieceFilter piece_filter, sim::StoreOpts opts, Piece** out);
+    Model* get_focus_model(const std::vector<Model*>& present_models);
     sim::Process collect_until(double deadline, int target, PieceFilter piece_filter, bool* timed_out);
     sim::Process ensure_one();
     sim::Process top_up(int limit, PieceFilter piece_filter);
@@ -1896,6 +1941,82 @@ inline std::vector<sim::Store*> PieceCollector::inlet_stores() {
 
 inline sim::Resource& PieceCollector::vacant_slots() { return *task->vacant_slots; }
 
+inline Model* most_common_model_(const std::vector<Model*>& models);  // defined below
+
+// Python PieceCollector.pick_piece: snapshot the (piece, buffer) pairs passing
+// the filter; if any, choose the one the exit-order policy prefers (FIFO by
+// buffer enter_time, FCFO by creation_time) and narrow the from_store filter to
+// that exact piece (no scheduling point between the snapshot and the take, so it
+// is honored immediately); if none, a plain from_store with the original filter
+// keeps fail_at / fail_delay working. Result goes to *out; check failed() after.
+inline sim::Process PieceCollector::pick_piece(PieceFilter piece_filter, sim::StoreOpts opts,
+                                               Piece** out) {
+    std::vector<std::pair<Piece*, Buffer*>> pieces;
+    for (Buffer* buffer : task->inlets)
+        for (sim::Component* c : *buffer) {
+            Piece* p = static_cast<Piece*>(c);
+            if (piece_filter(p)) pieces.push_back({p, buffer});
+        }
+
+    PieceFilter effective = piece_filter;
+    if (!pieces.empty()) {
+        Piece* target = nullptr;
+        double best = sim::inf;
+        // min(pieces, key=...) — first piece achieving the minimum wins on ties.
+        switch (cfg().piece_exit_order->decide()) {
+            case ExitOrder::FIRST_IN_FIRST_OUT:
+                for (auto& [p, b] : pieces) {
+                    double t = p->enter_time(*b);
+                    if (t < best) { best = t; target = p; }
+                }
+                break;
+            case ExitOrder::FIRST_CREATED_FIRST_OUT:
+                for (auto& [p, b] : pieces) {
+                    double t = p->creation_time();
+                    if (t < best) { best = t; target = p; }
+                }
+                break;
+        }
+        effective = [target](Piece* p) { return p == target; };
+    }
+
+    if (!opts.mode) opts.mode = "wait_pieces";
+    opts.filter = [effective](sim::Component* c) { return effective(static_cast<Piece*>(c)); };
+    sim::Component* piece = co_await from_store(inlet_stores(), opts);
+    if (!failed()) *out = static_cast<Piece*>(piece);
+}
+
+// Python PieceCollector.get_focus_model: the model the discriminating collectors
+// build the batch around, per the batch_model_choice policy.
+inline Model* PieceCollector::get_focus_model(const std::vector<Model*>& present_models) {
+    switch (cfg().batch_model_choice->decide()) {
+        case ModelChoice::MOST_PRESENT:
+            return most_common_model_(present_models);
+        case ModelChoice::FASTEST_TASK_DURATION: {
+            Model* best = nullptr;
+            double best_key = sim::inf;
+            for (Model* m : present_models) {
+                double k = cfg().get_model_config(m).duration->mean_now();
+                if (k < best_key) { best_key = k; best = m; }
+            }
+            return best;
+        }
+        case ModelChoice::SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY: {
+            Model* best = nullptr;
+            double best_key = sim::inf;
+            for (Model* m : present_models) {
+                int count = 0;
+                for (Model* mm : present_models)
+                    if (mm == m) ++count;
+                double k = cfg().get_model_config(m).min_carrier_capacity - count;
+                if (k < best_key) { best_key = k; best = m; }
+            }
+            return best;
+        }
+    }
+    return nullptr;  // unreachable
+}
+
 inline sim::Process PieceCollector::collect_until(double deadline, int target, PieceFilter piece_filter,
                                                   bool* timed_out) {
     while (static_cast<int>(collected_pieces.size()) < target) {
@@ -1905,17 +2026,16 @@ inline sim::Process PieceCollector::collect_until(double deadline, int target, P
             *timed_out = true;
             co_return;
         }
-        sim::Component* piece = co_await from_store(
-            inlet_stores(), {.fail_at = deadline, .request_priority = task->request_priority,
-                             .filter = [&piece_filter](sim::Component* c) {
-                                 return piece_filter(static_cast<Piece*>(c));
-                             }});
+        Piece* piece = nullptr;
+        co_await call(pick_piece(piece_filter,
+                                 {.fail_at = deadline, .request_priority = task->request_priority},
+                                 &piece));
         if (failed()) {
             release({{vacant_slots(), 1}});
             *timed_out = true;
             co_return;
         }
-        collected_pieces.push_back(static_cast<Piece*>(piece));
+        collected_pieces.push_back(piece);
     }
     *timed_out = false;
 }
@@ -1923,27 +2043,23 @@ inline sim::Process PieceCollector::collect_until(double deadline, int target, P
 inline sim::Process PieceCollector::ensure_one() {
     if (collected_pieces.empty()) {
         co_await call(request({{vacant_slots(), 1}}, {.request_priority = task->request_priority}));
-        sim::Component* piece = co_await from_store(
-            inlet_stores(), {.request_priority = task->request_priority,
-                             .filter = [this](sim::Component* c) {
-                                 return task->can_take(static_cast<Piece*>(c));
-                             }});
-        collected_pieces.push_back(static_cast<Piece*>(piece));
+        Piece* piece = nullptr;
+        co_await call(pick_piece([this](Piece* p) { return task->can_take(p); },
+                                 {.request_priority = task->request_priority}, &piece));
+        collected_pieces.push_back(piece);
     }
 }
 
 inline sim::Process PieceCollector::top_up(int limit, PieceFilter piece_filter) {
     while (vacant_slots().available_quantity() > 0 &&
            static_cast<int>(collected_pieces.size()) < limit) {
-        sim::Component* piece = co_await from_store(
-            inlet_stores(), {.fail_delay = 0, .request_priority = task->request_priority,
-                             .filter = [&piece_filter](sim::Component* c) {
-                                 return piece_filter(static_cast<Piece*>(c));
-                             }});
+        Piece* piece = nullptr;
+        co_await call(pick_piece(piece_filter,
+                                 {.fail_delay = 0, .request_priority = task->request_priority}, &piece));
         if (failed()) break;
 
         co_await call(request({{vacant_slots(), 1}}, {.request_priority = task->request_priority}));
-        collected_pieces.push_back(static_cast<Piece*>(piece));
+        collected_pieces.push_back(piece);
     }
 }
 
@@ -1971,6 +2087,22 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
             for (sim::Component* c : *buffer)
                 if (piece_filter(static_cast<Piece*>(c)))
                     valid_pieces.push_back({static_cast<Piece*>(c), buffer});
+        // exit-order policy before truncation (stable_sort: Python list.sort is stable)
+        switch (cfg().piece_exit_order->decide()) {
+            case ExitOrder::FIRST_IN_FIRST_OUT:
+                std::stable_sort(valid_pieces.begin(), valid_pieces.end(),
+                                 [](const auto& a, const auto& b) {
+                                     return a.first->enter_time(*a.second) <
+                                            b.first->enter_time(*b.second);
+                                 });
+                break;
+            case ExitOrder::FIRST_CREATED_FIRST_OUT:
+                std::stable_sort(valid_pieces.begin(), valid_pieces.end(),
+                                 [](const auto& a, const auto& b) {
+                                     return a.first->creation_time() < b.first->creation_time();
+                                 });
+                break;
+        }
         int truncate = static_cast<int>(std::min(
             double(max_carrier_capacity), vacant_slots().available_quantity() + min_carrier_capacity));
         if (static_cast<int>(valid_pieces.size()) > truncate) valid_pieces.resize(truncate);
@@ -2081,7 +2213,7 @@ inline sim::Process DiscriminatingGreedyPieceCollector::process() {
 
     Model* focus_on = nullptr;
     if (!present_models.empty()) {
-        focus_on = most_common_model_(present_models);
+        focus_on = get_focus_model(present_models);
     } else {
         bool timed_out = false;
         co_await call(collect_until(deadline, 1, [this](Piece* p) { return task->can_take(p); },
@@ -2148,7 +2280,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
     }
 
     if (!timed_out) {
-        Model* focus_on = most_common_model_(present_models);
+        Model* focus_on = get_focus_model(present_models);
         const ModelConfig& model_config = cfg().get_model_config(focus_on);
         co_await call(collect_batch(deadline, model_config.min_carrier_capacity,
                                     model_config.max_carrier_capacity,
