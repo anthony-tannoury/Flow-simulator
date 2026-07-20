@@ -10,8 +10,10 @@ on:
   push:
     branches: [claude/cpp-engine]
     paths:
-      - 'salabim++/**'
-      - 'simulation++/**'
+      # '+' is the extglob quantifier in GitHub path filters, so match it as a
+      # literal via a character class ([+]) — 'salabim++/**' is rejected outright.
+      - 'salabim[+][+]/**'
+      - 'simulation[+][+]/**'
       - 'engine/**'
       - 'CMakeLists.txt'
       - '.github/workflows/build-engines.yml'
