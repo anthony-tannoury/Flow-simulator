@@ -30,6 +30,15 @@ class OperatorShiftManager(ShiftManager):
     def on_leave(self, *args) -> None:
         assert isinstance(self.entity, OperatorGroup)
         self.entity.set_capacity(0)
+        # a task holding this group PER_TASK while starving for pieces is parked
+        # in its loaded-wait and would keep the crew reserved for days; wake it
+        # so the hand-off happens at the shift boundary
+        for task in self.entity.dependent_tasks:
+            if (getattr(task, '_awaiting_carrier', None) is not None
+                    and task.requested_per_task_operators
+                    and any(group is self.entity for group, _ in task.task_operators)
+                    and task.iswaiting()):
+                task.activate()
         super().on_leave(*args)
 
 

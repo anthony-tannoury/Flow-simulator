@@ -167,6 +167,37 @@ lot recouvre `attente_pieces`/`attente_place` de son collecteur) et des lots
 peuvent attendre en parallèle : ne les additionnez pas pour retomber sur TO.
 Elles se comparent entre elles et entre postes.
 
+### Les heures (colonnes `heures_machine`, `heures_main_oeuvre`)
+
+Les deux colonnes de comptabilité d'atelier. Elles ne suivent **pas** la même
+règle d'addition, et c'est voulu :
+
+* `heures_machine` — le temps horloge où la machine travaille réellement
+  (chargement ou traitement), en **union** sur tous les lots : un poste est une
+  seule machine physique, donc trois lots menés en parallèle pendant 40 minutes
+  comptent 40 minutes machine, pas 120. Sans parallélisme, l'union égale la
+  somme.
+  * **Ce n'est pas `temps_fonctionnement`.** TF compte « au moins un lot
+    engagé sur le poste », du lancement au dépôt — y compris les attentes du
+    lot engagé (équipe pas disponible, matière manquante). `heures_machine` ne
+    garde que les instants où la machine charge ou traite. On a donc toujours
+    `heures_machine` ≤ TF, et l'écart entre les deux, ce sont les attentes des
+    lots engagés.
+  * **La mise en route n'y est pas.** Le préchauffage vit dans sa propre
+    colonne `mise_en_route` ; pour des heures machine « préchauffage compris »,
+    additionnez les deux (les démarrages d'un poste ne se recouvrent jamais,
+    l'addition est donc exacte).
+* `heures_main_oeuvre` — les minutes-opérateur réservées au poste par
+  **toutes** ses équipes, en **somme** (opérateurs × durée) : trois personnes
+  qui travaillent une heure font bien trois heures de main-d'œuvre. Le compte
+  couvre : l'équipe de chargement et l'équipe de traitement PER_BATCH pendant
+  leurs prises réelles, l'équipe de démarrage pendant le préchauffage, et une
+  équipe PER_TASK sur **toute** sa fenêtre de réquisition (de la demande à la
+  libération, temps d'attente entre lots compris — c'est du personnel
+  immobilisé au poste, donc des heures réservées).
+* Le rapport `heures_main_oeuvre` ÷ `heures_machine` donne l'encadrement moyen
+  du poste (personnes présentes par heure de machine qui tourne).
+
 ## postes_modeles.csv — la production par modèle
 
 Pour chaque poste à pièces : le tc idéal du modèle, les pièces produites,
@@ -186,6 +217,25 @@ bonnes et rebutées de ce modèle. C'est le détail qui alimente TN.
   calendaire. Entrant durablement supérieur au sortant = le buffer gonfle =
   goulot en aval.
 * `temps_moyen_entre_arrivees` — durée simulée ÷ entrées.
+
+## operateurs.csv — un groupe d'opérateurs par ligne
+
+* `effectif` — la taille du groupe ; `temps_poste` — son temps posté total (la
+  somme de ses shifts sur la durée simulée).
+* `occupation_moyenne` — le nombre moyen d'opérateurs réquisitionnés,
+  moyenné sur toute la durée simulée (shifts et hors shifts confondus).
+* `heures_en_poste` / `heures_hors_poste` — les minutes-opérateur
+  réquisitionnées pendant / en dehors des shifts du groupe (2 opérateurs pris
+  90 minutes = 180). Colonnes de diagnostic : la simulation libère une équipe
+  PER_TASK à la fin de son shift (même si le poste attend des pièces) et sur
+  un abandon de lot, donc `heures_hors_poste` doit rester proche de zéro. Ce
+  qui reste, c'est un lot commencé avant la fin du shift qui se termine
+  légitimement après.
+* `taux_occupation` — le total réquisitionné (`occupation_moyenne` × durée
+  simulée) ÷ (`effectif` × `temps_poste`) : la part du temps posté réellement
+  passée réquisitionné. Comme les équipes sont relâchées en fin de shift, il
+  reste naturellement sous 100 % (au débordement d'un lot près).
+* `occupation_max` — le pic d'opérateurs réquisitionnés simultanément.
 
 ## flux.csv et flux_modeles.csv — la ligne entière
 

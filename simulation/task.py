@@ -71,6 +71,7 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
             self.request_resources(fail_at=earliest_deadline - duration - (fail_before - ideal_duration))
 
         self.hold(duration, mode=work_mode)
+        self.task.labor_minutes += sum(count for _, count in recuperated) * duration
         self.release(*recuperated)
 
     def handle_task_operators(self, earliest_deadline: float, ideal_duration: float) -> None:
@@ -191,7 +192,7 @@ class TaskStarter(Component, Donnable):
             self.hold(till=next_shutdown.end)
         
         deadline = self.task.get_earliest_deadline()
-        self.task.config.startup_operators.request(demander=self, fail_at=deadline - duration)
+        recuperated = self.task.config.startup_operators.request(demander=self, fail_at=deadline - duration)
         if self.failed():
             self.task.is_frozen.set(True)
             self.done.set(True)
@@ -199,6 +200,7 @@ class TaskStarter(Component, Donnable):
         
         self.hold(duration)
         self.task.startup_times.tally(duration)  # the setup work itself, not the wait for the crew
+        self.task.labor_minutes += sum(count for _, count in (recuperated or [])) * duration
         self.done.set(True)
 
 
@@ -277,12 +279,18 @@ class Task(Component, HasShifts, ABC):
         self.task_operators: list[tuple[OperatorGroup, int]] = []
         self.carrier_type = carrier_type
         # so each operator group can unfreeze this task when it comes back on shift
+        # (dict.fromkeys, not a set: iteration must not depend on object addresses,
+        # or the shift-boundary wake-up order — and with it the whole run — would
+        # change from process to process)
         for alternative in (config.operators, config.loading_operators, config.startup_operators):
-            for group in {g for alt in alternative.alternatives for g, _ in alt}:
+            for group in dict.fromkeys(g for alt in alternative.alternatives for g, _ in alt):
                 group.dependent_tasks.append(self)
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
         self.started_up = False
         self.requested_per_task_operators = False  # whether the PER_TASK crew is currently held
+        self.labor_minutes = 0.0        # operator-minutes booked on this task, all crews
+        self._task_crew_since = None    # claim start of the held PER_TASK crew
+        self._awaiting_carrier = None   # the pending carrier the process is parked on
         self.pending_carriers = CarrierTracker()
         self.active_carriers = CarrierTracker()
 
@@ -334,12 +342,26 @@ class Task(Component, HasShifts, ABC):
             self.is_frozen.set(True)
         else:
             self.requested_per_task_operators = True
+            self._task_crew_since = env.now()
 
     def release_task_operators(self) -> None:
+        if self.task_operators and self._task_crew_since is not None:
+            self.labor_minutes += (sum(count for _, count in self.task_operators)
+                                   * (env.now() - self._task_crew_since))
+        self._task_crew_since = None
         if self.task_operators:
             self.release(*self.task_operators)
         self.task_operators = []
         self.requested_per_task_operators = False
+
+    def labor_minutes_total(self) -> float:
+        """Booked operator-minutes on this task (loading, processing and startup
+        crews), a still-held PER_TASK crew's open claim included."""
+        total = self.labor_minutes
+        if self._task_crew_since is not None:
+            total += (sum(count for _, count in self.task_operators)
+                      * (env.now() - self._task_crew_since))
+        return total
 
     def process(self):
         while True:
@@ -371,7 +393,26 @@ class Task(Component, HasShifts, ABC):
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
             self.all_carriers.append(new_carrier)
-            self.wait(new_carrier.loaded)
+            # While parked here waiting for the collector, a held PER_TASK crew
+            # must still hand off at its shift end: the operator shift manager
+            # wakes this task (activate breaks the wait), the crew is released,
+            # and the wait resumes until the carrier actually loads.
+            self._awaiting_carrier = new_carrier
+            while not new_carrier.loaded():
+                self.wait(new_carrier.loaded)
+                if (self.config.operator_scope is Scope.PER_TASK
+                        and self.requested_per_task_operators and not self.active_carriers
+                        and any(group.is_in_downtime() for group, _ in self.task_operators)):
+                    self.release_task_operators()
+            self._awaiting_carrier = None
+
+            # a crew handed off during the wait is re-acquired before dispatching
+            # (whichever group is on shift now); a failed request freezes as usual
+            if (self.config.operator_scope is Scope.PER_TASK and self.started_up
+                    and not self.is_frozen() and not self.requested_per_task_operators):
+                self.request_task_operators()
+                if self.is_frozen() and not self.skip_frozen_check:
+                    continue
 
             if len(self.pending_carriers) >= self.config.min_carriers:
                 dispatched = []

@@ -77,6 +77,48 @@ def mode_total(components, tag: str) -> float:
     return sum(c.mode.value_duration(tag) for c in components)
 
 
+def union_mode_duration(components, tags: set) -> float:
+    """Wall-clock time where at least one component is in one of the given
+    modes (event-merged union; concurrent components never double-count)."""
+    now = env.now()
+    deltas = []
+    for component in components:
+        xs, ts = component.mode.xt(force_numeric=False)
+        for i, value in enumerate(xs):
+            if value in tags:
+                start = ts[i]
+                end = ts[i + 1] if i + 1 < len(ts) else now
+                if end > start:
+                    deltas.append((start, 1))
+                    deltas.append((end, -1))
+    deltas.sort()
+    total, active, prev = 0.0, 0, None
+    for t, delta in deltas:
+        if active > 0 and prev is not None:
+            total += t - prev
+        active += delta
+        prev = t
+    return total
+
+
+def level_during(level_monitor, status_monitor, status_value) -> float:
+    """Integral of a level monitor over the time a status monitor holds a value
+    (event-merged, extended to now)."""
+    xl, tl = level_monitor.xt()
+    xs, ts = status_monitor.xt(force_numeric=False)
+    times = sorted(set(tl) | set(ts) | {env.now()})
+    total, il, is_ = 0.0, 0, 0
+    for k in range(1, len(times)):
+        t0, t1 = times[k - 1], times[k]
+        while il + 1 < len(tl) and tl[il + 1] <= t0:
+            il += 1
+        while is_ + 1 < len(ts) and ts[is_ + 1] <= t0:
+            is_ += 1
+        if xs[is_] == status_value:
+            total += xl[il] * (t1 - t0)
+    return total
+
+
 def overlap_duration(mon_a, val_a, mon_b, val_b) -> float:
     """Time where level monitor a holds val_a AND b holds val_b (event-merged)."""
     xa, ta = mon_a.xt(force_numeric=False)
@@ -219,6 +261,13 @@ def task_kpis(task) -> dict:
         'temps_collecte': round(mode_total(carriers, 'collecting'), 3),
         'temps_chargement': round(t_loading, 3),
         'temps_traitement': round(t_processing, 3),
+        # heures machine: wall-clock machine time (union of loading + processing
+        # across carriers; a task is one physical machine, so parallel carriers
+        # inside it never multiply the hours). heures main-d'oeuvre:
+        # operator-minutes booked on the task by every crew (loading, processing
+        # PER_BATCH holds, the PER_TASK crew's whole claim window, startup).
+        'heures_machine': round(union_mode_duration(carriers, {'loading', 'processing'}), 3),
+        'heures_main_oeuvre': round(task.labor_minutes_total(), 3),
     }
 
 
@@ -268,6 +317,30 @@ def buffer_kpis(buffer) -> dict:
         'flux_entrant_j': round(entrees / tt * 1440, 3) if tt else '',
         'flux_sortant_j': round(sorties / tt * 1440, 3) if tt else '',
         'temps_moyen_entre_arrivees': round(tt / entrees, 3) if entrees else '',
+    }
+
+
+def operator_kpis(group) -> dict:
+    tt = env.now()
+    posted = group.is_in_downtime.value.value_duration(False)
+    claimed_mean = group.claimed_quantity.mean()
+    # Diagnostic split of the claimed operator-minutes by the group's own posted
+    # hours. The simulation releases a PER_TASK crew at its shift boundary (and
+    # on a freeze-abort), so heures_hors_poste should stay near zero; anything
+    # sizeable left is a batch legitimately finishing past the shift end.
+    en_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, False)
+    hors_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, True)
+    return {
+        'groupe': group.name(),
+        'effectif': group.n_operators,
+        'temps_poste': round(posted, 3),
+        'occupation_moyenne': round(claimed_mean, 3),
+        'heures_en_poste': round(en_poste, 3),
+        'heures_hors_poste': round(hors_poste, 3),
+        'occupation_max': group.claimed_quantity.maximum(),
+        # mean claimed is averaged over the whole run; scale it back to the time
+        # the group was actually posted, against its full headcount
+        'taux_occupation': ratio(claimed_mean * tt, group.n_operators * posted),
     }
 
 
@@ -361,12 +434,13 @@ DUREE_COLS = {
     'cycle_moyen', 'cycle_p90', 'cycle_max',
     'attente_pieces', 'attente_place', 'attente_operateurs', 'attente_matiere',
     'attente_vague', 'temps_collecte', 'temps_chargement', 'temps_traitement',
-    'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees',
+    'heures_machine', 'heures_main_oeuvre', 'heures_en_poste', 'heures_hors_poste',
+    'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee',
 }
 PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
-            'trs', 'trg', 'tre', 'taux_rebut', 'atteinte'}
+            'trs', 'trg', 'tre', 'taux_rebut', 'atteinte', 'taux_occupation'}
 INSTANT_COLS = {'creation', 'fin'}
 
 
@@ -395,7 +469,8 @@ def _write_csv(path: str, rows: list[dict], sim_start: datetime | None = None) -
 
 
 def write_report(directory: str, tasks: list, buffers: list, piece_generator=None,
-                 run_info: dict | None = None, sim_start: datetime | None = None) -> str:
+                 run_info: dict | None = None, sim_start: datetime | None = None,
+                 operator_groups: list | None = None) -> str:
     os.makedirs(directory, exist_ok=True)
 
     run = {'genere_le': datetime.now().isoformat(timespec='seconds'),
@@ -411,6 +486,9 @@ def write_report(directory: str, tasks: list, buffers: list, piece_generator=Non
                [row for t in tasks for row in task_model_rows(t)], sim_start)
     _write_csv(os.path.join(directory, 'buffers.csv'),
                [buffer_kpis(b) for b in buffers], sim_start)
+
+    _write_csv(os.path.join(directory, 'operateurs.csv'),
+               [operator_kpis(g) for g in (operator_groups or [])], sim_start)
 
     flux, par_modele = flow_kpis(buffers, piece_generator)
     _write_csv(os.path.join(directory, 'flux.csv'),

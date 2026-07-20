@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import salabim as sim
 
 from time import perf_counter
@@ -270,7 +271,8 @@ class Parser:
             buffers=buffers,
             piece_generator=self.piece_generator,
             run_info=run_info,
-            sim_start=self.sim_start
+            sim_start=self.sim_start,
+            operator_groups=list(self.operator_groups.values())
         )
         graphs.write_graphs(
             os.path.join(directory, 'graphes'),
@@ -281,7 +283,76 @@ class Parser:
             piece_generator=self.piece_generator,
             sim_start=self.sim_start
         )
+        self.write_machine_report(directory, run_info)
         return directory
+
+    def write_machine_report(self, directory: str, run_info: dict) -> None:
+        """report.json + flow.json next to the CSVs: the raw (unformatted) KPI
+        dicts keyed by node id, the graph-file map, and a snapshot of the flow
+        that ran — everything the designer's results mode needs to dress the
+        graph back up with numbers."""
+        from simulation.outlet import BufferType
+        import simulation as simulation_pkg
+
+        criterion = self.data['stopping_criterion']
+        exit_pieces = sum(len(b) for b in self.outlets.values()
+                          if isinstance(b, Buffer) and b.buffer_type is BufferType.EXIT)
+        goal_total = None
+        goal_reached = None
+        if same_name(criterion['type'], 'ByPiecesProduced'):
+            goal_total = sum(mg['goal'] for mg in criterion['models_goals'])
+            goal_reached = exit_pieces >= goal_total
+
+        def png(category: str, stem: str) -> str | None:
+            rel = os.path.join('graphes', 'png', category, f"{stem}.png")
+            return rel if os.path.isfile(os.path.join(directory, rel)) else None
+
+        safe = graphs._safe
+        flux, flux_modeles = kpis.flow_kpis(
+            [b for b in self.outlets.values() if isinstance(b, Buffer)], self.piece_generator)
+        data = {
+            'format': 'flow-simulator-report',
+            'version': 1,
+            'run': {
+                **run_info,
+                'source_file': os.path.abspath(self.filename),
+                'flow_snapshot': 'flow.json',
+                'sim_end_minutes': round(env.now(), 3),
+                'graine': simulation_pkg.SEED,
+                'genere_le': datetime.now().isoformat(timespec='seconds'),
+                'criterion': criterion,
+                'pieces_sorties': exit_pieces,
+                'objectif_total': goal_total,
+                'objectif_atteint': goal_reached,
+            },
+            'tasks': {id_: kpis.task_kpis(t) for id_, t in self.tasks.items()},
+            'tasks_models': {id_: rows for id_, t in self.tasks.items()
+                             if (rows := kpis.task_model_rows(t))},
+            'buffers': {id_: kpis.buffer_kpis(b) for id_, b in self.outlets.items()
+                        if isinstance(b, Buffer)},
+            'operators': {id_: kpis.operator_kpis(g) for id_, g in self.operator_groups.items()},
+            'flux': flux,
+            'flux_modeles': flux_modeles,
+            'graphs': {
+                'tasks': {id_: p for id_, t in self.tasks.items()
+                          if (p := png('postes', f"occupation_{safe(t.name())}"))},
+                'buffers': {id_: p for id_, b in self.outlets.items()
+                            if isinstance(b, Buffer)
+                            and (p := png('buffers', f"longueur_{safe(b.name())}"))},
+                'operators': {id_: p for id_, g in self.operator_groups.items()
+                              if (p := png('operateurs', f"disponibles_{safe(g.name())}"))},
+                'resources': {id_: p for id_, r in self.resources.items()
+                              if (p := png('ressources', f"stock_{safe(r.name())}"))},
+                'models': {m.name: p for m in self.piece_generator.models
+                           if (p := png('modeles', f"trajectoires_{safe(m.name)}"))},
+                'production': png('modeles', 'production'),
+                'encours': png('ligne', 'encours'),
+                'attente': png('ligne', 'pieces_en_attente'),
+            },
+        }
+        with open(os.path.join(directory, 'report.json'), 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=1, ensure_ascii=False)
+        shutil.copyfile(self.filename, os.path.join(directory, 'flow.json'))
 
     def load_all(self) -> None:
         self.load_models()

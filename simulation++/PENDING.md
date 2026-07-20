@@ -241,7 +241,26 @@ the stopping criterion now drives which is built.
   produites) and CSV with an `objectif` column; without goals, a two-bar chart
   (générées/produites) and a CSV without `objectif`.
 
-## 12. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
+## 12. Labor and machine hours (`task.py`, `kpis.py`)
+
+* `Task` gains `labor_minutes` (operator-minutes booked on the task by every
+  crew) filled at three points: `Carrier.handle_batch_operators` adds
+  `sum(counts) * duration` after each hold (loading + PER_BATCH processing);
+  `TaskStarter` adds the startup crew's `sum(counts) * duration` after the
+  warm-up hold; the PER_TASK crew accrues over its whole claim window
+  (`request_task_operators` stamps `_task_crew_since`, `release_task_operators`
+  adds `sum(counts) * (now - since)`), independent of how many carriers ran
+  under it. `Task.labor_minutes_total()` adds a still-held crew's open claim.
+* `kpis.task_kpis` gains two DUREE columns: `heures_machine` (wall-clock
+  machine time: the event-merged UNION of the carriers' loading + processing
+  intervals via new helper `union_mode_duration(components, tags)`; a task is
+  one physical machine, so parallel carriers inside it never multiply the
+  hours; warm-up is NOT included, it stays in `mise_en_route`; the
+  performance rate keeps the per-carrier SUM) and
+  `heures_main_oeuvre` (= `labor_minutes_total()`, which does sum: operators
+  x duration).
+
+## 13. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
 
 * `PieceGenerator` is now `Triggerable` (gains a `trigger` state). `Piece.enter`
   into a scrap buffer, right after decrementing `generated[idx]`, pulses
@@ -267,7 +286,33 @@ the stopping criterion now drives which is built.
   By-pieces-produced settings write one or the other behind an
   automatic-gap toggle, never both.
 
-## 13. Parser: tolerant type-name matching (`parser.py`) — optional
+## 14. Machine-readable report (`kpis.py`, `parser.py`) — mirror-worthy
+
+* `kpis.operator_kpis(group)`: name, headcount, posted time (downtime False),
+  mean/max claimed operators, `taux_occupation = claimed_mean * TT /
+  (headcount * posted)` (with the §16 hand-off fix the claims stop at the
+  shift boundary, so this stays under 100% up to a batch's legitimate
+  overrun), plus two diagnostic columns splitting the claimed
+  operator-minutes by the group's own shifts via helper
+  `level_during(level_monitor, status_monitor, value)` (integral of a level
+  over the time a status holds a value): `heures_en_poste` /
+  `heures_hors_poste` (the latter should be near zero now). `write_report`
+  gains `operator_groups` and writes `operateurs.csv`; `temps_poste` and the
+  heures columns joined DUREE_COLS, `taux_occupation` PCT_COLS.
+* `Parser.write_machine_report(directory, run_info)` (called at the end of
+  `report()`) writes two extra artifacts next to the CSVs:
+  - `report.json`: the same collector dicts (`task_kpis`, `task_model_rows`,
+    `buffer_kpis`, `operator_kpis`, `flow_kpis`) but RAW (minutes/fractions,
+    unformatted) and keyed by node/registry id, plus a `run` block (source
+    file, seed, sim end, criterion, pieces_sorties / objectif_total /
+    objectif_atteint) and a `graphs` map of node id -> relative PNG path
+    (only entries whose file exists).
+  - `flow.json`: a byte copy of the flow that ran, so any run folder can be
+    reopened standalone.
+  The designer's results mode consumes exactly these two files; mirroring them
+  in the C++ port makes its runs browsable in the same viewer.
+
+## 15. Parser: tolerant type-name matching (`parser.py`) — optional
 
 * `canon_name(value)` strips non-alphanumerics and lowercases; every type-name
   lookup (`dist_type`, function `kind`, policy `type`, buffer/collector/scope/
@@ -279,6 +324,36 @@ the stopping criterion now drives which is built.
   (`ByTime`, `PER_BATCH`, `AbortPendingCarriers`, ...), so the C++ parser keeps
   working without this; it only matters for hand-edited files using the
   designer's sentence-case display forms.
+
+## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
+
+* Bug fixed: a PER_TASK crew stayed claimed across its own shift end whenever
+  the task could not cycle its loop — parked on an empty carrier (starving for
+  pieces) or frozen after a `ConstrainedByShift` abort. The claim survived
+  `set_capacity(0)` for days (atelier: POOL_CIRE_SAM booked 115,800 of its
+  146,525 claimed operator-minutes outside its Saturday shifts, a 146.8%
+  occupation).
+* `Task` gains `_awaiting_carrier` (the pending carrier the process is parked
+  on). The plain `wait(new_carrier.loaded)` became an interruptible loop:
+  `while not loaded: wait(loaded)`, and on every wake it releases the crew if
+  it is held, no carrier is active and the crew's group is in downtime. After
+  the loop, a crew handed off during the wait is re-requested before
+  dispatching (whichever alternative is on shift now); a failed re-request
+  freezes as usual.
+* `OperatorShiftManager.on_leave` (after `set_capacity(0)`) wakes — via
+  `activate()`, which breaks the wait — every dependent task that has
+  `_awaiting_carrier` set, holds this group PER_TASK and `iswaiting()`, so the
+  hand-off happens AT the shift boundary instead of at the next piece arrival.
+* `PieceCarrier.abort` / `ResourceCarrier.abort`: between the carrier-tracker
+  removes and `self.cancel()`, when `active_carriers` just emptied, call
+  `task.release_task_operators()` — a freeze-abort must not keep the crew
+  reserved through the frozen wait. (Double release is harmless: the release
+  helper no-ops on an empty claim.)
+* Net effect: claimed operator-minutes for a PER_TASK crew now stop at the
+  earlier of its shift end and the task's freeze; `labor_minutes` (heures
+  main d'oeuvre) no longer books phantom out-of-shift supervision, and
+  off-shift "ghost work" disappears (atelier exits moved 2629 -> 2568; the
+  difference was work done by crews whose operators had gone home).
 
 ## Not needed in C++
 
@@ -296,6 +371,11 @@ the stopping criterion now drives which is built.
   carry the canonical value as item data. Only the Shutdowns card's on-node
   combo stores the display label in its property; its `to_clean_json`
   canonicalizes on export, so the JSON stays canonical there too.
+* Results mode (`flow_designer/results_mode.py` + window hooks) is
+  designer-only: it locks the canvas on the run's flow.json snapshot, routes
+  double-clicks to per-card KPI dialogs, shows the Run/Flux/Opérateurs/Ligne
+  dock, tooltips and the color-by-metric heat map — all read from report.json
+  (entry 13); no simulation-side behavior involved.
 * The flow-designer refactor around generation is designer-only; the C++ port has
   no designer and reads the criterion-based JSON described in §10. For the record:
   the generation mix (goals or per-model rates) lives in Simulation Settings per
