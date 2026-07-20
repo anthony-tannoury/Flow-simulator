@@ -27,8 +27,16 @@ app keeps working.
 
 ## Building one by hand
 
-You don't need CI — build the binary for your own platform in one command (these
-mirror the CI steps exactly). From the repo root:
+You don't need CI. The easiest way is the helper script, which builds the binary
+for the machine it runs on, smoke-tests it, and prints the commit command:
+
+```sh
+engines/build_local.sh          # Linux or macOS
+engines\build_local.bat         :: Windows (in an "x64 Native Tools" prompt)
+```
+
+Or run the compiler yourself (this is exactly what the scripts and CI do). From
+the repo root:
 
 ```sh
 # Linux (Clang; GCC ≤13 ICEs on the coroutines)
