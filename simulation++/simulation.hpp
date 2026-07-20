@@ -284,6 +284,20 @@ struct Bathtub {
     }
 };
 
+// Staircase following the line through (x1,y1)-(x2,y2) but holding each value
+// for `step_size` on the x axis (Python: function_generator.Step).
+struct Step {
+    static TimeFn generate(double x1, double y1, double x2, double y2, double step_size) {
+        if (x1 == x2) throw std::invalid_argument("Cannot generate a step function over a vertical span");
+        if (step_size <= 0) throw std::invalid_argument("Step size must be > 0");
+        return [=](double t) {
+            double slope = (y2 - y1) / (x2 - x1);
+            double anchor = x1 + std::floor((t - x1) / step_size) * step_size;
+            return y1 + slope * (anchor - x1);
+        };
+    }
+};
+
 // ============================================================================
 // sampler.py
 // ============================================================================
@@ -292,6 +306,10 @@ struct Sampler {
     virtual ~Sampler() = default;
     virtual double sample(double t) = 0;
     double sample_now() { return sample(env->now()); }
+    // Distribution.mean(t): the mean at the params evaluated at t (used by
+    // kpis for tc_ideal and by the fastest-duration focus policy).
+    virtual double mean(double /*t*/) { throw std::logic_error("mean() is not defined for this sampler"); }
+    double mean_now() { return mean(env->now()); }
 };
 
 using SamplerPtr = std::shared_ptr<Sampler>;
@@ -328,8 +346,31 @@ class Distribution : public Sampler {
             case DistType::Exponential: return sim::Exponential(p.at(0)).sample();
             case DistType::Triangular:  return sim::Triangular(p.at(0), p.at(1), p.at(2)).sample();
             case DistType::IntUniform:  return sim::IntUniform((long long)p.at(0), (long long)p.at(1)).sample();
-            case DistType::Lognormal:   // CPython lognormvariate == exp(normalvariate(mu, sigma))
-                return std::exp(sim::Normal(p.at(0), p.at(1)).sample());
+            case DistType::Lognormal: {
+                // Real-space parameters: p[0]=mean, p[1]=std of the VALUES (like
+                // Normal), converted to the underlying normal's (mu, sigma). Must
+                // match simulation/sampler.py LogNormal.
+                double m = p.at(0), sd = p.at(1);
+                if (m <= 0) throw std::invalid_argument("LogNormal mean must be > 0");
+                if (sd < 0) throw std::invalid_argument("LogNormal standard deviation must be >= 0");
+                double sigma_sq = std::log(1.0 + (sd * sd) / (m * m));
+                double mu = std::log(m) - sigma_sq / 2.0;
+                return std::exp(sim::Normal(mu, std::sqrt(sigma_sq)).sample());
+            }
+        }
+        throw std::invalid_argument("unknown distribution type");
+    }
+
+    double mean(double t) override {
+        auto p = sample_params_at(t);
+        switch (distr_type) {
+            case DistType::Constant:    return sim::Constant(p.at(0)).mean();
+            case DistType::Uniform:     return sim::Uniform(p.at(0), p.at(1)).mean();
+            case DistType::Normal:      return sim::Normal(p.at(0), p.at(1)).mean();
+            case DistType::Exponential: return sim::Exponential(p.at(0)).mean();
+            case DistType::Triangular:  return sim::Triangular(p.at(0), p.at(1), p.at(2)).mean();
+            case DistType::IntUniform:  return sim::IntUniform((long long)p.at(0), (long long)p.at(1)).mean();
+            case DistType::Lognormal:   return p.at(0);  // real-space mean parameter
         }
         throw std::invalid_argument("unknown distribution type");
     }

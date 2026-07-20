@@ -49,7 +49,7 @@ by the entries below.
   `DiscriminatingAltruisticPieceCollector` in place of the inline
   `Counter(...).most_common` pick.
 
-## 3. Distribution mean (`sampler.py`)
+## 3. Distribution mean (`sampler.py`)  — ✅ ported to simulation.hpp
 
 * `Distribution.mean(t)` = distribution constructed with params evaluated at
   `t`, `.mean()`; `Distribution.mean_now()` = `mean(env.now())`.
@@ -182,7 +182,7 @@ Data hooks needed:
   Now the crew is released the moment it goes off shift (after the current carrier)
   and the next on-shift pool is picked up; at most one crew is held at a time.
 
-## 8. Step time-function (`function_generator.py`)
+## 8. Step time-function (`function_generator.py`)  — ✅ ported to simulation.hpp
 
 * New `Step` class alongside `Linear`/`Exponential`/`Bathtub`:
   `Step.generate(x1, y1, x2, y2, step_size)` returns a staircase that follows
@@ -395,7 +395,7 @@ the stopping criterion now drives which is built.
   the same). Startup holds (`TaskStarter`) remain outside the shift
   constraint, as before.
 
-## 18. LogNormal distribution (`sampler.py`, `parser.py`) — mirror-worthy
+## 18. LogNormal distribution (`sampler.py`, `parser.py`) — mirror-worthy  — ✅ sim.hpp done (parser++ pending)
 
 * The flow designer offered `LogNormal` (fields `mean`, `sigma`) but the parser
   never mapped it, so any flow using it raised "unknown distribution type".
