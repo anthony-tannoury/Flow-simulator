@@ -36,7 +36,7 @@ DISTRIBUTION_SPECS = {
     "Normal": [("mean", float, 0.0), ("std", float, 1.0)],
     "Exponential": [("mean", float, 1.0)],
     "Triangular": [("low", float, 0.0), ("mode", float, 0.5), ("high", float, 1.0)],
-    "LogNormal": [("mean", float, 0.0), ("sigma", float, 1.0)],
+    "LogNormal": [("mean", float, 1.0), ("sigma", float, 1.0)],   # mean & std of the values (mean > 0)
 }
 
 # A distribution parameter (or productivity / router probability) is either constant or a
@@ -413,6 +413,7 @@ class TaskNode(SimNode):
         self.create_property("independent_carriers", False)
         self.create_property("timeout", 1000000000.0)
         self.create_property("priority", 5)
+        self.create_property("admin", False)   # administrative task: reporting classification only
         self.create_property("collector_type", "NON_DISCRIMINATING_GREEDY")
 
     def to_clean_json(self) -> dict:
@@ -436,6 +437,7 @@ class TaskNode(SimNode):
             "independent_carriers": bool(self.get_property("independent_carriers")),
             "timeout": self.get_property("timeout"),  # number of minutes | "inf"
             "priority": as_int(self.get_property("priority"), 5),
+            "admin": bool(self.get_property("admin")),
             "collector_type": self.get_property("collector_type"),
             "bufs_in": connected_refs_from_port(self, "bufs_in", "input"),
             "bufs_out": get_output_refs(self, "bufs_out"),
@@ -479,6 +481,7 @@ class ResourceTaskNode(SimNode):
         self.create_property("independent_carriers", False)
         self.create_property("timeout", 1000000000.0)
         self.create_property("priority", 5)
+        self.create_property("admin", False)   # administrative task: reporting classification only
 
     def to_clean_json(self) -> dict:
         return {
@@ -507,6 +510,7 @@ class ResourceTaskNode(SimNode):
             "independent_carriers": bool(self.get_property("independent_carriers")),
             "timeout": self.get_property("timeout"),  # number of minutes | "inf"
             "priority": as_int(self.get_property("priority"), 5),
+            "admin": bool(self.get_property("admin")),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),
             "breakdowns": connected_refs_from_port(self, "breakdowns", "input"),
             "position": [self.x_pos(), self.y_pos()],
@@ -2268,8 +2272,12 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
     f.addWidget(QtWidgets.QLabel("Startup operators:")); acc["startup_operators"] = AlternativesWidget(operator_names, get_property_json(node, "startup_operators", [])); f.addWidget(acc["startup_operators"])
     tabs.append(("Operators", _scroll(t)))
 
-    # carriers
+    # carriers (also the general task-settings tab)
     t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
+    acc["admin"] = QtWidgets.QCheckBox(); acc["admin"].setChecked(bool(node.get_property("admin")))
+    acc["admin"].setToolTip("Administrative task (inspection, waiting, storage, ...). Does not change "
+                            "the simulation; the report aggregates admin vs productive tasks separately.")
+    f.addRow("Admin task", acc["admin"])
     acc["min_carriers"] = QtWidgets.QLineEdit(str(node.get_property("min_carriers"))); f.addRow("Min carriers", acc["min_carriers"])
     acc["max_capacity"] = QtWidgets.QLineEdit(str(node.get_property("max_capacity"))); f.addRow("Max capacity", acc["max_capacity"])
     acc["timeout"] = InfFloatWidget(node.get_property("timeout") if node.has_property("timeout") else "inf")
@@ -2329,6 +2337,7 @@ def _apply_carrier_common(node, acc):
     node.set_property("priority", as_int(acc["priority"].text(), 5))
     node.set_property("contiguous_carriers", acc["contiguous_carriers"].isChecked())
     node.set_property("independent_carriers", acc["independent_carriers"].isChecked())
+    node.set_property("admin", acc["admin"].isChecked())
     set_property_json(node, "policies", acc["policies"].get_value())
     set_property_json(node, "task_shifts", acc["task_shifts"].chosen())
 
@@ -4298,10 +4307,10 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         "Shutdowns": ["shutdown_type", "mode"],
         "Buffer": ["buffer_type"],
         "Task": ["operator_scope", "resource_scope", "min_carriers", "max_capacity",
-                 "contiguous_carriers", "independent_carriers", "timeout", "priority", "collector_type"],
+                 "contiguous_carriers", "independent_carriers", "timeout", "priority", "admin", "collector_type"],
         "ResourceTask": ["resource_scope", "operator_scope", "resource_collector_type",
                          "min_carriers", "max_capacity", "min_carrier_capacity", "max_carrier_capacity",
-                         "contiguous_carriers", "independent_carriers", "timeout", "priority"],
+                         "contiguous_carriers", "independent_carriers", "timeout", "priority", "admin"],
     }
 
     def apply_clean_json_to_node(self, node, node_data: dict):

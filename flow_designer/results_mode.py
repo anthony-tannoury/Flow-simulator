@@ -47,6 +47,7 @@ LABEL_OVERRIDES = {
     'pieces_sorties': 'Pièces sorties', 'objectif_total': 'Objectif total',
     'objectif_atteint': 'Objectif atteint', 'source_file': 'Fichier source',
     'temps_calcul': 'Temps de calcul',
+    'admin': 'Tâche administrative',
     'heures_machine': 'Heures machine',
     'heures_en_poste': 'Heures en poste', 'heures_hors_poste': 'Heures hors poste',
     'heures_main_oeuvre': "Heures main-d'\u0153uvre",
@@ -126,6 +127,7 @@ class ResultsData:
         self.operators = data.get('operators', {})
         self.flux = data.get('flux', {})
         self.flux_modeles = data.get('flux_modeles', [])
+        self.admin_summary = data.get('admin_summary', {})
         self.graphs = data.get('graphs', {})
 
     def node_ids(self) -> set:
@@ -183,6 +185,41 @@ def _make_table(columns: list, rows: list) -> QtWidgets.QTableWidget:
 
 def kv_table(pairs: list) -> QtWidgets.QTableWidget:
     return _make_table(["", ""], [(label, value) for label, value in pairs])
+
+
+# Admin-vs-productive roll-up (mirrors simulation.kpis ADMIN_* metadata).
+_ADMIN_LABELS = {
+    'nb_taches': 'Nombre de postes', 'temps_fonctionnement': 'Temps de fonctionnement',
+    'cycle_total': 'Temps de cycle total', 'heures_machine': 'Heures machine',
+    'heures_main_oeuvre': "Heures main-d'œuvre",
+}
+_ADMIN_DUREE = {'temps_fonctionnement', 'cycle_total', 'heures_machine', 'heures_main_oeuvre'}
+
+
+def admin_table(summary: dict) -> QtWidgets.QTableWidget:
+    """The administrative vs productive roll-up, one row per indicator."""
+    def value(metric, group):
+        v = summary.get(group, {}).get(metric, '')
+        if not isinstance(v, (int, float)):
+            return ''
+        if metric in _ADMIN_DUREE:
+            return fmt_duree(v)
+        return str(int(v)) if float(v).is_integer() else f"{v:g}"
+
+    def share(metric, group):
+        v = summary.get(group, {}).get(metric, '')
+        return fmt_pct(v) if isinstance(v, (int, float)) else ''
+
+    def ratio(metric):
+        v = summary.get('ratio_admin_sur_productif', {}).get(metric, '')
+        return f"{v:g}" if isinstance(v, (int, float)) else ''
+
+    cols = ["Indicateur", "Administratives", "Productives", "Total",
+            "Part admin", "Part productif", "Ratio admin / prod"]
+    rows = [[_ADMIN_LABELS.get(m, m), value(m, 'administratives'), value(m, 'productives'),
+             value(m, 'total'), share(m, 'part_administratives'), share(m, 'part_productives'),
+             ratio(m)] for m in summary.get('indicateurs', [])]
+    return _make_table(cols, rows)
 
 
 def dict_kv_pairs(data: dict, skip=()) -> list:
@@ -375,6 +412,9 @@ class ResultsDock(QtWidgets.QDockWidget):
                 [pretty_label(k) for k in keys],
                 [[fmt_value(k, row.get(k)) for k in keys] for row in results.flux_modeles]))
         tabs.addTab(flux_host, "Flux")
+
+        if results.admin_summary:
+            tabs.addTab(admin_table(results.admin_summary), "Admin")
 
         if results.operators:
             op_host = QtWidgets.QWidget()
