@@ -287,6 +287,7 @@ class Task(Component, HasShifts, ABC):
         self.requested_per_task_operators = False  # whether the PER_TASK crew is currently held
         self.labor_minutes = 0.0        # operator-minutes booked on this task, all crews
         self._task_crew_since = None    # claim start of the held PER_TASK crew
+        self._awaiting_carrier = None   # the pending carrier the process is parked on
         self.pending_carriers = CarrierTracker()
         self.active_carriers = CarrierTracker()
 
@@ -389,7 +390,26 @@ class Task(Component, HasShifts, ABC):
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
             self.all_carriers.append(new_carrier)
-            self.wait(new_carrier.loaded)
+            # While parked here waiting for the collector, a held PER_TASK crew
+            # must still hand off at its shift end: the operator shift manager
+            # wakes this task (activate breaks the wait), the crew is released,
+            # and the wait resumes until the carrier actually loads.
+            self._awaiting_carrier = new_carrier
+            while not new_carrier.loaded():
+                self.wait(new_carrier.loaded)
+                if (self.config.operator_scope is Scope.PER_TASK
+                        and self.requested_per_task_operators and not self.active_carriers
+                        and any(group.is_in_downtime() for group, _ in self.task_operators)):
+                    self.release_task_operators()
+            self._awaiting_carrier = None
+
+            # a crew handed off during the wait is re-acquired before dispatching
+            # (whichever group is on shift now); a failed request freezes as usual
+            if (self.config.operator_scope is Scope.PER_TASK and self.started_up
+                    and not self.is_frozen() and not self.requested_per_task_operators):
+                self.request_task_operators()
+                if self.is_frozen() and not self.skip_frozen_check:
+                    continue
 
             if len(self.pending_carriers) >= self.config.min_carriers:
                 dispatched = []

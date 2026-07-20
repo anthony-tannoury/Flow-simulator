@@ -324,6 +324,36 @@ the stopping criterion now drives which is built.
   working without this; it only matters for hand-edited files using the
   designer's sentence-case display forms.
 
+## 15. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
+
+* Bug fixed: a PER_TASK crew stayed claimed across its own shift end whenever
+  the task could not cycle its loop — parked on an empty carrier (starving for
+  pieces) or frozen after a `ConstrainedByShift` abort. The claim survived
+  `set_capacity(0)` for days (atelier: POOL_CIRE_SAM booked 115,800 of its
+  146,525 claimed operator-minutes outside its Saturday shifts, a 146.8%
+  occupation).
+* `Task` gains `_awaiting_carrier` (the pending carrier the process is parked
+  on). The plain `wait(new_carrier.loaded)` became an interruptible loop:
+  `while not loaded: wait(loaded)`, and on every wake it releases the crew if
+  it is held, no carrier is active and the crew's group is in downtime. After
+  the loop, a crew handed off during the wait is re-requested before
+  dispatching (whichever alternative is on shift now); a failed re-request
+  freezes as usual.
+* `OperatorShiftManager.on_leave` (after `set_capacity(0)`) wakes — via
+  `activate()`, which breaks the wait — every dependent task that has
+  `_awaiting_carrier` set, holds this group PER_TASK and `iswaiting()`, so the
+  hand-off happens AT the shift boundary instead of at the next piece arrival.
+* `PieceCarrier.abort` / `ResourceCarrier.abort`: between the carrier-tracker
+  removes and `self.cancel()`, when `active_carriers` just emptied, call
+  `task.release_task_operators()` — a freeze-abort must not keep the crew
+  reserved through the frozen wait. (Double release is harmless: the release
+  helper no-ops on an empty claim.)
+* Net effect: claimed operator-minutes for a PER_TASK crew now stop at the
+  earlier of its shift end and the task's freeze; `labor_minutes` (heures
+  main d'oeuvre) no longer books phantom out-of-shift supervision, and
+  off-shift "ghost work" disappears (atelier exits moved 2629 -> 2568; the
+  difference was work done by crews whose operators had gone home).
+
 ## Not needed in C++
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON

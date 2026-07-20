@@ -315,6 +315,11 @@ class PieceCarrier(Carrier):
 
         self.task.pending_carriers.remove(self)
         self.task.active_carriers.remove(self)
+        # the task is frozen (or aborting) at this point: a held PER_TASK crew
+        # must not stay reserved through the frozen wait, but only once no other
+        # carrier is still mid-run with it
+        if not self.task.active_carriers:
+            self.task.release_task_operators()
         self.cancel()
 
     @override
