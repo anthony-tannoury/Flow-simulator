@@ -59,10 +59,18 @@ with Clang (Linux/macOS) and MSVC (Windows).
     exactly, exit/scrap and every KPI column land within RNG-stream tolerance.
   - Not ported: `Piece.journal` and the matplotlib graphs stay in Python, so the
     `graphs` map in report.json is empty for a C++ run.
-- **M3 — distribution** ⬜ per-platform static builds via GitHub Actions, committed
-  into `engines/`.
-- **M4 — designer** ⬜ the Python/C++ engine picker + auto-select of the bundled
-  binary + a "select executable" fallback.
+- **M3 — distribution** 🔶 per-platform static builds via GitHub Actions
+  (`.github/workflows/build-engines.yml`), committed into `engines/`.
+  - The Linux binary is built, bundled and smoke-tested (`engines/flow_sim-linux-x86_64`).
+  - The workflow is written and valid — it builds Linux/macOS/Windows and commits
+    all three back into `engines/`. It only runs once GitHub Actions can execute on
+    the repository's account; until then, build macOS/Windows by hand with the one
+    commands in `engines/README.md`. A missing platform binary is harmless: the
+    designer falls back to Python (or the "select executable" button) for it.
+- **M4 — designer** ✅ the Python/C++ engine picker (Simulation → Engine), stored in
+  QSettings, auto-selects the bundled `engines/flow_sim-<platform>` binary, with a
+  "Select C++ executable" fallback and a graceful Python fallback when no native
+  engine is present for the host platform.
 
 A ByPiecesProduced flow whose goal is never reachable (every shift ends with the
 goal unmet and no `timeout`) runs until nothing is left to schedule — the same
