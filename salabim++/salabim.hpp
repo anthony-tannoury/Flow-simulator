@@ -1442,7 +1442,7 @@ class Component {
     Component& enter_in_front_of(Queue& q, Component& poscomponent);
     Component& enter_behind(Queue& q, Component& poscomponent);
     Component& leave();          // leave all (non-internal) queues
-    Component& leave(Queue& q);
+    virtual Component& leave(Queue& q);  // virtual so Piece can stamp its journal on buffer exit
     long long count(const Queue* q = nullptr) const; // membership count
     long long index(const Queue& q) const;
     double enter_time(const Queue& q) const;

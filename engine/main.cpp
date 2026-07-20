@@ -197,6 +197,92 @@ int main(int argc, char** argv) {
         std::ofstream(out_dir / "report.json") << report.dump(1);
         std::ofstream(out_dir / "flow.json") << flow_text;  // byte copy of the flow that ran
 
+        // graph_data.json: raw monitor time-series + finished-piece journals + the
+        // generator's production tallies. The Python renderer (simulation/render_from_data.py)
+        // turns this into graphes/ PNGs and fills report.json's graphs map — all the
+        // matplotlib/presentation logic stays in one place (Python).
+        {
+            const double off = e.offset_raw_();  // t_raw is raw env time; display = raw - offset
+            auto series = [&](sim::Monitor& m) {
+                kpis::ojson t = kpis::ojson::array(), v = kpis::ojson::array();
+                const auto& tr = m.t_raw(); const auto& xr = m.x_raw();
+                for (size_t i = 0; i < tr.size(); ++i) { t.push_back(tr[i] - off); v.push_back(xr[i]); }
+                return kpis::ojson{{"t", t}, {"v", v}};
+            };
+            kpis::ojson gd;
+            gd["sim_start"] = p.data.value("start_date", "");
+
+            kpis::ojson jt = kpis::ojson::array();
+            for (const std::string& id : p.task_order) {
+                Task* t = p.tasks.at(id);
+                kpis::ojson row = series(t->vacant_slots->claimed_quantity);
+                row["id"] = id; row["name"] = t->name();
+                double cap = t->config->max_capacity;
+                row["capacity"] = std::isinf(cap) ? kpis::ojson(nullptr) : kpis::ojson(cap);
+                jt.push_back(row);
+            }
+            gd["tasks"] = jt;
+
+            kpis::ojson jb = kpis::ojson::array(), fps = kpis::ojson::array();
+            for (const auto& [id, o] : p.outlets) {
+                auto* b = dynamic_cast<Buffer*>(o);
+                if (!b) continue;
+                kpis::ojson row = series(b->length);
+                row["id"] = id; row["name"] = b->name();
+                row["type"] = b->buffer_type == BufferType::EXIT ? "EXIT"
+                            : b->buffer_type == BufferType::SCRAP ? "SCRAP" : "PASSAGE";
+                jb.push_back(row);
+                if (b->buffer_type == BufferType::EXIT || b->buffer_type == BufferType::SCRAP)
+                    for (sim::Component* c : *b) {
+                        auto* piece = static_cast<Piece*>(c);
+                        kpis::ojson jj = kpis::ojson::array();
+                        for (auto& je : piece->journal)
+                            jj.push_back(kpis::ojson::array({je.kind, je.name, je.t}));
+                        fps.push_back(kpis::ojson{{"buffer_id", id}, {"model", piece->model->name},
+                                                  {"journal", jj}});
+                    }
+            }
+            gd["buffers"] = jb;
+            gd["finished_pieces"] = fps;
+
+            kpis::ojson jo = kpis::ojson::array();
+            for (const auto& [id, g] : p.operator_groups) {
+                kpis::ojson row = series(g->available_quantity);
+                row["id"] = id; row["name"] = g->name(); row["n_operators"] = g->n_operators;
+                jo.push_back(row);
+            }
+            gd["operators"] = jo;
+
+            kpis::ojson jr = kpis::ojson::array();
+            for (const auto& [id, r] : p.resources) {
+                kpis::ojson row = series(r->available_quantity);
+                row["id"] = id; row["name"] = r->name();
+                jr.push_back(row);
+            }
+            gd["resources"] = jr;
+
+            gd["wip"] = kpis_state::WIP ? series(*kpis_state::WIP)
+                                        : kpis::ojson{{"t", kpis::ojson::array()}, {"v", kpis::ojson::array()}};
+
+            kpis::ojson gen;
+            if (p.piece_generator) {
+                kpis::ojson names = kpis::ojson::array(), gener = kpis::ojson::array();
+                for (Model* m : p.piece_generator->models) names.push_back(m->name);
+                for (int x : p.piece_generator->total_generated) gener.push_back(x);
+                gen["models"] = names;
+                gen["total_generated"] = gener;
+                if (auto* gg = dynamic_cast<GoalPieceGenerator*>(p.piece_generator)) {
+                    kpis::ojson goals = kpis::ojson::array();
+                    for (int gval : gg->goals) goals.push_back(gval);
+                    gen["goals"] = goals;
+                } else {
+                    gen["goals"] = nullptr;
+                }
+            }
+            gd["generator"] = gen;
+            std::ofstream(out_dir / "graph_data.json") << gd.dump();
+        }
+
         json done = snapshot();
         done["report_dir"] = out_dir.string();
         emit("DONE", done);

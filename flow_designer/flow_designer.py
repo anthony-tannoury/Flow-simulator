@@ -2707,6 +2707,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
         self._update_elapsed()
         self.cancel_btn.setText("Close")
         if exit_code == 0 and self._report_dir:
+            self._render_cpp_graphs_if_needed()
             self.status_lbl.setText(f"{self._outcome_line()}\nReport written to:\n{self._report_dir}")
             self.open_report_btn.setVisible(True)
             self.view_results_btn.setVisible(
@@ -2718,6 +2719,30 @@ class RunSimulationDialog(QtWidgets.QDialog):
             self.status_lbl.setText(f"Simulation failed (exit code {exit_code}).\n{tail}")
         else:
             self.status_lbl.setText(self._outcome_line())
+
+    def _render_cpp_graphs_if_needed(self):
+        """The native engine writes graph_data.json instead of drawing anything;
+        turn it into the graphes/ PNGs and fill report.json's graphs map with the
+        shared Python renderer, so results mode shows the same graphs a Python run
+        would. No-op for the Python engine (it draws its own) or if the data is
+        absent. A render failure is non-fatal — the report and KPIs are unaffected."""
+        if not self._cpp_exe or not self._report_dir:
+            return
+        if not os.path.isfile(os.path.join(self._report_dir, "graph_data.json")):
+            return
+        self.status_lbl.setText("Generating graphs...")
+        QtWidgets.QApplication.processEvents()
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        proc = QtCore.QProcess(self)
+        proc.setWorkingDirectory(repo_root)
+        env = QtCore.QProcessEnvironment.systemEnvironment()
+        env.insert("MPLBACKEND", "Agg")
+        proc.setProcessEnvironment(env)
+        proc.start(sys.executable, ["-m", "simulation.render_from_data", self._report_dir])
+        if not proc.waitForFinished(120000) or proc.exitCode() != 0:
+            self._stderr_tail.extend(
+                bytes(proc.readAllStandardError()).decode("utf-8", errors="replace").splitlines())
+            self._stderr_tail = self._stderr_tail[-30:]
 
     # --- UI helpers ---
 

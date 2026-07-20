@@ -87,8 +87,12 @@ report.json. Verified vs Python (seed 0) on sample_flow @60000: every column
 lands within statistical equivalence — e.g. Paint Line produites 932 vs 918,
 TRS 0.937 vs 0.931; Weld heures_machine 183 vs 191.
 
-STILL PENDING: `Piece.journal` (§5) is graph-only (graphs stay in Python; the
-C++ engine emits no PNGs, so report.json's `graphs` map is empty).
+DONE (§5): `Piece.journal` is now ported (buffer in/out via a virtual
+`Piece::leave`, task stamp in `PieceCarrier::successfully_end_process`). The
+engine writes `graph_data.json` (monitor series + finished-piece journals +
+production tallies); `simulation/render_from_data.py` feeds it to the unchanged
+`graphs.py` and fills report.json's `graphs` map, so a C++ run shows the same
+figures — trajectories and production histogram included — as a Python run.
 
 
 New module `simulation/kpis.py`: post-run collectors + CSV writer

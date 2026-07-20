@@ -582,6 +582,8 @@ class Piece : public sim::Component {  // data component (no process)
   public:
     Model* model;
     std::string id;
+    struct JournalEntry { std::string kind, name; double t; };  // 'in' | 'out' | 'task'
+    std::vector<JournalEntry> journal;  // §5: buffer in/out + task stamps, for trajectory graphs
 
     explicit Piece(Model* model_) : model(model_) {
         char buf[8];
@@ -592,6 +594,12 @@ class Piece : public sim::Component {  // data component (no process)
     }
 
     void enter(Buffer& q);  // defined after Buffer (trigger + scrap-return + base enter)
+
+    using sim::Component::leave;
+    // §5: mirror Python Piece.leave — stamp 'out' whenever the piece leaves a Buffer.
+    // leave(Queue&) is virtual in salabim++, and both removal paths (explicit
+    // piece->leave(buffer) and from_store) route through it. Defined after Buffer.
+    sim::Component& leave(sim::Queue& q) override;
 };
 
 class PickyPieceTaker {
@@ -792,7 +800,14 @@ inline void Piece::enter(Buffer& q) {
     }
     if (q.buffer_type == BufferType::EXIT || q.buffer_type == BufferType::SCRAP)  // §4 WIP -1
         if (kpis_state::WIP) kpis_state::WIP->tally(--kpis_state::wip_level);
+    journal.push_back({"in", q.name(), env->now()});  // §5
     sim::Component::enter(q);
+}
+
+inline sim::Component& Piece::leave(sim::Queue& q) {
+    if (auto* b = dynamic_cast<Buffer*>(&q))
+        journal.push_back({"out", b->name(), env->now()});
+    return sim::Component::leave(q);
 }
 
 inline void check_outlet_validity(const PickyPieceTaker& giver, const std::vector<Outlet*>& outlets) {
@@ -2705,6 +2720,8 @@ inline sim::Process PieceCarrier::successfully_end_process() {
     auto& pieces = piece_collector->collected_pieces;
     task->batch_sizes.tally(static_cast<double>(pieces.size()));            // §4
     task->cycle_times.tally(env->now() - creation_time());                 // §4
+    for (Piece* piece : pieces)                                            // §5: trajectory stamp
+        piece->journal.push_back({"task", task->name(), env->now()});
     place(pieces, ptask_()->outlets);
     for (Piece* piece : pieces) {                                          // §4
         ptask_()->deposited[piece->model] += 1;

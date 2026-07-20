@@ -57,8 +57,13 @@ with Clang (Linux/macOS) and MSVC (Windows).
   - Verified statistically equivalent to the Python engine (seed 0) on
     `sample_flow`, `sample_flow_rate` and `atelier_injection`: `generated` matches
     exactly, exit/scrap and every KPI column land within RNG-stream tolerance.
-  - Not ported: `Piece.journal` and the matplotlib graphs stay in Python, so the
-    `graphs` map in report.json is empty for a C++ run.
+  - Graphs: the engine writes a `graph_data.json` (raw monitor time-series +
+    per-piece journals + production tallies) instead of drawing. The designer then
+    runs `python -m simulation.render_from_data <run>` after a C++ run, which feeds
+    that data to the unchanged `simulation/graphs.py` and fills report.json's
+    `graphs` map — so results mode shows the same figures (occupation, buffers,
+    WIP, waiting, operator/resource availability, model trajectories, production)
+    a Python run would. The matplotlib/naming logic lives in one place (Python).
 - **M3 — distribution** ✅ per-platform static builds via GitHub Actions
   (`.github/workflows/build-engines.yml`), committed into `engines/`.
   - CI builds all three on GitHub-hosted runners — Linux (Clang, static libstdc++),
