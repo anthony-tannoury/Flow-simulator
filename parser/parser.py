@@ -277,7 +277,8 @@ class Parser:
             piece_generator=self.piece_generator,
             run_info=run_info,
             sim_start=self.sim_start,
-            operator_groups=list(self.operator_groups.values())
+            operator_groups=list(self.operator_groups.values()),
+            resources=list(self.resources.values())
         )
         graphs.write_graphs(
             os.path.join(directory, 'graphes'),
@@ -338,6 +339,7 @@ class Parser:
             'buffers': {id_: kpis.buffer_kpis(b) for id_, b in self.outlets.items()
                         if isinstance(b, Buffer)},
             'operators': {id_: kpis.operator_kpis(g) for id_, g in self.operator_groups.items()},
+            'resources': {id_: kpis.resource_kpis(r) for id_, r in self.resources.items()},
             'flux': flux,
             'flux_modeles': flux_modeles,
             'graphs': {

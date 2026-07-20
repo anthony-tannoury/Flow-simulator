@@ -133,6 +133,8 @@ int main(int argc, char** argv) {
         std::vector<OperatorGroup*> op_groups;
         for (auto& [id, g] : p.operator_groups) op_groups.push_back(g);
         std::vector<Buffer*> buffers = p.buffer_list();
+        std::vector<sim::Resource*> resources_list;
+        for (auto& [id, r] : p.resources) resources_list.push_back(r);
 
         const json& crit = p.data.at("stopping_criterion");
         int exit_pieces = static_cast<int>(exit_buffer ? exit_buffer->size() : 0);
@@ -143,7 +145,7 @@ int main(int argc, char** argv) {
         run_info["debut"] = p.data.value("start_date", "");
         run_info["critere_arret"] = crit.value("type", "");
         kpis::write_report(out_dir, tasks_ordered, buffers, p.piece_generator, op_groups, run_info,
-                           p.sim_start);
+                           p.sim_start, resources_list);
 
         // report.json: the raw (unformatted) KPI dicts keyed by node id, plus a run
         // block — everything the designer's results mode reads (mirror of
@@ -169,6 +171,8 @@ int main(int argc, char** argv) {
         for (const auto& [id, o] : p.outlets)
             if (auto* b = dynamic_cast<Buffer*>(o)) buffers_j[id] = kpis::buffer_kpis(b);
         for (const auto& [id, g] : p.operator_groups) ops_j[id] = kpis::operator_kpis(g);
+        kpis::ojson resources_j = kpis::ojson::object();
+        for (const auto& [id, r] : p.resources) resources_j[id] = kpis::resource_kpis(r);
         auto [flux, flux_modeles] = kpis::flow_kpis(buffers, p.piece_generator);
 
         kpis::ojson report;
@@ -191,6 +195,7 @@ int main(int argc, char** argv) {
         report["tasks_models"] = tasks_models_j;
         report["buffers"] = buffers_j;
         report["operators"] = ops_j;
+        report["resources"] = resources_j;
         report["flux"] = flux;
         report["flux_modeles"] = flux_modeles;
         report["graphs"] = kpis::ojson::object();  // C++ engine produces no graphs

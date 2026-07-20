@@ -378,6 +378,36 @@ inline ojson operator_kpis(OperatorGroup* g) {
     return r;
 }
 
+// Per-resource stock metrics from the available_quantity ("stock") monitor:
+// consommation = total downward movement, entrées = total upward movement
+// (restocks for a restockable input, output for a resource a task produces),
+// rupture = a fall to an empty stock. Mirrors kpis.resource_kpis.
+inline ojson resource_kpis(sim::Resource* res) {
+    double tt = env->now();
+    sim::Monitor& stock = res->available_quantity;
+    const std::vector<double>& v = stock.x_raw();
+    double consommation = 0.0, entrees = 0.0;
+    int ruptures = 0;
+    for (size_t i = 1; i < v.size(); ++i) {
+        double delta = v[i] - v[i - 1];
+        if (delta < 0) consommation -= delta; else entrees += delta;
+        if (v[i] == 0.0 && v[i - 1] > 0.0) ++ruptures;
+    }
+    ojson r;
+    r["ressource"] = res->name();
+    r["capacite"] = res->capacity();
+    r["stock_moyen"] = roundn(stock.mean(), 3);
+    r["stock_min"] = roundn(stock.minimum(), 3);
+    r["stock_max"] = roundn(stock.maximum(), 3);
+    r["stock_final"] = roundn(res->available_quantity(), 3);
+    r["consommation_totale"] = roundn(consommation, 3);
+    r["entrees_totales"] = roundn(entrees, 3);
+    r["consommation_j"] = tt ? ojson(roundn(consommation / tt * 1440, 3)) : blank();
+    r["nb_ruptures"] = ruptures;
+    r["temps_rupture"] = roundn(stock.value_duration(0.0), 3);
+    return r;
+}
+
 // --- flow / lead-time -------------------------------------------------------
 inline ojson lead_stats(std::vector<double> leads) {
     std::sort(leads.begin(), leads.end());
@@ -572,7 +602,8 @@ inline const std::set<std::string>& duree_cols() {
         "attente_vague", "temps_collecte", "temps_chargement", "temps_traitement", "heures_machine",
         "heures_main_oeuvre", "heures_en_poste", "heures_hors_poste", "sejour_moyen", "sejour_max",
         "temps_moyen_entre_arrivees", "temps_poste", "traversee_moyenne", "traversee_mediane",
-        "traversee_p90", "traversee_max", "temps_traversee", "tc_ideal", "duree_simulee"};
+        "traversee_p90", "traversee_max", "temps_traversee", "tc_ideal", "duree_simulee",
+        "temps_rupture"};
     return s;
 }
 inline const std::set<std::string>& pct_cols() {
@@ -649,7 +680,8 @@ inline void write_kv_csv(const fs::path& path, const ojson& obj,
 inline void write_report(const fs::path& dir, const std::vector<Task*>& tasks,
                          const std::vector<Buffer*>& buffers, PieceGenerator* gen,
                          const std::vector<OperatorGroup*>& operator_groups, ojson run_info,
-                         const ShiftManager::DateTime& sim_start) {
+                         const ShiftManager::DateTime& sim_start,
+                         const std::vector<sim::Resource*>& resources = {}) {
     fs::create_directories(dir);
 
     ojson run;
@@ -677,6 +709,10 @@ inline void write_report(const fs::path& dir, const std::vector<Task*>& tasks,
     std::vector<ojson> op_rows;
     for (OperatorGroup* g : operator_groups) op_rows.push_back(operator_kpis(g));
     write_csv(dir / "operateurs.csv", op_rows, sim_start);
+
+    std::vector<ojson> res_rows;
+    for (sim::Resource* r : resources) res_rows.push_back(resource_kpis(r));
+    write_csv(dir / "ressources.csv", res_rows, sim_start);
 
     auto [flux, flux_modeles] = flow_kpis(buffers, gen);
     write_kv_csv(dir / "flux.csv", flux, sim_start);
