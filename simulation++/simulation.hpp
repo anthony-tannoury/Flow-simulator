@@ -72,6 +72,14 @@ inline int piece_generators = 0;  // PieceGenerator.COUNT
 inline int exit_buffers = 0;      // Buffer.EXIT_BUFFERS
 }  // namespace counters
 
+// Global work-in-progress level monitor (kpis.WIP): +1 when a piece is born,
+// -1 when it reaches an EXIT or SCRAP buffer. A level Monitor integrates the
+// running level over time (mean/maximum); wip_level is the current level.
+namespace kpis_state {
+inline sim::Monitor* WIP = nullptr;
+inline int wip_level = 0;
+}  // namespace kpis_state
+
 // Create a fresh environment + reset all module state (Python: import time).
 inline sim::Environment& init(long long seed = 0, bool trace = false) {
     delete env;
@@ -80,6 +88,8 @@ inline sim::Environment& init(long long seed = 0, bool trace = false) {
     counters::piece_id = 0;
     counters::piece_generators = 0;
     counters::exit_buffers = 0;
+    kpis_state::WIP = new sim::Monitor("wip", sim::MonitorOpts{.level = true});
+    kpis_state::wip_level = 0;
     return *env;
 }
 
@@ -578,6 +588,7 @@ class Piece : public sim::Component {  // data component (no process)
         std::snprintf(buf, sizeof buf, "%06d", counters::piece_id);
         id = buf;
         counters::piece_id += 1;
+        if (kpis_state::WIP) kpis_state::WIP->tally(++kpis_state::wip_level);  // §4 WIP +1
     }
 
     void enter(Buffer& q);  // defined after Buffer (trigger + scrap-return + base enter)
@@ -779,6 +790,8 @@ inline void Piece::enter(Buffer& q) {
         q.piece_generator->generated[it - models.begin()] -= 1;
         q.piece_generator->trigger.trigger();  // §13: wake a generator sleeping between remakes
     }
+    if (q.buffer_type == BufferType::EXIT || q.buffer_type == BufferType::SCRAP)  // §4 WIP -1
+        if (kpis_state::WIP) kpis_state::WIP->tally(--kpis_state::wip_level);
     sim::Component::enter(q);
 }
 
@@ -1095,7 +1108,7 @@ class RestockableResource : public Resource {
     sim::Process restock(Component* demander) {
         if (!active_order && available_quantity() < threshold) {
             active_order = true;
-            co_await demander->hold(order_duration->sample_now());
+            co_await demander->hold(order_duration->sample_now(), {.mode = "wait_materials"});  // §4
             sim::make<Delivery>({}, this, delivery_duration);
         }
     }
@@ -1175,15 +1188,17 @@ class Alternative {
         }
 
         if (alternatives.size() == 1) {
-            co_await demander->call(
-                demander->request(reqspecs_(alternatives[0]), {.fail_at = fail_at, .cap_now = cap_now}));
+            co_await demander->call(demander->request(
+                reqspecs_(alternatives[0]),
+                {.fail_at = fail_at, .mode = "wait_operators", .cap_now = cap_now}));  // §4
             *out = demander->failed() ? std::nullopt : std::optional<OpsList>(alternatives[0]);
             co_return;
         }
 
         while (true) {
             for (const auto& alt : alternatives) {
-                co_await demander->call(demander->request(reqspecs_(alt), {.fail_delay = 0}));
+                co_await demander->call(
+                    demander->request(reqspecs_(alt), {.fail_delay = 0, .mode = "wait_operators"}));  // §4
                 if (!demander->failed()) {
                     *out = alt;
                     co_return;
@@ -1192,8 +1207,8 @@ class Alternative {
 
             std::vector<sim::WaitSpec> specs;
             for (auto* t : triggers) specs.push_back(sim::WaitSpec(*t));
-            co_await demander->sim::Component::wait(std::move(specs),
-                                                    {.fail_at = fail_at, .cap_now = cap_now});
+            co_await demander->sim::Component::wait(
+                std::move(specs), {.fail_at = fail_at, .mode = "wait_operators", .cap_now = cap_now});  // §4
             if (demander->failed()) {
                 *out = std::nullopt;
                 co_return;
@@ -1519,7 +1534,8 @@ class Carrier : public Component, public Dispatchable, public Donnable {
     sim::Process handle_operators(const Alternative::OpsList& operators, double ideal_duration,
                                   double* out);
     sim::Process handle_batch_operators(Alternative& operators, double earliest_deadline,
-                                        double ideal_duration, double fail_before, bool do_restock);
+                                        double ideal_duration, double fail_before, bool do_restock,
+                                        const char* work_mode);  // §4: "loading" / "processing"
     sim::Process handle_task_operators(double earliest_deadline, double ideal_duration);
 
     sim::Process process() override;
@@ -1873,7 +1889,7 @@ inline double Carrier::operator_fit_deadline(const Alternative::OpsList& operato
 
 inline sim::Process Carrier::handle_batch_operators(Alternative& operators, double earliest_deadline,
                                                     double ideal_duration, double fail_before,
-                                                    bool do_restock) {
+                                                    bool do_restock, const char* work_mode) {
     std::optional<Alternative::OpsList> recuperated;
     co_await call(operators.request(this, &recuperated, earliest_deadline - fail_before, true));
     co_await call(freeze_abort_if(failed()));
@@ -1893,7 +1909,7 @@ inline sim::Process Carrier::handle_batch_operators(Alternative& operators, doub
         co_await call(check_shift_fit(*recuperated, duration));  // §17: re-check after materials
     }
 
-    co_await hold(duration);
+    co_await hold(duration, {.mode = work_mode});  // §4: "loading" / "processing"
     double booked = 0;  // §12: operator-minutes booked by this batch crew
     for (const auto& [g, c] : *recuperated) booked += c;
     task->labor_minutes += booked * duration;
@@ -1907,7 +1923,7 @@ inline sim::Process Carrier::handle_task_operators(double earliest_deadline, dou
     double fit = std::min(earliest_deadline, operator_fit_deadline(task->task_operators));
     co_await call(request_resources(fit - duration));               // §17: tighten by the crew deadline
     co_await call(check_shift_fit(task->task_operators, duration));  // §17: re-check after materials
-    co_await hold(duration);
+    co_await hold(duration, {.mode = "processing"});                // §4
 }
 
 inline sim::Process Carrier::process() {
@@ -1935,16 +1951,17 @@ inline sim::Process Carrier::process() {
 
     co_await call(freeze_abort_if(env->now() > earliest_deadline - (ideal_duration + ideal_loading_duration)));
     co_await wait(allow_dispatch,
-                  {.fail_at = earliest_deadline - (ideal_duration + ideal_loading_duration), .cap_now = true});
+                  {.fail_at = earliest_deadline - (ideal_duration + ideal_loading_duration),
+                   .mode = "wait_dispatch", .cap_now = true});  // §4
     co_await call(freeze_abort_if(failed()));
 
     bool delegate_restock_to_loading = !static_cast<bool>(task->config->operators);
     co_await call(handle_batch_operators(task->config->loading_operators, earliest_deadline,
                                          ideal_loading_duration, ideal_duration + ideal_loading_duration,
-                                         delegate_restock_to_loading));
+                                         delegate_restock_to_loading, "loading"));
     if (task->config->operator_scope == Scope::PER_BATCH) {
         co_await call(handle_batch_operators(task->config->operators, earliest_deadline, ideal_duration,
-                                             ideal_duration, !delegate_restock_to_loading));
+                                             ideal_duration, !delegate_restock_to_loading, "processing"));
     } else {
         co_await call(handle_task_operators(earliest_deadline, ideal_duration));
     }
@@ -2306,8 +2323,9 @@ inline Model* PieceCollector::get_focus_model(const std::vector<Model*>& present
 inline sim::Process PieceCollector::collect_until(double deadline, int target, PieceFilter piece_filter,
                                                   bool* timed_out) {
     while (static_cast<int>(collected_pieces.size()) < target) {
-        co_await call(request({{vacant_slots(), 1}},
-                              {.fail_at = deadline, .request_priority = task->request_priority}));
+        co_await call(request({{vacant_slots(), 1}}, {.fail_at = deadline,
+                                                      .mode = "wait_slot",
+                                                      .request_priority = task->request_priority}));  // §4
         if (failed()) {
             *timed_out = true;
             co_return;
@@ -2329,7 +2347,8 @@ inline sim::Process PieceCollector::collect_until(double deadline, int target, P
 
 inline sim::Process PieceCollector::ensure_one() {
     if (collected_pieces.empty()) {
-        co_await call(request({{vacant_slots(), 1}}, {.request_priority = task->request_priority}));
+        co_await call(request({{vacant_slots(), 1}},
+                              {.mode = "wait_slot", .request_priority = task->request_priority}));  // §4
         Piece* piece = nullptr;
         co_await call(pick_piece([this](Piece* p) { return task->can_take(p); },
                                  {.request_priority = task->request_priority}, &piece));
@@ -2346,7 +2365,8 @@ inline sim::Process PieceCollector::top_up(int limit, PieceFilter piece_filter) 
                                  {.fail_delay = 0, .request_priority = task->request_priority}, &piece));
         if (failed()) break;
 
-        co_await call(request({{vacant_slots(), 1}}, {.request_priority = task->request_priority}));
+        co_await call(request({{vacant_slots(), 1}},
+                              {.mode = "wait_slot", .request_priority = task->request_priority}));  // §4
         collected_pieces.push_back(piece);
         task->pieces_in += 1;  // §4
     }
@@ -2356,7 +2376,7 @@ inline sim::Process PieceCollector::block_remainder(int max_carrier_capacity) {
     if (!cfg().contiguous_carriers) {
         int remainder = max_carrier_capacity - static_cast<int>(collected_pieces.size());
         co_await call(request({{vacant_slots(), double(remainder)}},
-                              {.request_priority = task->request_priority}));
+                              {.mode = "wait_slot", .request_priority = task->request_priority}));  // §4
     }
 }
 
@@ -2364,7 +2384,8 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
                                                   int max_carrier_capacity, PieceFilter piece_filter,
                                                   bool* timed_out) {
     co_await call(request({{vacant_slots(), double(min_carrier_capacity)}},
-                          {.fail_at = deadline, .request_priority = task->request_priority}));
+                          {.fail_at = deadline, .mode = "wait_slot",
+                           .request_priority = task->request_priority}));  // §4
     if (failed()) {
         *timed_out = true;
         co_return;
@@ -2400,7 +2421,8 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
             int additional = static_cast<int>(valid_pieces.size()) - min_carrier_capacity;
             if (additional > 0) {
                 co_await call(request({{vacant_slots(), double(additional)}},
-                                      {.fail_delay = 0, .request_priority = task->request_priority}));
+                                      {.fail_delay = 0, .mode = "wait_slot",
+                                       .request_priority = task->request_priority}));  // §4
                 if (failed()) {
                     additional = 0;
                     valid_pieces.resize(min_carrier_capacity);
@@ -2431,12 +2453,12 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
                 co_await call(
                     request({{vacant_slots(), double(max_carrier_capacity -
                                                      static_cast<int>(valid_pieces.size()))}},
-                            {.request_priority = task->request_priority}));
+                            {.mode = "wait_slot", .request_priority = task->request_priority}));  // §4
             }
         } else {
             std::vector<sim::WaitSpec> specs;
             for (Buffer* inlet : task->inlets) specs.push_back(sim::WaitSpec(inlet->trigger));
-            co_await sim::Component::wait(std::move(specs), {.fail_at = deadline});
+            co_await sim::Component::wait(std::move(specs), {.fail_at = deadline, .mode = "wait_pieces"});  // §4
             if (failed()) {
                 release({{vacant_slots(), double(min_carrier_capacity)}});
                 *timed_out = true;
@@ -2487,6 +2509,7 @@ inline sim::Process NonDiscriminatingGreedyPieceCollector::process() {
     }
 
     co_await call(block_remainder(model_config.max_carrier_capacity));
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2526,6 +2549,7 @@ inline sim::Process DiscriminatingGreedyPieceCollector::process() {
     }
 
     co_await call(block_remainder(model_config.max_carrier_capacity));
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2542,6 +2566,7 @@ inline sim::Process NonDiscriminatingAltruisticPieceCollector::process() {
                                 [this](Piece* p) { return task->can_take(p); }, &timed_out));
     if (timed_out) co_await call(ensure_one());
 
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2562,7 +2587,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
 
         std::vector<sim::WaitSpec> specs;
         for (Buffer* inlet : task->inlets) specs.push_back(sim::WaitSpec(inlet->trigger));
-        co_await sim::Component::wait(std::move(specs), {.fail_at = deadline});
+        co_await sim::Component::wait(std::move(specs), {.fail_at = deadline, .mode = "wait_pieces"});  // §4
         if (failed()) {
             timed_out = true;
             break;
@@ -2582,6 +2607,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
 
     if (timed_out) co_await call(ensure_one());
 
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2614,9 +2640,11 @@ inline sim::Process PieceCarrier::handle_restock() {
 
 inline void PieceCarrier::abort_to(const std::vector<Outlet*>& outlets) {
     place(piece_collector->collected_pieces, outlets);
+    piece_collector->set_mode("");  // §4: stop accruing the last mode on abort
     piece_collector->done.set(true);
     piece_collector->cancel();
 
+    set_mode("");  // §4
     loaded.set(true);
     done.set(true);
 
@@ -2644,7 +2672,7 @@ inline sim::Process PieceCarrier::freeze_abort_if(bool condition) {
 
 inline sim::Process PieceCarrier::wait_for_collector(double fail_at) {
     piece_collector->allow_dispatch.set(true);
-    co_await wait(piece_collector->done, {.fail_at = fail_at});
+    co_await wait(piece_collector->done, {.fail_at = fail_at, .mode = "collecting"});  // §4
 }
 
 inline double PieceCarrier::get_ideal_loading_duration() {
@@ -2665,11 +2693,13 @@ inline sim::Process PieceCarrier::request_resources(double fail_at) {
     std::vector<sim::ReqSpec> resources;
     for (const auto& [r, q] : ptask_()->pconfig()->get_model_config(model).resources)
         resources.push_back(sim::ReqSpec(*r, q * mult));
-    co_await call(request(std::move(resources), {.fail_at = fail_at, .cap_now = true}));
+    co_await call(request(std::move(resources),
+                          {.fail_at = fail_at, .mode = "wait_materials", .cap_now = true}));  // §4
     co_await call(freeze_abort_if(failed()));
 }
 
 inline sim::Process PieceCarrier::successfully_end_process() {
+    set_mode("");  // §4: stop the last work mode accruing to now
     piece_collector->cancel();
 
     auto& pieces = piece_collector->collected_pieces;
@@ -2909,6 +2939,7 @@ inline sim::Process GreedyResourceCollector::process() {
         co_await call(top_up());
     }
 
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2942,6 +2973,7 @@ inline sim::Process AltruisticResourceCollector::process() {
         co_await call(top_up());
     }
 
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2975,9 +3007,11 @@ inline void ResourceCarrier::abort() {
         if (transformed[i].salvageable)
             transformed[i].resource->replenish_nb(this, resource_collector->requested_quantities[i]);
 
+    resource_collector->set_mode("");  // §4
     resource_collector->done.set(true);
     resource_collector->cancel();
 
+    set_mode("");  // §4
     loaded.set(true);
     done.set(true);
 
@@ -3005,7 +3039,7 @@ inline sim::Process ResourceCarrier::wait_for_collector(double fail_at) {
     }
 
     resource_collector->allow_dispatch.set(true);
-    co_await wait(resource_collector->done, {.fail_at = fail_at, .cap_now = true});
+    co_await wait(resource_collector->done, {.fail_at = fail_at, .mode = "collecting", .cap_now = true});  // §4
 }
 
 inline double ResourceCarrier::get_ideal_loading_duration() {
@@ -3023,11 +3057,13 @@ inline sim::Process ResourceCarrier::request_resources(double fail_at) {
     std::vector<sim::ReqSpec> resources;
     for (const auto& [r, q] : rtask_()->rconfig()->non_transformed_resources)
         resources.push_back(sim::ReqSpec(*r, q * mult));
-    co_await call(request(std::move(resources), {.fail_at = fail_at, .cap_now = true}));
+    co_await call(request(std::move(resources),
+                          {.fail_at = fail_at, .mode = "wait_materials", .cap_now = true}));  // §4
     co_await call(freeze_abort_if(failed()));
 }
 
 inline sim::Process ResourceCarrier::successfully_end_process() {
+    set_mode("");  // §4: stop the last work mode accruing to now
     for (const auto& [resource_out, distr] : rtask_()->rconfig()->resources_out_distr)
         co_await call(resource_out->replenish(this, distr.sample() * resource_collector->requested_quantity));
 

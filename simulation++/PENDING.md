@@ -68,15 +68,19 @@ sim.hpp so far has the mode-INDEPENDENT tallies: Task `batch_sizes` / `cycle_tim
 take), PieceTask `deposited` / `scrapped` (SCRAP detected via `piece->queues()`),
 tallied in `PieceCarrier::successfully_end_process` and `TaskStarter`.
 
-STILL PENDING (fold into kpis++): the per-carrier mode tags on the sim's holds /
-requests / waits, `union_mode_duration`, the global WIP level monitor, and
-`Piece.journal`. GROUNDWORK DONE: salabim++ Component now keeps a mode-over-time
-timeline — `set_mode` appends `{now, mode}` and `mode_log()` exposes it, so kpis++
-can reconstruct intervals like Python's `mode.xt()` (each entry runs to the next,
-the last to now) for `mode_total` / `union_mode_duration`. What remains is tagging
-the sim's interaction points (loading / processing / wait_operators / wait_materials
-/ wait_dispatch / wait_pieces / wait_slot / collecting) so the timeline carries the
-KPI modes, then reading them in kpis++.
+SIM SIDE DONE: the mode tags are on the sim's holds / requests / waits (loading /
+processing / wait_operators / wait_materials / wait_dispatch / wait_pieces /
+wait_slot / collecting), carriers and collectors reset to "" on end / abort /
+passivate so a finished component's last mode does not accrue to now, and the
+global WIP level monitor (`kpis_state::WIP` + `wip_level`) is +1 at Piece birth,
+-1 on entering an EXIT/SCRAP buffer. salabim++ Component keeps the mode-over-time
+timeline (`mode_log()`). Verified on sample_flow: the timeline carries
+loading/processing/wait_dispatch/wait_materials/wait_operators/collecting and WIP
+moves (mean 1.44, max 6).
+
+STILL PENDING: `Piece.journal` (§5, graph-only) and the kpis++ READER — the
+`mode_total` / `union_mode_duration` helpers over `mode_log()`, the collectors,
+the CSV writer and the rich report.json.
 
 
 New module `simulation/kpis.py`: post-run collectors + CSV writer
