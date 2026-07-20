@@ -36,22 +36,22 @@
       "id": "model_742fd366"
     },
     {
-      "name": "RM1 LEAP 1A​",
+      "name": "RM1 LEAP 1A",
       "parent": "model_3853af8a",
       "id": "model_300990ff"
     },
     {
-      "name": "RM2 LEAP 1B​",
+      "name": "RM2 LEAP 1B",
       "parent": "model_3853af8a",
       "id": "model_e093ec36"
     },
     {
-      "name": "RM3 LEAP 1B​",
+      "name": "RM3 LEAP 1B",
       "parent": "model_3853af8a",
       "id": "model_02d3ef7d"
     },
     {
-      "name": "D1 LEAP 1B​",
+      "name": "D1 LEAP 1B",
       "parent": "model_3853af8a",
       "id": "model_256d4101"
     }
@@ -3965,13 +3965,16 @@
       "buffer_probs": [
         {
           "buffer": "buffer_c5a55e57",
-          "probability": null
+          "probability": {
+            "kind": "constant",
+            "value": 0.92
+          }
         },
         {
           "buffer": "buffer_a6ba9da4",
           "probability": {
             "kind": "constant",
-            "value": 0.0
+            "value": 0.08
           }
         }
       ],
