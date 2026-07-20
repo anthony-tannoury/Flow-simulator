@@ -321,22 +321,26 @@ def buffer_kpis(buffer) -> dict:
 
 
 def operator_kpis(group) -> dict:
+    tt = env.now()
     posted = group.is_in_downtime.value.value_duration(False)
-    # Claims can outlive the shift that granted them (a batch finishing late, a
-    # PER_TASK crew held by a starving task): split the claimed operator-minutes
-    # into inside / outside the group's own posted hours. The occupation rate
-    # only counts the in-shift part, against headcount x posted time, so it
-    # stays in [0, 100%]; the out-of-shift part gets its own column.
+    claimed_mean = group.claimed_quantity.mean()
+    # Diagnostic split of the claimed operator-minutes by the group's own posted
+    # hours. The simulation releases a PER_TASK crew at its shift boundary (and
+    # on a freeze-abort), so heures_hors_poste should stay near zero; anything
+    # sizeable left is a batch legitimately finishing past the shift end.
     en_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, False)
     hors_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, True)
     return {
         'groupe': group.name(),
         'effectif': group.n_operators,
         'temps_poste': round(posted, 3),
+        'occupation_moyenne': round(claimed_mean, 3),
         'heures_en_poste': round(en_poste, 3),
         'heures_hors_poste': round(hors_poste, 3),
         'occupation_max': group.claimed_quantity.maximum(),
-        'taux_occupation': ratio(en_poste, group.n_operators * posted),
+        # mean claimed is averaged over the whole run; scale it back to the time
+        # the group was actually posted, against its full headcount
+        'taux_occupation': ratio(claimed_mean * tt, group.n_operators * posted),
     }
 
 

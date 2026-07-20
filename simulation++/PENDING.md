@@ -289,15 +289,16 @@ the stopping criterion now drives which is built.
 ## 14. Machine-readable report (`kpis.py`, `parser.py`) — mirror-worthy
 
 * `kpis.operator_kpis(group)`: name, headcount, posted time (downtime False),
-  max claimed, and the claimed operator-minutes SPLIT by the group's own
-  shifts via new helper `level_during(level_monitor, status_monitor, value)`
-  (integral of a level over the time a status holds a value):
-  `heures_en_poste` (claims inside the shifts) / `heures_hors_poste` (claims
-  outliving the shift that granted them — late batches, PER_TASK crews held by
-  starving tasks). `taux_occupation = heures_en_poste / (headcount * posted)`,
-  always in [0, 1]. `write_report` gains `operator_groups` and writes
-  `operateurs.csv`; the heures columns joined DUREE_COLS, `taux_occupation`
-  PCT_COLS.
+  mean/max claimed operators, `taux_occupation = claimed_mean * TT /
+  (headcount * posted)` (with the §16 hand-off fix the claims stop at the
+  shift boundary, so this stays under 100% up to a batch's legitimate
+  overrun), plus two diagnostic columns splitting the claimed
+  operator-minutes by the group's own shifts via helper
+  `level_during(level_monitor, status_monitor, value)` (integral of a level
+  over the time a status holds a value): `heures_en_poste` /
+  `heures_hors_poste` (the latter should be near zero now). `write_report`
+  gains `operator_groups` and writes `operateurs.csv`; `temps_poste` and the
+  heures columns joined DUREE_COLS, `taux_occupation` PCT_COLS.
 * `Parser.write_machine_report(directory, run_info)` (called at the end of
   `report()`) writes two extra artifacts next to the CSVs:
   - `report.json`: the same collector dicts (`task_kpis`, `task_model_rows`,
@@ -324,7 +325,7 @@ the stopping criterion now drives which is built.
   working without this; it only matters for hand-edited files using the
   designer's sentence-case display forms.
 
-## 15. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
+## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
 
 * Bug fixed: a PER_TASK crew stayed claimed across its own shift end whenever
   the task could not cycle its loop — parked on an empty carrier (starving for

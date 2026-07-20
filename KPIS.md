@@ -222,18 +222,19 @@ bonnes et rebutées de ce modèle. C'est le détail qui alimente TN.
 
 * `effectif` — la taille du groupe ; `temps_poste` — son temps posté total (la
   somme de ses shifts sur la durée simulée).
-* `heures_en_poste` — les minutes-opérateur réquisitionnées par des postes
-  **pendant** les shifts du groupe (2 opérateurs pris 90 minutes = 180).
-* `heures_hors_poste` — les minutes-opérateur réquisitionnées **en dehors** de
-  ses shifts : une réquisition survit à la fin du shift qui l'a accordée (un
-  lot qui déborde, et surtout une équipe PER_TASK gardée par un poste affamé
-  qui attend des pièces). Un gros chiffre ici ne dit pas « ils travaillent la
-  nuit » mais « ils restent réquisitionnés après leur shift » — c'est un
-  signal d'organisation, pas de production.
-* `taux_occupation` = `heures_en_poste` ÷ (`effectif` × `temps_poste`), donc
-  toujours dans [0, 100 %] : la part du temps posté réellement passée
-  réquisitionné. Les heures hors poste n'y entrent pas — elles se lisent dans
-  leur propre colonne.
+* `occupation_moyenne` — le nombre moyen d'opérateurs réquisitionnés,
+  moyenné sur toute la durée simulée (shifts et hors shifts confondus).
+* `heures_en_poste` / `heures_hors_poste` — les minutes-opérateur
+  réquisitionnées pendant / en dehors des shifts du groupe (2 opérateurs pris
+  90 minutes = 180). Colonnes de diagnostic : la simulation libère une équipe
+  PER_TASK à la fin de son shift (même si le poste attend des pièces) et sur
+  un abandon de lot, donc `heures_hors_poste` doit rester proche de zéro. Ce
+  qui reste, c'est un lot commencé avant la fin du shift qui se termine
+  légitimement après.
+* `taux_occupation` — le total réquisitionné (`occupation_moyenne` × durée
+  simulée) ÷ (`effectif` × `temps_poste`) : la part du temps posté réellement
+  passée réquisitionné. Comme les équipes sont relâchées en fin de shift, il
+  reste naturellement sous 100 % (au débordement d'un lot près).
 * `occupation_max` — le pic d'opérateurs réquisitionnés simultanément.
 
 ## flux.csv et flux_modeles.csv — la ligne entière
