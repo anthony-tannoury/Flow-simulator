@@ -59,14 +59,16 @@ with Clang (Linux/macOS) and MSVC (Windows).
     exactly, exit/scrap and every KPI column land within RNG-stream tolerance.
   - Not ported: `Piece.journal` and the matplotlib graphs stay in Python, so the
     `graphs` map in report.json is empty for a C++ run.
-- **M3 — distribution** 🔶 per-platform static builds via GitHub Actions
+- **M3 — distribution** ✅ per-platform static builds via GitHub Actions
   (`.github/workflows/build-engines.yml`), committed into `engines/`.
-  - The Linux binary is built, bundled and smoke-tested (`engines/flow_sim-linux-x86_64`).
-  - The workflow is written and valid — it builds Linux/macOS/Windows and commits
-    all three back into `engines/`. It only runs once GitHub Actions can execute on
-    the repository's account; until then, build macOS/Windows by hand with the one
-    commands in `engines/README.md`. A missing platform binary is harmless: the
-    designer falls back to Python (or the "select executable" button) for it.
+  - CI builds all three on GitHub-hosted runners — Linux (Clang, static libstdc++),
+    macOS (Apple Clang, universal arm64 + x86-64) and Windows (MSVC, `/MT`) — smoke-
+    tests each, and commits them back into `engines/` with `[skip ci]`. Verified the
+    committed artifacts are an ELF x86-64, a 2-arch universal Mach-O, and a PE32+ x64
+    exe respectively.
+  - `engines/build_local.sh` / `build_local.bat` reproduce any platform's binary by
+    hand with the same commands, if you'd rather not use Actions. A missing platform
+    binary is harmless: the designer falls back to Python (or "select executable").
 - **M4 — designer** ✅ the Python/C++ engine picker (Simulation → Engine), stored in
   QSettings, auto-selects the bundled `engines/flow_sim-<platform>` binary, with a
   "Select C++ executable" fallback and a graceful Python fallback when no native
