@@ -209,7 +209,11 @@ PIECE_DEFAULT_POLICIES = {
 class Parser:
     def __init__(self, filename: str) -> None:
         self.filename = filename
-        with open(filename, 'r') as file:
+        # encoding='utf-8' is not optional: without it Python uses the locale
+        # code page (cp1252 on Western Windows), which reads UTF-8 accents as
+        # mojibake ('Entrée' -> 'Entrée'). That corrupted string would then be
+        # written faithfully to the report CSVs. The flow JSON is always UTF-8.
+        with open(filename, 'r', encoding='utf-8') as file:
             self.data = json.load(file)
         self.sim_start = to_datetime(self.data['start_date'])
         self.discriminate()
