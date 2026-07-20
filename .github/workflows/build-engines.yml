@@ -10,11 +10,11 @@ on:
   push:
     branches: [claude/cpp-engine]
     paths:
-      # '+' is the extglob quantifier in GitHub path filters, so match it as a
-      # literal via a character class ([+]) — 'salabim++/**' is rejected outright.
-      - 'salabim[+][+]/**'
-      - 'simulation[+][+]/**'
-      - 'engine/**'
+      # Match by extension: GitHub path filters reject any '+' in the pattern
+      # (extglob), so 'salabim++/**' / 'simulation++/**' can't be written — but
+      # the '++' in the actual file path is fine, and '**/*.hpp' matches it.
+      - '**/*.hpp'
+      - '**/*.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/build-engines.yml'
 
