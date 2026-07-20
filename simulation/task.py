@@ -38,25 +38,35 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
     def freeze_abort_if(self, condition: bool) -> None:
         pass
 
-    def handle_operators(self, operators: list[tuple[OperatorGroup, int]], ideal_duration: float) -> float:
+    def check_shift_fit(self, operators: list[tuple[OperatorGroup, int]], duration: float) -> None:
+        """Shift-fit decision for a work hold of `duration` starting now. Also
+        re-run after the materials step: a restock order or a stock-out wait can
+        outdate the first approval, and what fit then may not fit anymore."""
+        task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), duration)
         if not operators:
-            task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), ideal_duration)
             self.freeze_abort_if(task_shift_constraint_decision is Action.ABORT)
-            return ideal_duration
-        
-        productivity = operators[0][0].productivity
-
-        match self.task.config.protocols.operators_self_conscious.decide():
-            case ConsciousnessState.CONSCIOUS:
-                duration = ideal_duration / productivity.sample_now()
-            case ConsciousnessState.UNCONSCIOUS:
-                duration = ideal_duration
+            return
 
         current_operator_shift = operators[0][0].current_or_last_shift()
         operator_shift_constraint_decision = self.task.config.protocols.operator_shift_constraint.decide(current_operator_shift, duration)
-        task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), duration)
-
         self.freeze_abort_if(operator_shift_constraint_decision is Action.ABORT or task_shift_constraint_decision is Action.ABORT)
+
+    def operator_fit_deadline(self, operators: list[tuple[OperatorGroup, int]]) -> float:
+        return (self.task.config.protocols.operator_shift_constraint.deadline(operators[0][0].current_or_last_shift())
+                if operators else float('inf'))
+
+    def handle_operators(self, operators: list[tuple[OperatorGroup, int]], ideal_duration: float) -> float:
+        if not operators:
+            duration = ideal_duration
+        else:
+            productivity = operators[0][0].productivity
+            match self.task.config.protocols.operators_self_conscious.decide():
+                case ConsciousnessState.CONSCIOUS:
+                    duration = ideal_duration / productivity.sample_now()
+                case ConsciousnessState.UNCONSCIOUS:
+                    duration = ideal_duration
+
+        self.check_shift_fit(operators, duration)
         return duration
 
     def handle_batch_operators(self, operators: Alternative, earliest_deadline: float, ideal_duration: float, fail_before: float, handle_restock: bool, work_mode: str) -> None:
@@ -68,7 +78,12 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
 
         if handle_restock:
             self.handle_restock()
-            self.request_resources(fail_at=earliest_deadline - duration - (fail_before - ideal_duration))
+            # a materials wait that cannot end before the crew's fit deadline can
+            # never pass the re-check below: give up (and free the crew) as soon
+            # as success becomes impossible, not when the materials show up
+            self.request_resources(fail_at=min(earliest_deadline - duration - (fail_before - ideal_duration),
+                                               self.operator_fit_deadline(recuperated) - duration))
+            self.check_shift_fit(recuperated, duration)
 
         self.hold(duration, mode=work_mode)
         self.task.labor_minutes += sum(count for _, count in recuperated) * duration
@@ -77,7 +92,8 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
     def handle_task_operators(self, earliest_deadline: float, ideal_duration: float) -> None:
         duration = self.handle_operators(self.task.task_operators, ideal_duration)
         self.handle_restock()
-        self.request_resources(fail_at=earliest_deadline - duration)
+        self.request_resources(fail_at=min(earliest_deadline, self.operator_fit_deadline(self.task.task_operators)) - duration)
+        self.check_shift_fit(self.task.task_operators, duration)
         self.hold(duration, mode="processing")
 
     @abstractmethod
