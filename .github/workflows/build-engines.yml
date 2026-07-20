@@ -61,11 +61,14 @@ jobs:
         if: matrix.name == 'windows-x86_64'
         shell: cmd
         run: |
-          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          rem Locate whatever VS edition the runner has (Enterprise/Community/BuildTools)
+          rem instead of hardcoding a path that varies across runner images.
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%i"
+          call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat"
           cl /std:c++20 /O2 /EHsc /MT /nologo ^
             /I salabim++ /I simulation++ /I engine /I engine\third_party ^
             engine\main.cpp /Fe:flow_sim-${{ matrix.name }}.exe
-          del flow_sim-${{ matrix.name }}.obj main.obj 2>nul
+          del main.obj 2>nul
 
       - name: Smoke test (Unix)
         if: runner.os != 'Windows'
