@@ -15,10 +15,16 @@
 #include "json.hpp"
 
 #include <cctype>
+#include <chrono>
+#include <cstdio>
+#include <map>
 #include <memory>
+#include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace parser {
@@ -218,5 +224,474 @@ inline PieceProtocolBundle make_piece_protocols(const json& policies) {
             make_piece_exit_order(policy_or(policies, "piece_exit_order", "FirstInFirstOut")),
             make_model_choice(policy_or(policies, "batch_model_choice", "MostPresent"))};
 }
+
+// --- date / number parsing --------------------------------------------------
+inline ShiftManager::days_t parse_date(const std::string& s) {  // "dd-mm-yyyy"
+    int d = 0, m = 0, y = 0;
+    std::sscanf(s.c_str(), "%d-%d-%d", &d, &m, &y);
+    return std::chrono::sys_days{std::chrono::year{y} / std::chrono::month{unsigned(m)} /
+                                 std::chrono::day{unsigned(d)}};
+}
+
+inline ShiftManager::DateTime parse_datetime(const std::string& s) {  // "dd-mm-yyyy hh:mm"
+    int d = 0, m = 0, y = 0, hh = 0, mm = 0;
+    std::sscanf(s.c_str(), "%d-%d-%d %d:%d", &d, &m, &y, &hh, &mm);
+    return {std::chrono::sys_days{std::chrono::year{y} / std::chrono::month{unsigned(m)} /
+                                  std::chrono::day{unsigned(d)}},
+            hh, mm};
+}
+
+inline double to_minutes(const std::string& s) {  // "hh:mm"
+    int hh = 0, mm = 0;
+    std::sscanf(s.c_str(), "%d:%d", &hh, &mm);
+    return 60.0 * hh + mm;
+}
+
+// float(x) where x may be the JSON string "inf" / "-inf" (Python's float()).
+inline double parse_float(const json& v) {
+    if (v.is_string()) {
+        std::string s = v.get<std::string>();
+        std::string c = canon_name(s);
+        if (c == "inf" || c == "inf0" || c == "infinity") return sim::inf;
+        if (!s.empty() && s[0] == '-' && (canon_name(s.substr(1)) == "inf")) return -sim::inf;
+        return std::stod(s);
+    }
+    return v.get<double>();
+}
+
+inline Intervals join_shifts(const std::vector<Intervals>& parts) {
+    Intervals joined;
+    for (const auto& part : parts)
+        for (const auto& iv : part) joined.push_back(iv);
+    return joined;
+}
+
+// ============================================================================
+// Parser — flow JSON -> a live simulation (mirror of parser.py's Parser class).
+// Build objects with `load_all()`, then run the engine; the registries below
+// expose everything a report needs (kpis++ consumes them).
+// ============================================================================
+class Parser {
+  public:
+    json data;
+    ShiftManager::DateTime sim_start;
+
+    std::map<std::string, const json*> by_id;              // node id -> node
+    std::map<std::string, std::vector<const json*>> per_kind;
+
+    std::map<std::string, Model*> models;
+    std::map<std::string, ShiftManager::days_t> closing_days;
+    std::map<std::string, Intervals> shifts;
+    std::map<std::string, Resource*> resources;
+    std::map<std::string, OperatorGroup*> operator_groups;
+    std::map<std::string, Outlet*> outlets;                // Buffers and Routers
+    std::vector<std::string> scrap_buffers_ids;
+    std::map<std::string, Task*> tasks;
+    std::vector<std::string> task_order;                   // JSON order, for stable reporting
+    PieceGenerator* piece_generator = nullptr;
+    StoppingCriterion* stopping_criterion = nullptr;
+
+    explicit Parser(const std::string& flow_json_text) {
+        data = json::parse(flow_json_text);  // nlohmann decodes UTF-8 (no mojibake, §15b)
+        sim_start = parse_datetime(data.at("start_date").get<std::string>());
+        discriminate();
+        for (const auto& n : data.at("nodes")) by_id[n.at("id").get<std::string>()] = &n;
+    }
+
+    void load_all() {
+        load_models();
+        load_closing_days();
+        load_shifts();
+        load_resources();
+        load_operators();
+        load_non_scrap_buffers();
+        load_routers(/*with_scrap=*/false);
+        load_piece_generator();
+        load_scrap_buffers();
+        load_routers(/*with_scrap=*/true);
+        load_piece_tasks();
+        load_resource_tasks();
+        load_shutdowns();
+        load_breakdowns();
+        load_stopping_criterion();
+    }
+
+    std::vector<Buffer*> buffer_list() const {
+        std::vector<Buffer*> out;
+        for (const auto& [id, o] : outlets)
+            if (auto* b = dynamic_cast<Buffer*>(o)) out.push_back(b);
+        return out;
+    }
+
+    Buffer* exit_buffer() const {
+        for (const auto& [id, o] : outlets)
+            if (auto* b = dynamic_cast<Buffer*>(o); b && b->buffer_type == BufferType::EXIT) return b;
+        return nullptr;
+    }
+
+  private:
+    const std::vector<const json*>& nodes_of(const char* kind) {
+        static const std::vector<const json*> empty;
+        auto it = per_kind.find(kind);
+        return it == per_kind.end() ? empty : it->second;
+    }
+
+    Intervals join_named_shifts(const json& ids) {
+        std::vector<Intervals> parts;
+        for (const auto& id : ids) parts.push_back(shifts.at(id.get<std::string>()));
+        return join_shifts(parts);
+    }
+
+    IntervalPtr to_interval(const json& iv) {
+        return interval(
+            double(ShiftManager::minutes_between(sim_start, parse_datetime(iv.at("start").get<std::string>()))),
+            double(ShiftManager::minutes_between(sim_start, parse_datetime(iv.at("end").get<std::string>()))));
+    }
+
+    Alternative make_alternative(const json& alternatives) {
+        std::vector<Alternative::OpsList> alts;
+        for (const auto& alt : alternatives) {
+            Alternative::OpsList ops;
+            for (const auto& m : alt)
+                ops.push_back({operator_groups.at(m.at("operator").get<std::string>()),
+                               m.at("count").get<int>()});
+            alts.push_back(std::move(ops));
+        }
+        return Alternative(std::move(alts));
+    }
+
+    std::vector<std::pair<Model*, ModelConfig>> make_models_configs(const json& list) {
+        std::vector<std::pair<Model*, ModelConfig>> out;
+        std::map<std::string, SamplerPtr> durations;  // dedup identical duration dicts (shared object)
+        for (const auto& mc : list) {
+            Model* model = models.at(mc.at("model").get<std::string>());
+            std::string key = mc.at("duration").dump();
+            auto it = durations.find(key);
+            if (it == durations.end()) it = durations.emplace(key, make_distribution(mc.at("duration"))).first;
+            std::vector<std::pair<Resource*, double>> res;
+            for (const auto& r : mc.at("resources"))
+                res.push_back({resources.at(r.at("resource").get<std::string>()), r.at("value").get<double>()});
+            out.push_back({model, ModelConfig{it->second, std::move(res),
+                                              mc.at("min_carrier_capacity").get<int>(),
+                                              mc.at("max_carrier_capacity").get<int>()}});
+        }
+        return out;
+    }
+
+    bool touches_scrap(const json& router) {
+        for (const auto& entry : router.at("buffer_probs")) {
+            const json& target = *by_id.at(entry.at("buffer").get<std::string>());
+            if (target.at("kind") == "Router")
+                throw std::invalid_argument("router-to-router chains are not supported");
+            if (same_name(target.at("buffer_type").get<std::string>(), "SCRAP")) return true;
+        }
+        return false;
+    }
+
+    void discriminate() {
+        for (const auto& node : data.at("nodes"))
+            per_kind[node.at("kind").get<std::string>()].push_back(&node);
+    }
+
+    void load_models() {
+        for (const auto& m : data.at("models"))
+            models[m.at("id").get<std::string>()] = new Model(m.at("name").get<std::string>());
+        for (const auto& m : data.at("models"))
+            if (!m.at("parent").is_null())
+                models.at(m.at("id").get<std::string>())
+                    ->set_parent(models.at(m.at("parent").get<std::string>()));
+    }
+
+    void load_closing_days() {
+        for (const auto& cd : data.at("closing_days"))
+            closing_days[cd.at("id").get<std::string>()] = parse_date(cd.at("date").get<std::string>());
+    }
+
+    void load_shifts() {
+        for (const auto& shift : data.at("shifts")) {
+            std::set<long long> days_off;
+            for (const auto& d : shift.at("days_off"))
+                days_off.insert(closing_days.at(d.get<std::string>()).time_since_epoch().count());
+
+            std::string mode = canon_name(shift.at("mode").get<std::string>());
+            if (mode == "weekly") {
+                std::vector<bool> working_days;
+                std::vector<std::vector<std::pair<double, double>>> shifts_per_day;
+                for (const auto& d : shift.at("days")) {
+                    working_days.push_back(d.at("working").get<bool>());
+                    std::vector<std::pair<double, double>> day;
+                    for (const auto& s : d.at("intervals"))
+                        day.push_back({to_minutes(s.at("start").get<std::string>()),
+                                       to_minutes(s.at("end").get<std::string>())});
+                    shifts_per_day.push_back(std::move(day));
+                }
+                shifts[shift.at("id").get<std::string>()] = ShiftManager::generate_weekly_shifts(
+                    sim_start, shifts_per_day, working_days, days_off,
+                    parse_date(shift.at("horizon").at("start").get<std::string>()),
+                    parse_date(shift.at("horizon").at("end").get<std::string>()));
+            } else if (mode == "custom") {
+                std::vector<std::pair<ShiftManager::DateTime, ShiftManager::DateTime>> intervals;
+                for (const auto& i : shift.at("custom_intervals"))
+                    intervals.push_back({parse_datetime(i.at("start").get<std::string>()),
+                                         parse_datetime(i.at("end").get<std::string>())});
+                shifts[shift.at("id").get<std::string>()] =
+                    ShiftManager::generate_custom_shifts(sim_start, intervals, days_off);
+            } else {
+                throw std::invalid_argument("unknown shift mode: " + shift.at("mode").get<std::string>());
+            }
+        }
+    }
+
+    void load_resources() {
+        for (const auto& r : data.at("resources")) {
+            std::string name = r.at("name").get<std::string>();
+            double lifespan = parse_float(r.at("lifespan"));
+            double capacity = r.at("max_capacity").get<double>();
+            double initial = r.at("initial_capacity").get<double>();
+            std::string id = r.at("id").get<std::string>();
+            if (r.at("restockable").get<bool>()) {
+                resources[id] = new RestockableResource(
+                    name, capacity, make_distribution(r.at("order_duration")),
+                    make_distribution(r.at("delivery_duration")), r.at("threshold").get<double>(),
+                    initial, lifespan);
+            } else {
+                resources[id] = new Resource(name, capacity, initial, lifespan);
+            }
+        }
+    }
+
+    void load_operators() {
+        std::map<std::string, SamplerPtr> productivities;
+        for (const auto& op : data.at("operators")) {
+            std::string key = op.at("productivity").dump();
+            auto it = productivities.find(key);
+            if (it == productivities.end())
+                it = productivities.emplace(key, make_distribution(op.at("productivity"))).first;
+            operator_groups[op.at("id").get<std::string>()] =
+                new OperatorGroup(op.at("name").get<std::string>(), op.at("capacity").get<double>(),
+                                  join_named_shifts(op.at("shifts")), it->second);
+        }
+    }
+
+    void load_non_scrap_buffers() {
+        for (const json* bp : nodes_of("Buffer")) {
+            const json& b = *bp;
+            std::string id = b.at("id").get<std::string>();
+            if (same_name(b.at("buffer_type").get<std::string>(), "SCRAP")) {
+                scrap_buffers_ids.push_back(id);
+                continue;
+            }
+            std::vector<Model*> vm;
+            for (const auto& m : b.at("valid_models")) vm.push_back(models.at(m.get<std::string>()));
+            outlets[id] = new Buffer(b.at("name").get<std::string>(), vm,
+                                     lookup(buffer_types(), b.at("buffer_type").get<std::string>(),
+                                            "buffer type"));
+        }
+    }
+
+    void load_routers(bool with_scrap) {
+        for (const json* rp : nodes_of("Router")) {
+            const json& r = *rp;
+            if (touches_scrap(r) != with_scrap) continue;
+            std::vector<std::pair<Outlet*, Router::Prob>> op;
+            for (const auto& e : r.at("buffer_probs")) {
+                Outlet* target = outlets.at(e.at("buffer").get<std::string>());
+                Router::Prob prob = e.at("probability").is_null()
+                                        ? Router::Prob{}
+                                        : Router::Prob{make_callable(e.at("probability"))};
+                op.push_back({target, prob});
+            }
+            outlets[r.at("id").get<std::string>()] = new Router(std::move(op));
+        }
+    }
+
+    void load_piece_generator() {
+        const json& node = *nodes_of("PieceGenerator").at(0);
+        const json& criterion = data.at("stopping_criterion");
+        for (const auto& id : node.at("outlets"))
+            if (!outlets.count(id.get<std::string>()))
+                throw std::invalid_argument("piece generator outlet routes into a scrap buffer");
+
+        Intervals shifts_ = join_named_shifts(node.at("shifts"));
+        std::vector<Outlet*> outs;
+        for (const auto& id : node.at("outlets")) outs.push_back(outlets.at(id.get<std::string>()));
+        std::string name = node.at("name").get<std::string>();
+
+        std::string type = canon_name(criterion.at("type").get<std::string>());
+        if (type == "bypiecesproduced") {
+            std::vector<std::pair<Model*, int>> goals;
+            for (const auto& mg : criterion.at("models_goals"))
+                goals.push_back({models.at(mg.at("model").get<std::string>()), mg.at("goal").get<int>()});
+            double grace = 0.0;
+            std::optional<double> gap;
+            if (criterion.contains("gap") && !criterion.at("gap").is_null())
+                gap = parse_float(criterion.at("gap"));
+            else if (criterion.contains("grace_period"))
+                grace = parse_float(criterion.at("grace_period"));
+            piece_generator = sim::make<GoalPieceGenerator>({.name = name}, goals, shifts_, outs, grace, gap);
+        } else if (type == "bytime") {
+            std::vector<Model*> ms;
+            std::vector<std::optional<std::variant<double, TimeFn>>> probs;
+            for (const auto& mp : criterion.at("models_probs")) {
+                ms.push_back(models.at(mp.at("model").get<std::string>()));
+                if (mp.at("probability").is_null()) probs.push_back(std::nullopt);
+                else probs.push_back(make_callable(mp.at("probability")));
+            }
+            std::variant<double, TimeFn> gap = make_callable(criterion.at("gap"));
+            piece_generator =
+                sim::make<RatePieceGenerator>({.name = name}, ms, shifts_, outs, gap, probs);
+        } else {
+            throw std::invalid_argument("unknown stopping criterion type: " +
+                                        criterion.at("type").get<std::string>());
+        }
+    }
+
+    void load_scrap_buffers() {
+        for (const std::string& id : scrap_buffers_ids) {
+            const json& b = *by_id.at(id);
+            std::vector<Model*> vm;
+            for (const auto& m : b.at("valid_models")) vm.push_back(models.at(m.get<std::string>()));
+            outlets[id] = new Buffer(b.at("name").get<std::string>(), vm, BufferType::SCRAP,
+                                     piece_generator);
+        }
+    }
+
+    std::vector<Outlet*> resolve_outlets(const json& ids) {
+        std::vector<Outlet*> out;
+        for (const auto& id : ids) out.push_back(outlets.at(id.get<std::string>()));
+        return out;
+    }
+
+    std::vector<Buffer*> resolve_buffers(const json& ids) {
+        std::vector<Buffer*> out;
+        for (const auto& id : ids)
+            out.push_back(dynamic_cast<Buffer*>(outlets.at(id.get<std::string>())));
+        return out;
+    }
+
+    void fill_common_config(TaskConfig* cfg, const json& t, const Protocols& protocols) {
+        cfg->task_shifts = join_named_shifts(t.at("task_shifts"));
+        cfg->startup_duration = make_distribution(t.at("startup_duration"));
+        cfg->loading_duration = make_distribution(t.at("loading_duration"));
+        cfg->startup_operators = make_alternative(t.at("startup_operators"));
+        cfg->loading_operators = make_alternative(t.at("loading_operators"));
+        cfg->operators = make_alternative(t.at("operators"));
+        cfg->operator_scope = lookup(scopes(), t.at("operator_scope").get<std::string>(), "operator scope");
+        cfg->resource_scope = lookup(scopes(), t.at("resource_scope").get<std::string>(), "resource scope");
+        cfg->min_carriers = t.at("min_carriers").get<int>();
+        cfg->max_capacity = t.at("max_capacity").get<double>();
+        cfg->timeout = parse_float(t.at("timeout"));
+        cfg->priority = t.at("priority").get<int>();
+        cfg->admin = t.value("admin", false);
+        cfg->contiguous_carriers = t.at("contiguous_carriers").get<bool>();
+        cfg->independent_carriers = t.at("independent_carriers").get<bool>();
+        cfg->protocols = protocols;
+    }
+
+    void load_piece_tasks() {
+        for (const json* tp : nodes_of("Task")) {
+            const json& t = *tp;
+            auto bundle = make_piece_protocols(t.at("policies"));
+            auto cfg = std::make_shared<PieceTaskConfig>();
+            fill_common_config(cfg.get(), t, bundle.shared);
+            cfg->piece_exit_order = bundle.piece_exit_order;
+            cfg->batch_model_choice = bundle.batch_model_choice;
+            cfg->models_configs = make_models_configs(t.at("models_configs"));
+            cfg->piece_collector_type =
+                lookup(piece_collector_types(), t.at("collector_type").get<std::string>(), "collector type");
+            std::string id = t.at("id").get<std::string>();
+            tasks[id] = sim::make<PieceTask>({.name = t.at("name").get<std::string>()}, cfg,
+                                             resolve_buffers(t.at("bufs_in")), resolve_outlets(t.at("bufs_out")));
+            task_order.push_back(id);
+        }
+    }
+
+    void load_resource_tasks() {
+        for (const json* tp : nodes_of("ResourceTask")) {
+            const json& t = *tp;
+            auto cfg = std::make_shared<ResourceTaskConfig>();
+            fill_common_config(cfg.get(), t, make_protocols(t.at("policies")));
+            for (const auto& r : t.at("non_transformed_resources"))
+                cfg->non_transformed_resources.push_back(
+                    {resources.at(r.at("resource").get<std::string>()), r.at("value").get<double>()});
+            for (const auto& r : t.at("transformed_resources"))
+                cfg->transformed_resources_salvageable.push_back(
+                    TransformedResource{resources.at(r.at("resource").get<std::string>()),
+                                        r.at("proportion").get<double>(), r.at("salvageable").get<bool>()});
+            for (const auto& r : t.at("resources_out"))
+                cfg->resources_out_distr.push_back(
+                    {resources.at(r.at("resource").get<std::string>()),
+                     Bounded{make_salabim_distribution(r.at("distribution")),
+                             r.at("lowerbound").get<double>(), r.at("upperbound").get<double>()}});
+            cfg->duration = make_distribution(t.at("duration"));
+            cfg->resource_collector_type = lookup(resource_collector_types(),
+                                                  t.at("resource_collector_type").get<std::string>(),
+                                                  "resource collector type");
+            cfg->min_carrier_capacity = t.at("min_carrier_capacity").get<double>();
+            cfg->max_carrier_capacity = t.at("max_carrier_capacity").get<double>();
+            std::string id = t.at("id").get<std::string>();
+            tasks[id] = sim::make<ResourceTask>({.name = t.at("name").get<std::string>()}, cfg);
+            task_order.push_back(id);
+        }
+    }
+
+    void load_shutdowns() {
+        std::vector<const json*> task_nodes = nodes_of("Task");
+        for (const json* p : nodes_of("ResourceTask")) task_nodes.push_back(p);
+        for (const json* tp : task_nodes) {
+            const json& tn = *tp;
+            Task* task = tasks.at(tn.at("id").get<std::string>());
+            for (const auto& sid : tn.at("shutdowns")) {
+                const json& sn = *by_id.at(sid.get<std::string>());
+                Intervals intervals;
+                std::string mode = canon_name(sn.value("mode", "custom"));
+                if (mode == "custom") {
+                    for (const auto& i : sn.at("intervals")) intervals.push_back(to_interval(i));
+                } else if (mode == "generator") {
+                    const json& g = sn.at("generator");
+                    intervals = Shutdowns::generate_periodic_shutdown(
+                        task, g.at("in_between").get<double>(), g.at("duration").get<double>(), sim_start,
+                        parse_datetime(g.at("start").get<std::string>()),
+                        parse_datetime(g.at("end").get<std::string>()));
+                } else {
+                    throw std::invalid_argument("unknown shutdowns mode: " + sn.at("mode").get<std::string>());
+                }
+                std::string stype = canon_name(sn.at("shutdown_type").get<std::string>());
+                if (stype == "flexible") sim::make<FlexibleShutdowns>({}, task, intervals);
+                else if (stype == "nonflexible") sim::make<NonFlexibleShutdowns>({}, task, intervals);
+                else throw std::invalid_argument("unknown shutdown type: " +
+                                                 sn.at("shutdown_type").get<std::string>());
+            }
+        }
+    }
+
+    void load_breakdowns() {
+        for (const json* bp : nodes_of("Breakdown")) {
+            const json& b = *bp;
+            sim::make<Breakdown>({.name = b.at("name").get<std::string>()},
+                                 tasks.at(b.at("task").get<std::string>()), make_mtbf(b.at("mtbf")),
+                                 make_distribution(b.at("mttr")), resolve_outlets(b.at("outlets")));
+        }
+    }
+
+    void load_stopping_criterion() {
+        const json& criterion = data.at("stopping_criterion");
+        std::string type = canon_name(criterion.at("type").get<std::string>());
+        if (type == "bytime") {
+            double minutes = double(ShiftManager::minutes_between(
+                sim_start, parse_datetime(criterion.at("time").get<std::string>())));
+            stopping_criterion = sim::make<ByTime>({}, minutes);
+        } else if (type == "bypiecesproduced") {
+            int total = 0;
+            for (const auto& mg : criterion.at("models_goals")) total += mg.at("goal").get<int>();
+            stopping_criterion =
+                sim::make<ByPiecesProduced>({}, total, exit_buffer(), parse_float(criterion.at("timeout")));
+        } else {
+            throw std::invalid_argument("unknown stopping criterion type: " +
+                                        criterion.at("type").get<std::string>());
+        }
+        sim::make<SimulationStopper>({}, stopping_criterion);
+    }
+};
 
 }  // namespace parser
