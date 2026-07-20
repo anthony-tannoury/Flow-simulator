@@ -19,7 +19,7 @@ int main() {
 
     // --- generator -----------------------------------------------------------
     auto* b0 = new Buffer("B0", {model_p}, BufferType::PASSAGE);
-    auto* gen = sim::make<PieceGenerator>({}, std::vector<std::pair<Model*, int>>{{model_p1, 40}, {model_p2, 30}},
+    auto* gen = sim::make<GoalPieceGenerator>({}, std::vector<std::pair<Model*, int>>{{model_p1, 40}, {model_p2, 30}},
                                           Intervals{interval(0, 1400)}, std::vector<Outlet*>{b0});
 
     // --- resources -----------------------------------------------------------

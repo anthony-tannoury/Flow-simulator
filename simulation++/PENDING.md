@@ -198,7 +198,7 @@ Data hooks needed:
   vertical span (`x1 == x2`) or `step_size <= 0`. (`function_generator.py`
   gained `import math`.)
 
-## 9. Piece-generator split: goal vs rate (`piece.py`)
+## 9. Piece-generator split: goal vs rate (`piece.py`)  — ✅ ported to simulation.hpp
 
 The single `PieceGenerator` became an abstract base with two concrete flavours;
 the stopping criterion now drives which is built.
@@ -266,7 +266,7 @@ the stopping criterion now drives which is built.
   `heures_main_oeuvre` (= `labor_minutes_total()`, which does sum: operators
   x duration).
 
-## 13. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
+## 13. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)  — ✅ sim.hpp done (parser++ pending)
 
 * `PieceGenerator` is now `Triggerable` (gains a `trigger` state). `Piece.enter`
   into a scrap buffer, right after decrementing `generated[idx]`, pulses

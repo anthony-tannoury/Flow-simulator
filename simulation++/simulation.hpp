@@ -617,29 +617,59 @@ class PickyPieceTaker {
     }
 };
 
-class PieceGenerator : public Component, public PickyPieceTaker, public HasShifts {
+// §9: abstract base shared by GoalPieceGenerator (a fixed goal paced over the
+// shifts) and RatePieceGenerator (a stream at a given gap + mix, until ByTime).
+// §13: Triggerable — scrap buffers pulse `trigger` when they take a piece so a
+// goal generator sleeping with nothing left to make wakes for the remake.
+class PieceGenerator : public Component, public PickyPieceTaker, public HasShifts, public Triggerable {
   public:
     std::vector<Model*> models;
     std::vector<Outlet*> outlets;
-    std::vector<int> goals;
-    std::vector<double> probs;
     std::vector<int> generated;
-    int total_goal = 0;
-    double gap = 0;
+    std::vector<int> total_generated;  // per-model physical births (scrap remakes included)
     ShiftManager* shift_manager = nullptr;
 
-    PieceGenerator(std::vector<std::pair<Model*, int>> models_goals, Intervals shifts_,
-                   std::vector<Outlet*> outlets_);  // body after outlet.py (check_outlet_validity)
+    PieceGenerator(std::vector<Model*> models_, Intervals shifts_, std::vector<Outlet*> outlets_);
 
-    void update_probs() {
-        int total_generated = 0;
-        for (int g : generated) total_generated += g;
-        for (size_t i = 0; i < models.size(); ++i)
-            probs[i] = double(goals[i] - generated[i]) / double(total_goal - total_generated);
-    }
+    void emit(int idx);  // build a Piece, place it, bump both counters (defined after place())
 
-    int total_generated() const;
-    sim::Process process() override;  // body after outlet.py (place)
+    // hold for gap, unless it would spill past the current shift — then hold to
+    // the shift end and report false via *held_full so the caller re-checks.
+    sim::Process hold_within_shift(double gap, bool* held_full);
+
+    sim::Process process() override = 0;  // abstract
+};
+
+class GoalPieceGenerator : public PieceGenerator {
+  public:
+    std::vector<int> goals;
+    std::vector<double> probs;
+    int total_goal = 0;
+    double gap = 0;
+
+    GoalPieceGenerator(std::vector<std::pair<Model*, int>> models_goals, Intervals shifts_,
+                       std::vector<Outlet*> outlets_, double grace_period = 0.0,
+                       std::optional<double> gap_ = std::nullopt);
+
+    void update_probs();
+    sim::Process process() override;
+};
+
+class RatePieceGenerator : public PieceGenerator {
+  public:
+    // gap and per-model probabilities are each a constant or a function of time;
+    // exactly one probability may be nullopt = the freeloader (1 - sum(others)).
+    std::variant<double, TimeFn> gap;
+    std::vector<std::optional<std::variant<double, TimeFn>>> model_probs;
+    int freeloader_index = -1;
+
+    RatePieceGenerator(std::vector<Model*> models_, Intervals shifts_, std::vector<Outlet*> outlets_,
+                       std::variant<double, TimeFn> gap_,
+                       std::vector<std::optional<std::variant<double, TimeFn>>> model_probs_);
+
+    double current_gap();
+    std::vector<double> current_probs();
+    sim::Process process() override;
 };
 
 // ============================================================================
@@ -741,11 +771,12 @@ class Router : public Outlet {
 
 inline void Piece::enter(Buffer& q) {
     q.trigger.trigger();
-    if (q.piece_generator != nullptr) {
+    if (q.piece_generator != nullptr) {  // scrap buffer: re-open the model's goal
         auto& models = q.piece_generator->models;
         auto it = std::find(models.begin(), models.end(), model);
         assert(it != models.end());
         q.piece_generator->generated[it - models.begin()] -= 1;
+        q.piece_generator->trigger.trigger();  // §13: wake a generator sleeping between remakes
     }
     sim::Component::enter(q);
 }
@@ -788,38 +819,91 @@ inline std::vector<Model*> models_of_(const std::vector<std::pair<Model*, int>>&
     return out;
 }
 
-inline PieceGenerator::PieceGenerator(std::vector<std::pair<Model*, int>> models_goals,
-                                      Intervals shifts_, std::vector<Outlet*> outlets_)
-    : PickyPieceTaker(models_of_(models_goals)), HasShifts(std::move(shifts_)) {
+inline PieceGenerator::PieceGenerator(std::vector<Model*> models_, Intervals shifts_,
+                                      std::vector<Outlet*> outlets_)
+    : PickyPieceTaker(std::move(models_)), HasShifts(std::move(shifts_)) {
     if (counters::piece_generators > 0)
         throw std::invalid_argument("Cannot have more than one piece generator");
     counters::piece_generators += 1;
 
-    models = valid_models;  // PickyPieceTaker was built from the goal keys
+    models = valid_models;  // PickyPieceTaker was built from the models list
     check_outlet_validity(*this, outlets_);
 
     shift_manager = sim::make<ShiftManager>({}, static_cast<HasShifts*>(this));
 
     outlets = std::move(outlets_);
+    generated.assign(models.size(), 0);
+    total_generated.assign(models.size(), 0);
+}
+
+inline void PieceGenerator::emit(int idx) {
+    Piece* piece = sim::make<Piece>({}, models[idx]);
+    place({piece}, outlets);
+    generated[idx] += 1;
+    total_generated[idx] += 1;
+}
+
+inline sim::Process PieceGenerator::hold_within_shift(double gap, bool* held_full) {
+    const Interval* current_shift = current_or_last_shift();
+    double shift_time_left = current_shift != nullptr ? current_shift->end - env->now() : sim::inf;
+    if (gap > shift_time_left) {
+        co_await hold(shift_time_left);
+        *held_full = false;
+        co_return;
+    }
+    co_await hold(gap);
+    *held_full = true;
+}
+
+// ---- GoalPieceGenerator ----
+inline GoalPieceGenerator::GoalPieceGenerator(std::vector<std::pair<Model*, int>> models_goals,
+                                              Intervals shifts_, std::vector<Outlet*> outlets_,
+                                              double grace_period, std::optional<double> gap_)
+    : PieceGenerator(models_of_(models_goals), std::move(shifts_), std::move(outlets_)) {
     for (auto& [m, g] : models_goals) goals.push_back(g);
     probs.assign(models.size(), 0.0);
-    generated.assign(models.size(), 0);
-
     for (int g : goals) total_goal += g;
-    double shift_len = 0;
-    for (const auto& s : shifts) shift_len += s->length();
-    gap = shift_len / total_goal;
+
+    if (gap_.has_value()) {  // user-fixed pacing: may finish early or spill past the shifts
+        if (grace_period != 0.0)
+            throw std::invalid_argument("Grace period only applies to the automatic gap");
+        if (*gap_ <= 0) throw std::invalid_argument("Gap must be > 0");
+        gap = *gap_;
+    } else {  // automatic: pace the goal over the shifts minus the grace-period reserve
+        double working_time = 0;
+        for (const auto& s : shifts) working_time += s->length();
+        if (grace_period < 0) throw std::invalid_argument("Grace period must be >= 0");
+        if (grace_period >= working_time)
+            throw std::invalid_argument(
+                "Grace period must be smaller than the generator's total shift time");
+        gap = (working_time - grace_period) / total_goal;
+    }
 }
 
-inline int PieceGenerator::total_generated() const {
-    int s = 0;
-    for (int g : generated) s += g;
-    return s;
+inline void GoalPieceGenerator::update_probs() {
+    int total_gen = 0;
+    for (int g : generated) total_gen += g;
+    if (total_goal == total_gen) {
+        probs.assign(models.size(), 0.0);
+    } else {
+        for (size_t i = 0; i < models.size(); ++i)
+            probs[i] = double(goals[i] - generated[i]) / double(total_goal - total_gen);
+    }
 }
 
-inline sim::Process PieceGenerator::process() {
-    while (total_generated() < total_goal) {
+inline sim::Process GoalPieceGenerator::process() {
+    while (true) {
         co_await wait({{is_in_downtime, false}});
+
+        // everything asked for is out: sleep until a scrap buffer takes a piece
+        // (its trigger pulse re-opens that model's goal), instead of polling
+        update_probs();
+        double sum_probs = 0;
+        for (double p : probs) sum_probs += p;
+        if (sum_probs == 0) {
+            co_await wait(trigger);
+            continue;
+        }
 
         const Interval* current_shift = current_or_last_shift();
         double shift_time_left =
@@ -829,12 +913,59 @@ inline sim::Process PieceGenerator::process() {
             continue;
         }
 
-        update_probs();
         co_await hold(gap);
         int idx = weighted_choice(probs);
-        Piece* piece = sim::make<Piece>({}, models[idx]);
-        place({piece}, outlets);
-        generated[idx] += 1;
+        emit(idx);
+    }
+}
+
+// ---- RatePieceGenerator ----
+inline RatePieceGenerator::RatePieceGenerator(
+    std::vector<Model*> models_, Intervals shifts_, std::vector<Outlet*> outlets_,
+    std::variant<double, TimeFn> gap_,
+    std::vector<std::optional<std::variant<double, TimeFn>>> model_probs_)
+    : PieceGenerator(std::move(models_), std::move(shifts_), std::move(outlets_)),
+      gap(std::move(gap_)), model_probs(std::move(model_probs_)) {
+    int none_count = 0;
+    for (size_t i = 0; i < model_probs.size(); ++i)
+        if (!model_probs[i].has_value()) {
+            ++none_count;
+            freeloader_index = static_cast<int>(i);
+        }
+    if (none_count > 1)
+        throw std::invalid_argument("At most one model can be the freeloader in a rate generator");
+}
+
+inline double RatePieceGenerator::current_gap() {
+    return std::holds_alternative<double>(gap) ? std::get<double>(gap)
+                                               : std::get<TimeFn>(gap)(env->now());
+}
+
+inline std::vector<double> RatePieceGenerator::current_probs() {
+    std::vector<double> probs(model_probs.size(), 0.0);
+    for (size_t i = 0; i < model_probs.size(); ++i) {
+        if (!model_probs[i].has_value()) continue;  // freeloader stays 0 for now
+        const auto& p = *model_probs[i];
+        probs[i] = std::holds_alternative<double>(p) ? std::get<double>(p)
+                                                     : std::get<TimeFn>(p)(env->now());
+    }
+    if (freeloader_index != -1) {
+        double sum = 0;
+        for (double p : probs) sum += p;
+        probs[freeloader_index] = 1 - sum;
+    }
+    check_probabilities(probs);
+    return probs;
+}
+
+inline sim::Process RatePieceGenerator::process() {
+    while (true) {
+        co_await wait({{is_in_downtime, false}});
+        bool held_full = false;
+        co_await call(hold_within_shift(current_gap(), &held_full));
+        if (!held_full) continue;
+        int idx = weighted_choice(current_probs());
+        emit(idx);
     }
 }
 

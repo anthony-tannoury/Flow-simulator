@@ -56,7 +56,7 @@ Built build_placeholder() {
     Intervals shifts{interval(0, 100000)};
     auto* in_buffer = new Buffer("in", {m}, BufferType::PASSAGE);
     auto* exit_buffer = new Buffer("out", {m}, BufferType::EXIT);
-    sim::make<PieceGenerator>({}, std::vector<std::pair<Model*, int>>{{m, 50}},
+    sim::make<GoalPieceGenerator>({}, std::vector<std::pair<Model*, int>>{{m, 50}},
                               shifts, std::vector<Outlet*>{in_buffer});
 
     Protocols protocols{
