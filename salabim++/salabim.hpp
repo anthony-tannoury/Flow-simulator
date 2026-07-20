@@ -1346,6 +1346,12 @@ class Component {
     void set_mode(const std::optional<std::string>& m);
     double mode_time() const { return mode_time_; }
 
+    // Mode-over-time record (salabim's Component.mode is a MonitorTimestamp).
+    // Each set_mode with a value appends {now, mode}; the KPI layer reconstructs
+    // the intervals like Python's mode.xt() (each entry runs until the next, the
+    // last to env.now()) to get value_duration / union-of-modes.
+    const std::vector<std::pair<double, std::string>>& mode_log() const { return mode_log_; }
+
     double creation_time() const { return creation_time_; }
     double scheduled_time() const { return scheduled_time_; }
     double scheduled_priority() const { return scheduled_priority_; }
@@ -1537,6 +1543,7 @@ class Component {
     double creation_time_ = 0;
     std::string mode_;
     double mode_time_ = 0;
+    std::vector<std::pair<double, std::string>> mode_log_;  // (time, mode) timeline
     bool suppress_trace_ = false;
     bool skip_standby_ = false;
     std::uint_least32_t last_line_ = 0;   // last co_await site, for trace line numbers
@@ -2942,6 +2949,7 @@ inline void Component::set_mode(const std::optional<std::string>& m) {
     if (m) {
         mode_time_ = env->now_raw_();
         mode_ = *m;
+        mode_log_.emplace_back(env->now(), *m);  // timeline for the KPI layer
     }
 }
 

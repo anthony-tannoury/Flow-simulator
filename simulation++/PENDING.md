@@ -68,12 +68,15 @@ sim.hpp so far has the mode-INDEPENDENT tallies: Task `batch_sizes` / `cycle_tim
 take), PieceTask `deposited` / `scrapped` (SCRAP detected via `piece->queues()`),
 tallied in `PieceCarrier::successfully_end_process` and `TaskStarter`.
 
-STILL PENDING (fold into kpis++): the per-carrier mode tags + `union_mode_duration`,
-the global WIP level monitor, and `Piece.journal`. NOTE: salabim++'s `set_mode`
-records only the CURRENT mode + its start time, NOT Python salabim's mode-over-time
-monitor — so `union_mode_duration` cannot read a mode timeline. kpis++ must record
-each carrier's loading/processing intervals explicitly (start, end) instead of
-tagging modes and integrating them afterward.
+STILL PENDING (fold into kpis++): the per-carrier mode tags on the sim's holds /
+requests / waits, `union_mode_duration`, the global WIP level monitor, and
+`Piece.journal`. GROUNDWORK DONE: salabim++ Component now keeps a mode-over-time
+timeline — `set_mode` appends `{now, mode}` and `mode_log()` exposes it, so kpis++
+can reconstruct intervals like Python's `mode.xt()` (each entry runs to the next,
+the last to now) for `mode_total` / `union_mode_duration`. What remains is tagging
+the sim's interaction points (loading / processing / wait_operators / wait_materials
+/ wait_dispatch / wait_pieces / wait_slot / collecting) so the timeline carries the
+KPI modes, then reading them in kpis++.
 
 
 New module `simulation/kpis.py`: post-run collectors + CSV writer
