@@ -156,7 +156,7 @@ Data hooks needed:
   `TRG = TRS * (TR/TO)`, `TRE = TRS * (TR/TT)`; the old `TU`-based identity is
   dropped. `Do = TF_union / TR` is unchanged.
 
-## 7. Freeze/startup lifecycle fixes
+## 7. Freeze/startup lifecycle fixes  — ✅ ported to simulation.hpp
 
 * `operator.py`: `OperatorGroup` gets `dependent_tasks: list`; `Task.setup`
   registers itself on every group it uses (operators + loading_operators +
@@ -247,7 +247,7 @@ the stopping criterion now drives which is built.
   produites) and CSV with an `objectif` column; without goals, a two-bar chart
   (générées/produites) and a CSV without `objectif`.
 
-## 12. Labor and machine hours (`task.py`, `kpis.py`)
+## 12. Labor and machine hours (`task.py`, `kpis.py`)  — ⏳ task.py side ported (labor_minutes + task_crew_since + labor_minutes_total, and the accrual points in the PER_TASK crew, handle_batch_operators and TaskStarter); kpis.py side (heures_machine union + heures_main_oeuvre columns) still pending
 
 * `Task` gains `labor_minutes` (operator-minutes booked on the task by every
   crew) filled at three points: `Carrier.handle_batch_operators` adds
@@ -341,7 +341,7 @@ the stopping criterion now drives which is built.
   read side. The C++ port must likewise read the JSON as UTF-8 explicitly, never
   via a locale-dependent default.
 
-## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
+## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)  — ✅ ported to simulation.hpp
 
 * Bug fixed: a PER_TASK crew stayed claimed across its own shift end whenever
   the task could not cycle its loop — parked on an empty carrier (starving for
@@ -371,7 +371,7 @@ the stopping criterion now drives which is built.
   off-shift "ghost work" disappears (atelier exits moved 2629 -> 2568; the
   difference was work done by crews whose operators had gone home).
 
-## 17. Shift-fit re-checked after the materials step (`task.py`)
+## 17. Shift-fit re-checked after the materials step (`task.py`)  — ✅ ported to simulation.hpp
 
 * Gap fixed: `ConstrainedByShift` approved a work hold BEFORE `handle_restock`
   + `request_resources`. A restock-order hold or a stock-out wait between the

@@ -997,6 +997,7 @@ class OperatorGroup : public sim::Resource, public Triggerable, public HasShifts
     SamplerPtr productivity;
     double n_operators;
     OperatorShiftManager* manager = nullptr;
+    std::vector<Task*> dependent_tasks;  // tasks to unfreeze / hand off when this group returns/leaves
 
     OperatorGroup(const std::string& name, double capacity, Intervals shifts_, SamplerPtr productivity_)
         : sim::Resource(name, capacity, sim::ResourceOpts{.anonymous = false}),
@@ -1010,19 +1011,7 @@ class OperatorGroup : public sim::Resource, public Triggerable, public HasShifts
 
 inline OperatorShiftManager::OperatorShiftManager(OperatorGroup* operator_group)
     : ShiftManager(static_cast<HasShifts*>(operator_group)) {}
-
-inline void OperatorShiftManager::on_enter() {
-    auto* g = static_cast<OperatorGroup*>(entity);
-    g->set_capacity(g->n_operators);
-    g->trigger.trigger();
-    ShiftManager::on_enter();
-}
-
-inline void OperatorShiftManager::on_leave() {
-    auto* g = static_cast<OperatorGroup*>(entity);
-    g->set_capacity(0);
-    ShiftManager::on_leave();
-}
+// on_enter / on_leave bodies are defined after Task (they touch Task members).
 
 class Alternative {
   public:
@@ -1390,6 +1379,10 @@ class Carrier : public Component, public Dispatchable, public Donnable {
     virtual double get_ideal_loading_duration() = 0;
     virtual double get_ideal_duration() = 0;
 
+    // §17: shift-fit decision, re-run after the materials step; deadline helper.
+    sim::Process check_shift_fit(const Alternative::OpsList& operators, double duration);
+    double operator_fit_deadline(const Alternative::OpsList& operators);
+
     sim::Process handle_operators(const Alternative::OpsList& operators, double ideal_duration,
                                   double* out);
     sim::Process handle_batch_operators(Alternative& operators, double earliest_deadline,
@@ -1410,6 +1403,7 @@ class TaskShiftManager : public ShiftManager {
   public:
     explicit TaskShiftManager(HasShifts* entity_) : ShiftManager(entity_) {}
     void on_enter() override;  // needs Task
+    void on_leave() override;  // needs Task (resets started_up: re-warm each shift)
 };
 
 class Task : public Component, public HasShifts {
@@ -1426,6 +1420,10 @@ class Task : public Component, public HasShifts {
     Alternative::OpsList task_operators;
     std::unique_ptr<sim::Resource> vacant_slots;
     bool started_up = false;
+    bool requested_per_task_operators = false;      // whether the PER_TASK crew is currently held
+    double labor_minutes = 0.0;                     // operator-minutes booked on this task, all crews
+    std::optional<double> task_crew_since;          // claim start of the held PER_TASK crew (Python None)
+    Carrier* awaiting_carrier = nullptr;            // the pending carrier the process is parked on
     CarrierTracker pending_carriers;
     CarrierTracker active_carriers;
 
@@ -1451,6 +1449,22 @@ class Task : public Component, public HasShifts {
         non_flexible_shutdowns = sim::make<NonFlexibleShutdowns>({}, this, Intervals{});
         flexible_shutdowns = sim::make<FlexibleShutdowns>({}, this, Intervals{});
         vacant_slots = std::make_unique<sim::Resource>("", config->max_capacity);
+
+        // Register on every operator group so it can unfreeze this task (on return)
+        // or hand off its PER_TASK crew (on leave). Dedup is per-alternative-object
+        // (Python dict.fromkeys within each alternative; a group in two of the three
+        // alternatives is appended once per alternative), and iteration order follows
+        // insertion so the shift-boundary wake-up order stays process-independent.
+        for (Alternative* alt : {&config->operators, &config->loading_operators,
+                                 &config->startup_operators}) {
+            std::vector<OperatorGroup*> seen;
+            for (const auto& a : alt->alternatives)
+                for (const auto& [g, c] : a)
+                    if (std::find(seen.begin(), seen.end(), g) == seen.end()) {
+                        seen.push_back(g);
+                        g->dependent_tasks.push_back(this);
+                    }
+        }
     }
 
     virtual Carrier* make_carrier() = 0;  // Python: self.carrier_type(task=self)
@@ -1463,7 +1477,15 @@ class Task : public Component, public HasShifts {
         return s != nullptr ? s->start : sim::inf;
     }
 
-    sim::Process handle_startup();
+    sim::Process handle_startup();  // §7: warm-up only (PER_TASK crew handled separately)
+    sim::Process request_task_operators();  // §7: request + hold the PER_TASK crew
+    void release_task_operators();          // §7/§16: release the held crew (idempotent)
+    double labor_minutes_total() const;     // §12: booked minutes incl. a still-held crew
+    bool any_task_operator_in_downtime() const {
+        for (const auto& [g, c] : task_operators)
+            if (g->is_in_downtime()) return true;
+        return false;
+    }
     sim::Process process() override;
 };
 
@@ -1495,6 +1517,10 @@ inline sim::Process TaskStarter::process() {
     }
 
     co_await hold(duration);
+    double booked = 0;  // §12: the startup crew's operator-minutes
+    if (got.has_value())
+        for (const auto& [g, c] : *got) booked += c;
+    task->labor_minutes += booked * duration;
     done.set(true);
 }
 
@@ -1503,21 +1529,84 @@ inline void TaskShiftManager::on_enter() {
     ShiftManager::on_enter();
 }
 
-inline sim::Process Task::handle_startup() {
+inline void TaskShiftManager::on_leave() {
+    static_cast<Task*>(dynamic_cast<Component*>(entity))->started_up = false;  // re-warm next shift
+    ShiftManager::on_leave();
+}
+
+// §7/§16: OperatorShiftManager on_enter/on_leave — defined here (they touch Task).
+inline void OperatorShiftManager::on_enter() {
+    auto* g = static_cast<OperatorGroup*>(entity);
+    g->set_capacity(g->n_operators);
+    g->trigger.trigger();
+    // a task frozen because these operators left resumes when they come back,
+    // instead of staying frozen until its own (possibly weeks-away) shift start
+    for (Task* task : g->dependent_tasks) task->is_frozen.set(false);
+    ShiftManager::on_enter();
+}
+
+inline void OperatorShiftManager::on_leave() {
+    auto* g = static_cast<OperatorGroup*>(entity);
+    g->set_capacity(0);
+    // a task holding this group PER_TASK while starving for pieces is parked in
+    // its loaded-wait and would keep the crew reserved for days; wake it so the
+    // hand-off happens at the shift boundary (activate() breaks the wait).
+    for (Task* task : g->dependent_tasks) {
+        if (task->awaiting_carrier != nullptr && task->requested_per_task_operators &&
+            task->iswaiting()) {
+            bool holds_this = false;
+            for (const auto& [group, count] : task->task_operators)
+                if (group == g) { holds_this = true; break; }
+            if (holds_this) task->activate();  // discard the Yield: side effects are synchronous
+        }
+    }
+    ShiftManager::on_leave();
+}
+
+inline sim::Process Task::handle_startup() {  // §7: warm-up only
     TaskStarter* task_starter = sim::make<TaskStarter>({}, this);
     co_await wait(task_starter->done);
     if (is_frozen()) co_return;
-
     started_up = true;
+}
 
-    if (config->operator_scope == Scope::PER_TASK) {
-        double deadline =
-            std::min(non_flexible_shutdowns->get_deadline(), flexible_shutdowns->get_deadline());
-        std::optional<Alternative::OpsList> got;
-        co_await call(config->operators.request(this, &got, deadline));
-        task_operators = got.value_or(Alternative::OpsList{});
-        if (failed()) is_frozen.set(true);
+// §7: PER_TASK crew — one crew supervises every carrier; requested once, reused
+// across carriers, re-requested only after a release (its shift end). The flag
+// keeps it from being claimed twice without a release (which used to hoard pools).
+inline sim::Process Task::request_task_operators() {
+    double deadline =
+        std::min(non_flexible_shutdowns->get_deadline(), flexible_shutdowns->get_deadline());
+    std::optional<Alternative::OpsList> got;
+    co_await call(config->operators.request(this, &got, deadline));
+    task_operators = got.value_or(Alternative::OpsList{});
+    if (failed()) {
+        is_frozen.set(true);
+    } else {
+        requested_per_task_operators = true;
+        task_crew_since = env->now();
     }
+}
+
+inline void Task::release_task_operators() {
+    if (!task_operators.empty() && task_crew_since.has_value()) {
+        double booked = 0;
+        for (const auto& [g, c] : task_operators) booked += c;
+        labor_minutes += booked * (env->now() - *task_crew_since);
+    }
+    task_crew_since.reset();
+    if (!task_operators.empty()) release(Alternative::reqspecs_(task_operators));
+    task_operators.clear();
+    requested_per_task_operators = false;
+}
+
+inline double Task::labor_minutes_total() const {
+    double total = labor_minutes;
+    if (task_crew_since.has_value()) {
+        double booked = 0;
+        for (const auto& [g, c] : task_operators) booked += c;
+        total += booked * (env->now() - *task_crew_since);
+    }
+    return total;
 }
 
 inline sim::Process Task::process() {
@@ -1529,13 +1618,42 @@ inline sim::Process Task::process() {
         if (!skip_downtime_check) specs.push_back(sim::WaitSpec(is_in_downtime, false));
         co_await wait(std::move(specs), {.all = true});
 
+        // §16: PER_TASK crew hands off at operator-shift boundaries — once no
+        // carrier is mid-run, drop a crew that has gone off shift so the next
+        // round re-picks whichever group is on shift now.
+        if (config->operator_scope == Scope::PER_TASK && requested_per_task_operators &&
+            active_carriers.empty() && any_task_operator_in_downtime())
+            release_task_operators();
+
         if (!started_up) co_await call(handle_startup());
+
+        if (config->operator_scope == Scope::PER_TASK && started_up && !is_frozen() &&
+            !requested_per_task_operators)
+            co_await call(request_task_operators());
 
         if ((is_frozen() && !skip_frozen_check) || !started_up) continue;
 
         Carrier* new_carrier = make_carrier();
         pending_carriers.add(new_carrier);
-        co_await wait(new_carrier->loaded);
+        // §16: while parked on the collector, a held PER_TASK crew must still hand
+        // off at its shift end — the operator shift manager wakes this task
+        // (activate breaks the wait), the crew is released, the wait resumes.
+        awaiting_carrier = new_carrier;
+        while (!new_carrier->loaded()) {
+            co_await wait(new_carrier->loaded);
+            if (config->operator_scope == Scope::PER_TASK && requested_per_task_operators &&
+                active_carriers.empty() && any_task_operator_in_downtime())
+                release_task_operators();
+        }
+        awaiting_carrier = nullptr;
+
+        // a crew handed off during the wait is re-acquired before dispatching
+        // (whichever group is on shift now); a failed request freezes as usual
+        if (config->operator_scope == Scope::PER_TASK && started_up && !is_frozen() &&
+            !requested_per_task_operators) {
+            co_await call(request_task_operators());
+            if (is_frozen() && !skip_frozen_check) continue;
+        }
 
         if (static_cast<int>(pending_carriers.size()) >= config->min_carriers) {
             std::vector<Carrier*> dispatched;
@@ -1575,28 +1693,40 @@ inline sim::Process Task::process() {
 
 inline sim::Process Carrier::handle_operators(const Alternative::OpsList& operators,
                                               double ideal_duration, double* out) {
+    double duration = ideal_duration;
+    if (!operators.empty()) {
+        SamplerPtr productivity = operators[0].first->productivity;
+        switch (task->config->protocols.operators_self_conscious->decide()) {
+            case ConsciousnessState::CONSCIOUS: duration = ideal_duration / productivity->sample_now(); break;
+            case ConsciousnessState::UNCONSCIOUS: duration = ideal_duration; break;
+        }
+    }
+    co_await call(check_shift_fit(operators, duration));
+    *out = duration;
+}
+
+// §17: the shift-fit decision, split out of handle_operators so it can be re-run
+// after the materials step (a restock order or stock-out wait can outdate the
+// first approval). Same decisions, same order: task constraint only when no crew,
+// operator + task constraints otherwise.
+inline sim::Process Carrier::check_shift_fit(const Alternative::OpsList& operators, double duration) {
+    Action task_d =
+        task->config->protocols.task_shift_constraint->decide(task->current_or_last_shift(), duration);
     if (operators.empty()) {
-        Action d = task->config->protocols.task_shift_constraint->decide(task->current_or_last_shift(),
-                                                                         ideal_duration);
-        co_await call(freeze_abort_if(d == Action::ABORT));
-        *out = ideal_duration;
+        co_await call(freeze_abort_if(task_d == Action::ABORT));
         co_return;
     }
-
-    SamplerPtr productivity = operators[0].first->productivity;
-
-    double duration = 0;
-    switch (task->config->protocols.operators_self_conscious->decide()) {
-        case ConsciousnessState::CONSCIOUS: duration = ideal_duration / productivity->sample_now(); break;
-        case ConsciousnessState::UNCONSCIOUS: duration = ideal_duration; break;
-    }
-
     const Interval* current_operator_shift = operators[0].first->current_or_last_shift();
-    Action od = task->config->protocols.operator_shift_constraint->decide(current_operator_shift, duration);
-    Action td = task->config->protocols.task_shift_constraint->decide(task->current_or_last_shift(), duration);
+    Action op_d =
+        task->config->protocols.operator_shift_constraint->decide(current_operator_shift, duration);
+    co_await call(freeze_abort_if(op_d == Action::ABORT || task_d == Action::ABORT));
+}
 
-    co_await call(freeze_abort_if(od == Action::ABORT || td == Action::ABORT));
-    *out = duration;
+inline double Carrier::operator_fit_deadline(const Alternative::OpsList& operators) {
+    return operators.empty()
+               ? sim::inf
+               : task->config->protocols.operator_shift_constraint->deadline(
+                     operators[0].first->current_or_last_shift());
 }
 
 inline sim::Process Carrier::handle_batch_operators(Alternative& operators, double earliest_deadline,
@@ -1612,10 +1742,19 @@ inline sim::Process Carrier::handle_batch_operators(Alternative& operators, doub
 
     if (do_restock) {
         co_await call(handle_restock());
-        co_await call(request_resources(earliest_deadline - duration - (fail_before - ideal_duration)));
+        // §17: a materials wait that cannot end before the crew's fit deadline can
+        // never pass the re-check below — give up (freeing the crew) the moment
+        // success becomes impossible, not when the materials show up.
+        double base = earliest_deadline - duration - (fail_before - ideal_duration);
+        double fit = operator_fit_deadline(*recuperated) - duration;
+        co_await call(request_resources(std::min(base, fit)));
+        co_await call(check_shift_fit(*recuperated, duration));  // §17: re-check after materials
     }
 
     co_await hold(duration);
+    double booked = 0;  // §12: operator-minutes booked by this batch crew
+    for (const auto& [g, c] : *recuperated) booked += c;
+    task->labor_minutes += booked * duration;
     release(Alternative::reqspecs_(*recuperated));
 }
 
@@ -1623,7 +1762,9 @@ inline sim::Process Carrier::handle_task_operators(double earliest_deadline, dou
     double duration = 0;
     co_await call(handle_operators(task->task_operators, ideal_duration, &duration));
     co_await call(handle_restock());
-    co_await call(request_resources(earliest_deadline - duration));
+    double fit = std::min(earliest_deadline, operator_fit_deadline(task->task_operators));
+    co_await call(request_resources(fit - duration));               // §17: tighten by the crew deadline
+    co_await call(check_shift_fit(task->task_operators, duration));  // §17: re-check after materials
     co_await hold(duration);
 }
 
@@ -1668,7 +1809,8 @@ inline sim::Process Carrier::process() {
 
     if (task->flexible_shutdowns->adapt(Interval(start_time, env->now()))) task->is_frozen.set(true);
 
-    if (task->is_frozen() && !task->skip_frozen_check && !task->skip_downtime_check) task->release();
+    if (task->is_frozen() && !task->skip_frozen_check && !task->skip_downtime_check)
+        task->release_task_operators();
 
     co_await call(successfully_end_process());
 }
@@ -1898,7 +2040,7 @@ class PieceTask : public Task, public PickyPieceTaker {
             if (outs != nullptr) c->abort_to(*outs);
             else c->abort();
         }
-        release();
+        release_task_operators();  // §7/§16: release the held PER_TASK crew (idempotent)
         started_up = false;
     }
 
@@ -2332,6 +2474,9 @@ inline void PieceCarrier::abort_to(const std::vector<Outlet*>& outlets) {
 
     task->pending_carriers.remove(this);
     task->active_carriers.remove(this);
+    // §16: a freeze-abort must not keep the PER_TASK crew reserved through the
+    // frozen wait, but only once no other carrier is still mid-run with it.
+    if (task->active_carriers.empty()) task->release_task_operators();
     cancel();
 }
 
@@ -2474,7 +2619,7 @@ class ResourceTask : public Task {
         for (Carrier* c : pending_carriers) all.push_back(c);
         for (Carrier* c : active_carriers) all.push_back(c);
         for (Carrier* c : all) c->abort();
-        release();
+        release_task_operators();  // §7/§16: release the held PER_TASK crew (idempotent)
         started_up = false;
     }
 
@@ -2677,6 +2822,8 @@ inline void ResourceCarrier::abort() {
 
     task->pending_carriers.remove(this);
     task->active_carriers.remove(this);
+    // §16: free the PER_TASK crew on a freeze-abort once no carrier is mid-run.
+    if (task->active_carriers.empty()) task->release_task_operators();
     cancel();
 }
 
