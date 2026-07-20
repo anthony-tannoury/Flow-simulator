@@ -399,20 +399,26 @@ the stopping criterion now drives which is built.
 
 * The flow designer offered `LogNormal` (fields `mean`, `sigma`) but the parser
   never mapped it, so any flow using it raised "unknown distribution type".
-* `sampler.py` gains a `LogNormal` class: `exp(Normal(mean, sigma))`, where
-  `mean`/`sigma` are the parameters of the underlying normal (the mean and std
-  of the variable's log, the numpy.random.lognormal convention). It composes
-  salabim's `Normal` so it draws from the shared seeded stream, and exposes the
-  salabim-distribution interface the code relies on: `sample()` and
-  `mean()` = `exp(mu + sigma^2 / 2)` (the closed-form mean, used by
-  `kpis.ideal_cycle_times` for `tc_ideal`). salabim has no LogNormal, hence the
-  hand-rolled class.
+* `sampler.py` gains a `LogNormal` class parameterised by the mean and standard
+  deviation of the VALUES themselves (real-space), NOT the log-space mu/sigma of
+  numpy.random.lognormal. `LogNormal(120, 30)` draws positive values averaging
+  120 with std 30 — same reading as `Normal(120, 30)` and consistent with every
+  other distribution in the tool (all real, physical parameters). It converts
+  `(mean, std)` to the underlying normal via `sigma^2 = ln(1 + (std/mean)^2)`,
+  `mu = ln(mean) - sigma^2/2`, then exponentiates a salabim `Normal` draw (so it
+  stays on the shared seeded stream). `mean()` returns the real mean; `mean`
+  must be > 0. (The first cut used log-space params, so an MTTR entered as
+  `mean=120` meant `exp(120) ~ 1e52` minutes and never ended — a task stayed
+  broken for the whole run. This is the fix.)
 * `parser.DISTR_TYPE_TO_CLASS` maps `'LogNormal'` to it, so both
   `make_distribution` (Distribution wrapper) and `make_salabim_distribution`
-  (output-resource `sim.Bounded`) accept it like any other distribution.
+  (output-resource `sim.Bounded`) accept it like any other distribution. The
+  designer's JSON keys stay `mean` / `sigma` (sigma = the real std), so existing
+  files are read correctly; the designer's default `mean` is 1.0 (must be > 0).
 * C++ port: salabim++ has Normal/Uniform/Exponential/Triangular but no
-  LogNormal. Add a `LogNormal` distribution there (exp of a Normal draw, same
-  `sample`/`mean` interface) and map `"LogNormal"` in the C++ parser's
+  LogNormal. Add a `LogNormal` distribution there with the SAME real-space
+  (mean, std) parameterisation (convert to mu/sigma as above, exp of a Normal
+  draw, `mean()` = the real mean) and map `"LogNormal"` in the C++ parser's
   distribution table. This is the full designer distribution set (Constant,
   Uniform, Normal, Exponential, Triangular, LogNormal); the two sides now match.
 

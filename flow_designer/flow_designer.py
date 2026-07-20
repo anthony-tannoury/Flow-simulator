@@ -36,7 +36,7 @@ DISTRIBUTION_SPECS = {
     "Normal": [("mean", float, 0.0), ("std", float, 1.0)],
     "Exponential": [("mean", float, 1.0)],
     "Triangular": [("low", float, 0.0), ("mode", float, 0.5), ("high", float, 1.0)],
-    "LogNormal": [("mean", float, 0.0), ("sigma", float, 1.0)],
+    "LogNormal": [("mean", float, 1.0), ("sigma", float, 1.0)],   # mean & std of the values (mean > 0)
 }
 
 # A distribution parameter (or productivity / router probability) is either constant or a
