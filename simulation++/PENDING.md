@@ -61,7 +61,20 @@ by the entries below.
   `t`, `.mean()`; `Distribution.mean_now()` = `mean(env.now())`.
   (salabim++ distributions already expose `mean()`.)
 
-## 4. KPI instrumentation (`kpis.py` + hooks across the simulation)
+## 4. KPI instrumentation (`kpis.py` + hooks across the simulation)  — ⏳ partial
+
+sim.hpp so far has the mode-INDEPENDENT tallies: Task `batch_sizes` / `cycle_times`
+/ `startup_times` monitors, `all_carriers`, `pieces_in` (bumped in every collector
+take), PieceTask `deposited` / `scrapped` (SCRAP detected via `piece->queues()`),
+tallied in `PieceCarrier::successfully_end_process` and `TaskStarter`.
+
+STILL PENDING (fold into kpis++): the per-carrier mode tags + `union_mode_duration`,
+the global WIP level monitor, and `Piece.journal`. NOTE: salabim++'s `set_mode`
+records only the CURRENT mode + its start time, NOT Python salabim's mode-over-time
+monitor — so `union_mode_duration` cannot read a mode timeline. kpis++ must record
+each carrier's loading/processing intervals explicitly (start, end) instead of
+tagging modes and integrating them afterward.
+
 
 New module `simulation/kpis.py`: post-run collectors + CSV writer
 (`write_report(directory, tasks, buffers, piece_generator, run_info)` →
@@ -428,7 +441,7 @@ the stopping criterion now drives which is built.
   distribution table. This is the full designer distribution set (Constant,
   Uniform, Normal, Exponential, Triangular, LogNormal); the two sides now match.
 
-## 19. Administrative task flag + admin/productive roll-up (`task.py`, `kpis.py`, `parser.py`) — mirror-worthy
+## 19. Administrative task flag + admin/productive roll-up (`task.py`, `kpis.py`, `parser.py`) — mirror-worthy  — ⏳ sim.hpp `admin` field on TaskConfig done; parser read + kpis columns/roll-up pending
 
 * `TaskConfig` gains a boolean `admin` field (reporting classification only, no
   effect on the simulation). The parser reads `pt.get('admin', False)` for both

@@ -31,6 +31,7 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -1484,6 +1485,7 @@ struct TaskConfig {
     bool independent_carriers = false;
     double timeout = sim::inf;
     int priority = 5;
+    bool admin = false;  // §19: administrative task — a reporting classification only, no behaviour
 
     Protocols protocols;
 
@@ -1557,6 +1559,13 @@ class Task : public Component, public HasShifts {
     Carrier* awaiting_carrier = nullptr;            // the pending carrier the process is parked on
     CarrierTracker pending_carriers;
     CarrierTracker active_carriers;
+
+    // §4 KPI instrumentation: finished carriers stay readable, tallies fill on deposit
+    std::vector<Carrier*> all_carriers;
+    sim::Monitor batch_sizes{"batch_sizes"};
+    sim::Monitor cycle_times{"cycle_times"};
+    sim::Monitor startup_times{"startup_times"};
+    int pieces_in = 0;  // pieces physically taken from the inlets (retries included)
 
     bool skip_frozen_check = false;
     bool skip_downtime_check = false;
@@ -1648,6 +1657,7 @@ inline sim::Process TaskStarter::process() {
     }
 
     co_await hold(duration);
+    task->startup_times.tally(duration);  // §6: the setup work itself, not the wait for the crew
     double booked = 0;  // §12: the startup crew's operator-minutes
     if (got.has_value())
         for (const auto& [g, c] : *got) booked += c;
@@ -1766,6 +1776,7 @@ inline sim::Process Task::process() {
 
         Carrier* new_carrier = make_carrier();
         pending_carriers.add(new_carrier);
+        all_carriers.push_back(new_carrier);  // §4: finished carriers stay readable for KPIs
         // §16: while parked on the collector, a held PER_TASK crew must still hand
         // off at its shift end — the operator shift manager wakes this task
         // (activate breaks the wait), the crew is released, the wait resumes.
@@ -2141,6 +2152,8 @@ class PieceTask : public Task, public PickyPieceTaker {
   public:
     std::vector<Buffer*> inlets;
     std::vector<Outlet*> outlets;
+    std::map<Model*, int> deposited;  // §4: pieces deposited per model
+    std::map<Model*, int> scrapped;   // §4: of those, how many landed in a SCRAP buffer
 
     PieceTask(std::shared_ptr<PieceTaskConfig> config_, std::vector<Buffer*> inlets_,
               std::vector<Outlet*> outlets_)
@@ -2309,6 +2322,7 @@ inline sim::Process PieceCollector::collect_until(double deadline, int target, P
             co_return;
         }
         collected_pieces.push_back(piece);
+        task->pieces_in += 1;  // §4
     }
     *timed_out = false;
 }
@@ -2320,6 +2334,7 @@ inline sim::Process PieceCollector::ensure_one() {
         co_await call(pick_piece([this](Piece* p) { return task->can_take(p); },
                                  {.request_priority = task->request_priority}, &piece));
         collected_pieces.push_back(piece);
+        task->pieces_in += 1;  // §4
     }
 }
 
@@ -2333,6 +2348,7 @@ inline sim::Process PieceCollector::top_up(int limit, PieceFilter piece_filter) 
 
         co_await call(request({{vacant_slots(), 1}}, {.request_priority = task->request_priority}));
         collected_pieces.push_back(piece);
+        task->pieces_in += 1;  // §4
     }
 }
 
@@ -2408,6 +2424,7 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
             for (auto& [piece, buffer] : valid_pieces) {
                 piece->leave(*buffer);
                 collected_pieces.push_back(piece);
+                task->pieces_in += 1;  // §4
             }
 
             if (!cfg().contiguous_carriers) {
@@ -2654,7 +2671,20 @@ inline sim::Process PieceCarrier::request_resources(double fail_at) {
 
 inline sim::Process PieceCarrier::successfully_end_process() {
     piece_collector->cancel();
-    place(piece_collector->collected_pieces, ptask_()->outlets);
+
+    auto& pieces = piece_collector->collected_pieces;
+    task->batch_sizes.tally(static_cast<double>(pieces.size()));            // §4
+    task->cycle_times.tally(env->now() - creation_time());                 // §4
+    place(pieces, ptask_()->outlets);
+    for (Piece* piece : pieces) {                                          // §4
+        ptask_()->deposited[piece->model] += 1;
+        for (sim::Queue* q : piece->queues())
+            if (auto* b = dynamic_cast<Buffer*>(q);
+                b != nullptr && b->buffer_type == BufferType::SCRAP) {
+                ptask_()->scrapped[piece->model] += 1;
+                break;
+            }
+    }
     done.set(true);
 
     task->pending_carriers.remove(this);
