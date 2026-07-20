@@ -11,7 +11,7 @@ from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, Piece
 from simulation.resource_task import ResourceTask, ResourceTaskConfig, ResourceCollectorType
 from simulation.piece import Model, GoalPieceGenerator, RatePieceGenerator
 from simulation.task import Task, Scope, Protocols
-from simulation.sampler import Sampler, Distribution, FailureRate
+from simulation.sampler import Sampler, Distribution, FailureRate, LogNormal
 from simulation.function_generator import Linear, Exponential, Step, Bathtub
 from simulation.outlet import Outlet, Buffer, Router, BufferType
 from simulation.judgement_day import ByTime, ByPiecesProduced, SimulationStopper
@@ -165,7 +165,8 @@ DISTR_TYPE_TO_CLASS = {
     'Uniform': sim.Uniform,
     'Normal': sim.Normal,
     'Exponential': sim.Exponential,
-    'Triangular': sim.Triangular
+    'Triangular': sim.Triangular,
+    'LogNormal': LogNormal,
 }
 
 STR_TO_BUFFER_TYPE = {

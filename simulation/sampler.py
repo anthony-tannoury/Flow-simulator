@@ -1,8 +1,35 @@
+import math
+
 import salabim as sim
 import numpy as np
 
 from simulation import env
 from typing import Protocol, Callable
+
+
+class LogNormal:
+    """Log-normal distribution: exp(Normal(mean, sigma)).
+
+    `mean` and `sigma` are the parameters of the *underlying* normal, i.e. the
+    mean and standard deviation of the variable's natural logarithm (the same
+    convention as numpy.random.lognormal and the flow designer's LogNormal
+    fields). salabim has no LogNormal, so this composes salabim's Normal and
+    exponentiates its draws, which keeps sampling on the shared seeded random
+    stream. It exposes the same `sample()` / `mean()` interface as the salabim
+    distribution classes, so the parser's Distribution wrapper and sim.Bounded
+    use it exactly like Normal, Uniform, etc."""
+
+    def __init__(self, mean: float, sigma: float, randomstream=None, env=None) -> None:
+        self._mu = mean
+        self._sigma = sigma
+        self._normal = sim.Normal(mean, sigma, randomstream=randomstream, env=env)
+
+    def sample(self) -> float:
+        return math.exp(self._normal.sample())
+
+    def mean(self) -> float:
+        # closed-form mean of the log-normal, exp(mu + sigma^2 / 2)
+        return math.exp(self._mu + self._sigma * self._sigma / 2)
 
 
 class Sampler(Protocol):

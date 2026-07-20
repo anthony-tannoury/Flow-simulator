@@ -395,6 +395,27 @@ the stopping criterion now drives which is built.
   the same). Startup holds (`TaskStarter`) remain outside the shift
   constraint, as before.
 
+## 18. LogNormal distribution (`sampler.py`, `parser.py`) — mirror-worthy
+
+* The flow designer offered `LogNormal` (fields `mean`, `sigma`) but the parser
+  never mapped it, so any flow using it raised "unknown distribution type".
+* `sampler.py` gains a `LogNormal` class: `exp(Normal(mean, sigma))`, where
+  `mean`/`sigma` are the parameters of the underlying normal (the mean and std
+  of the variable's log, the numpy.random.lognormal convention). It composes
+  salabim's `Normal` so it draws from the shared seeded stream, and exposes the
+  salabim-distribution interface the code relies on: `sample()` and
+  `mean()` = `exp(mu + sigma^2 / 2)` (the closed-form mean, used by
+  `kpis.ideal_cycle_times` for `tc_ideal`). salabim has no LogNormal, hence the
+  hand-rolled class.
+* `parser.DISTR_TYPE_TO_CLASS` maps `'LogNormal'` to it, so both
+  `make_distribution` (Distribution wrapper) and `make_salabim_distribution`
+  (output-resource `sim.Bounded`) accept it like any other distribution.
+* C++ port: salabim++ has Normal/Uniform/Exponential/Triangular but no
+  LogNormal. Add a `LogNormal` distribution there (exp of a Normal draw, same
+  `sample`/`mean` interface) and map `"LogNormal"` in the C++ parser's
+  distribution table. This is the full designer distribution set (Constant,
+  Uniform, Normal, Exponential, Triangular, LogNormal); the two sides now match.
+
 ## Not needed in C++
 
 * Buffer monitor checkboxes were removed from the flow designer and the JSON
