@@ -1,4 +1,4 @@
-// Flow-simulator C++ engine ("flow_sim") — M1 harness.
+// Flow-simulator C++ engine ("flow_sim").
 //
 // Drop-in alternative to flow_designer/sim_runner.py. Same contract:
 //   * invoked as   flow_sim <flow.json>
@@ -9,18 +9,17 @@
 //        @@ERROR {...}     on a fatal error, before exiting nonzero
 //   * writes runs/<stamp>_<stem>/ with report.json and flow.json
 //
-// M1 status: the harness below (argument handling, the @@ protocol, the slicing
-// loop, the run folder, JSON read/write) is real and stays. Building the actual
-// simulation FROM the flow JSON is parser++ (next step); until then a small
-// placeholder sim stands in so the whole pipe is exercised end to end. Every
-// placeholder site is tagged `TODO(parser++)` / `TODO(kpis++)`.
+// The flow JSON is now parsed into a real simulation (parser++); the run is
+// sliced exactly like sim_runner.py so the stopper's plain-run semantics hold
+// (the SimulationStopper activates main, the slice returns early). The full KPI
+// report (postes/buffers/flux CSVs + the rich report.json) is kpis++, still
+// pending; until then a minimal, well-formed report.json is written and every
+// such site is tagged `TODO(kpis++)`.
 //
 // Build with Clang or MSVC — salabim.hpp uses C++20 coroutines that GCC<=13
 // miscompiles (internal compiler error).
 
-#include "simulation.hpp"
-
-#include "json.hpp"
+#include "parser.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -29,6 +28,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 using json = nlohmann::json;
@@ -38,55 +38,7 @@ namespace fs = std::filesystem;
 namespace {
 
 void emit(const char* tag, const json& payload) {
-    // std::endl flushes: the designer reads these lines live.
-    std::cout << "@@" << tag << ' ' << payload.dump() << std::endl;
-}
-
-// --- placeholder simulation ------------------------------------------------
-// TODO(parser++): replace with `build_from_json(flow)` — a generator, tasks,
-// buffers, operators, routers, criterion built from the JSON. For now: one
-// model, one instant task, a 50-piece goal, so the harness has something real
-// to run and count.
-struct Built {
-    Buffer* exit_buffer;
-};
-
-Built build_placeholder() {
-    auto* m = new Model("M");
-    Intervals shifts{interval(0, 100000)};
-    auto* in_buffer = new Buffer("in", {m}, BufferType::PASSAGE);
-    auto* exit_buffer = new Buffer("out", {m}, BufferType::EXIT);
-    sim::make<GoalPieceGenerator>({}, std::vector<std::pair<Model*, int>>{{m, 50}},
-                              shifts, std::vector<Outlet*>{in_buffer});
-
-    Protocols protocols{
-        .pending_carriers_pre_flexible_shutdowns = std::make_shared<AbortPendingCarriers>(),
-        .pending_carrier_pre_task_shift_end = std::make_shared<AbortPendingCarriers>(),
-        .operator_shift_constraint = std::make_shared<NotConstrainedByShift>(),
-        .task_shift_constraint = std::make_shared<NotConstrainedByShift>(),
-        .operators_self_conscious = std::make_shared<Conscious>(),
-    };
-    auto cfg = std::make_shared<PieceTaskConfig>();
-    cfg->task_shifts = {interval(0, 100000)};
-    cfg->startup_duration = distribution(DistType::Constant, {0});
-    cfg->loading_duration = distribution(DistType::Constant, {0});
-    cfg->startup_operators = Alternative();
-    cfg->loading_operators = Alternative();
-    cfg->operators = Alternative();
-    cfg->operator_scope = Scope::PER_BATCH;
-    cfg->resource_scope = Scope::PER_BATCH;
-    cfg->min_carriers = 1;
-    cfg->max_capacity = 1;
-    cfg->contiguous_carriers = false;
-    cfg->independent_carriers = false;
-    cfg->timeout = 100;
-    cfg->priority = 5;
-    cfg->protocols = protocols;
-    cfg->models_configs = {{m, ModelConfig{distribution(DistType::Constant, {5}), {}, 1, 1}}};
-    cfg->piece_collector_type = PieceCollectorType::NON_DISCRIMINATING_GREEDY;
-    sim::make<PieceTask>({}, cfg, std::vector<Buffer*>{in_buffer}, std::vector<Outlet*>{exit_buffer});
-
-    return {exit_buffer};
+    std::cout << "@@" << tag << ' ' << payload.dump() << std::endl;  // endl flushes: read live
 }
 
 std::string timestamp() {
@@ -94,6 +46,10 @@ std::string timestamp() {
     char buf[32];
     std::strftime(buf, sizeof(buf), "%Y-%m-%d_%H%M%S", std::localtime(&now));
     return buf;
+}
+
+double wall_seconds(std::chrono::steady_clock::time_point t0) {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 }
 
 }  // namespace
@@ -110,57 +66,85 @@ int main(int argc, char** argv) {
             emit("ERROR", {{"message", "cannot open " + json_path.string()}});
             return 2;
         }
-        json flow = json::parse(f);  // reads UTF-8; the mojibake bug can't recur here
-
-        // TODO(parser++): consume `flow` fully. For now just prove it parsed.
-        std::string start_date = flow.value("start_date", "");
-        std::size_t node_count = flow.contains("nodes") ? flow["nodes"].size() : 0;
+        std::stringstream buffer;
+        buffer << f.rdbuf();
+        std::string flow_text = buffer.str();  // nlohmann decodes UTF-8 (no mojibake)
 
         auto& e = init(0, false);
         e.trace(false);
-        Built built = build_placeholder();
 
-        // TODO(parser++): derive TILL and the criterion from the JSON.
-        const double TILL = 2880.0;
-        const double SLICE = 240.0;
-        emit("META", {{"engine", "cpp"},
-                      {"criterion", "placeholder"},
-                      {"nodes", node_count},
-                      {"start_date", start_date},
-                      {"total_time", TILL}});
+        parser::Parser p(flow_text);
+        p.load_all();
+        StoppingCriterion* criterion = p.stopping_criterion;
+        Buffer* exit_buffer = p.exit_buffer();
+
+        // --- @@META + slice stride (mirror sim_runner.py) ----------------------
+        json meta = {{"engine", "cpp"},
+                     {"file", json_path.string()},
+                     {"sim_start", p.data.value("start_date", "")}};
+        double stride = 30.0;
+        if (auto* bt = dynamic_cast<ByTime*>(criterion)) {
+            meta["criterion"] = "ByTime";
+            meta["total_time"] = bt->time;
+            stride = std::max(1.0, bt->time / 1000.0);  // ~1000 progress points
+        } else if (auto* bp = dynamic_cast<ByPiecesProduced*>(criterion)) {
+            meta["criterion"] = "ByPiecesProduced";
+            meta["goal"] = bp->total;
+            if (!std::isinf(bp->timeout)) meta["timeout"] = bp->timeout;
+            stride = 30.0;  // sim minutes per slice; grows when slices turn out empty
+        } else {
+            emit("ERROR", {{"message", "unknown stopping criterion"}});
+            return 1;
+        }
+        emit("META", meta);
 
         auto t0 = std::chrono::steady_clock::now();
-        for (double target = SLICE;; target += SLICE) {
-            e.run(sim::RunOpts{.till = std::min(target, TILL)});
-            double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-            emit("PROGRESS", {{"sim_now", e.now()},
-                              {"elapsed", elapsed},
-                              {"pieces", static_cast<int>(built.exit_buffer->size())}});
-            if (e.now() >= TILL || std::isinf(e.peek())) break;
-        }
+        auto snapshot = [&]() {
+            return json{{"sim_now", e.now()},
+                        {"elapsed", wall_seconds(t0)},
+                        {"pieces", static_cast<int>(exit_buffer ? exit_buffer->size() : 0)}};
+        };
 
-        fs::path out_dir = fs::current_path() / "runs" / (timestamp() + "_" + json_path.stem().string());
+        // Slice so progress can be reported from outside the sim; the stopper
+        // activates main, so a slice returns early when the criterion fires.
+        double last_emit = -1.0;
+        while (!criterion->done()) {
+            auto slice_started = std::chrono::steady_clock::now();
+            e.run(sim::RunOpts{.till = e.now() + stride});
+            if (std::isinf(e.peek()) && !criterion->done()) break;  // nothing left to schedule
+            double now = wall_seconds(t0);
+            if (now - last_emit >= 0.1) {
+                emit("PROGRESS", snapshot());
+                last_emit = now;
+            }
+            if (wall_seconds(slice_started) < 0.005) stride = std::min(stride * 2, 1440.0);
+        }
+        emit("PROGRESS", snapshot());
+
+        // --- run folder + report ----------------------------------------------
+        fs::path out_dir =
+            fs::current_path() / "runs" / (timestamp() + "_" + json_path.stem().string());
         fs::create_directories(out_dir);
 
         // TODO(kpis++): the full report — postes/buffers/flux/operateurs CSVs and
-        // the rich report.json. For now a minimal, well-formed report.json so the
-        // designer's results mode has the run block to read.
+        // the rich report.json (raw KPI dicts, admin_summary, graphs map). For now
+        // a minimal, well-formed report.json so results mode has a run block.
+        int exit_pieces = static_cast<int>(exit_buffer ? exit_buffer->size() : 0);
         json report;
         report["format"] = "flow-simulator-report";
         report["version"] = 1;
         report["run"] = {{"engine", "cpp"},
-                         {"sim_end_minutes", e.now()},
-                         {"pieces_sorties", static_cast<int>(built.exit_buffer->size())},
                          {"source_file", json_path.string()},
-                         {"flow_snapshot", "flow.json"}};
+                         {"flow_snapshot", "flow.json"},
+                         {"sim_end_minutes", e.now()},
+                         {"criterion", p.data.at("stopping_criterion")},
+                         {"pieces_sorties", exit_pieces}};
         std::ofstream(out_dir / "report.json") << report.dump(1);
-        std::ofstream(out_dir / "flow.json") << flow.dump(1);
+        std::ofstream(out_dir / "flow.json") << flow_text;  // byte copy of the flow that ran
 
-        double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        emit("DONE", {{"report_dir", out_dir.string()},
-                      {"sim_now", e.now()},
-                      {"elapsed", elapsed},
-                      {"pieces", static_cast<int>(built.exit_buffer->size())}});
+        json done = snapshot();
+        done["report_dir"] = out_dir.string();
+        emit("DONE", done);
         return 0;
     } catch (const std::exception& ex) {
         emit("ERROR", {{"message", ex.what()}});
