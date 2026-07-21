@@ -16,7 +16,7 @@ int main() {
 
     Intervals gen_shifts{interval(0, 480), interval(600, 1080)};
     auto* b0 = new Buffer("B0", {model_a, model_b}, BufferType::PASSAGE);
-    auto* gen = sim::make<PieceGenerator>({}, std::vector<std::pair<Model*, int>>{{model_a, 30}, {model_b, 20}},
+    auto* gen = sim::make<GoalPieceGenerator>({}, std::vector<std::pair<Model*, int>>{{model_a, 30}, {model_b, 20}},
                                           gen_shifts, std::vector<Outlet*>{b0});
 
     auto* og1 = new OperatorGroup("og1", 2, Intervals{interval(0, 1400)},

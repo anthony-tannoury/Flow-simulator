@@ -160,7 +160,7 @@
         }
       },
       "shifts": [
-        "shift_a02b817c"
+        "shift_98ac7b07"
       ],
       "id": "operator_97fcb1f5"
     },
@@ -177,7 +177,7 @@
         }
       },
       "shifts": [
-        "shift_74a22217"
+        "shift_efa35ddc"
       ],
       "id": "operator_796ea384"
     }
@@ -231,7 +231,7 @@
   ],
   "shifts": [
     {
-      "id": "shift_c01ba51b",
+      "id": "shift_10bc51e7",
       "name": "Temps d'ouverture P1",
       "mode": "weekly",
       "days_off": [
@@ -298,7 +298,7 @@
       }
     },
     {
-      "id": "shift_191d58b8",
+      "id": "shift_4386d987",
       "name": "Temps d'ouverture P3",
       "mode": "weekly",
       "days_off": [
@@ -372,7 +372,7 @@
       }
     },
     {
-      "id": "shift_43a68d28",
+      "id": "shift_a76e9dea",
       "name": "Temps d'ouverture P2",
       "mode": "custom",
       "days_off": [
@@ -399,9 +399,9 @@
         "closingday_8389bb93",
         "closingday_745a3415",
         "closingday_9e5d6ccf",
+        "closingday_61cc949d",
         "closingday_c040805a",
         "closingday_914d12ae",
-        "closingday_61cc949d",
         "closingday_bc9e8f7e"
       ],
       "days": [
@@ -540,19 +540,15 @@
       }
     },
     {
-      "id": "shift_a02b817c",
+      "id": "shift_98ac7b07",
       "name": "SHIFT_NUIT",
       "mode": "weekly",
       "days_off": [
-        "closingday_fcd95861",
         "closingday_f5ba34fa",
         "closingday_8389bb93",
         "closingday_745a3415",
         "closingday_9e5d6ccf",
-        "closingday_61cc949d",
-        "closingday_c040805a",
-        "closingday_914d12ae",
-        "closingday_bc9e8f7e"
+        "closingday_61cc949d"
       ],
       "days": [
         {
@@ -626,21 +622,15 @@
         }
       ],
       "horizon": {
-        "start": "01-01-2026",
-        "end": "31-12-2026"
+        "start": "01-05-2026",
+        "end": "30-09-2026"
       }
     },
     {
-      "id": "shift_74a22217",
+      "id": "shift_efa35ddc",
       "name": "SHITF_RENFORT_SAM",
       "mode": "weekly",
       "days_off": [
-        "closingday_fcd95861",
-        "closingday_f5ba34fa",
-        "closingday_8389bb93",
-        "closingday_745a3415",
-        "closingday_9e5d6ccf",
-        "closingday_61cc949d",
         "closingday_c040805a",
         "closingday_914d12ae",
         "closingday_bc9e8f7e"
@@ -681,68 +671,69 @@
         }
       ],
       "horizon": {
-        "start": "01-01-2026",
+        "start": "01-10-2026",
         "end": "31-12-2026"
       }
     }
   ],
   "stopping_criterion": {
     "type": "ByPiecesProduced",
-    "timeout": "inf",
+    "timeout": 1051200.0,
     "grace_period": 30000.0,
     "models_goals": [
       {
         "model": "model_c1c20e4c",
-        "goal": 300
+        "goal": 1000
       },
       {
         "model": "model_f551538b",
-        "goal": 300
+        "goal": 1000
       },
       {
         "model": "model_f8a1d4ad",
-        "goal": 300
+        "goal": 1000
       },
       {
         "model": "model_742fd366",
-        "goal": 300
+        "goal": 1000
       },
       {
         "model": "model_300990ff",
-        "goal": 450
+        "goal": 1500
       },
       {
         "model": "model_e093ec36",
-        "goal": 450
+        "goal": 1500
       },
       {
         "model": "model_02d3ef7d",
-        "goal": 450
+        "goal": 1500
       },
       {
         "model": "model_256d4101",
-        "goal": 450
+        "goal": 1500
       }
     ]
   },
   "start_date": "01-01-2026 00:00",
+  "seed": 1,
   "nodes": [
     {
       "id": "piecegenerator_590444be",
       "kind": "PieceGenerator",
       "name": "Piece Generator",
       "shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "outlets": [
         "buffer_81433f15",
         "buffer_a2f5ab52"
       ],
       "position": [
-        273.96968580714,
-        604.2307455658138
+        270.3322687112232,
+        606.0494541137721
       ]
     },
     {
@@ -757,7 +748,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 5.0
+                "value": 0.28
               }
             }
           },
@@ -843,9 +834,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -878,6 +869,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_81433f15"
@@ -892,8 +884,8 @@
         "breakdown_97702ad0"
       ],
       "position": [
-        1132.6846157388109,
-        -2.9601283396991676
+        1128.91984417801,
+        -4.842514120099608
       ]
     },
     {
@@ -932,7 +924,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 5.0
+                "value": 0.28
               }
             }
           },
@@ -1012,9 +1004,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1047,6 +1039,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_81433f15"
@@ -1105,7 +1098,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 2.5
+                "value": 1.08
               }
             }
           },
@@ -1191,9 +1184,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1226,6 +1219,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_064a900c"
@@ -1252,7 +1246,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 2.5
+                "value": 1.08
               }
             }
           },
@@ -1338,9 +1332,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1373,6 +1367,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_064a900c"
@@ -1423,7 +1418,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 1.3
+                "value": 1.27
               }
             }
           },
@@ -1509,9 +1504,9 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1544,6 +1539,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_a2f5ab52"
@@ -1574,7 +1570,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 1.3
+                "value": 1.27
               }
             }
           },
@@ -1660,9 +1656,9 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1695,6 +1691,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_a2f5ab52"
@@ -1744,11 +1741,11 @@
         {
           "model": "model_f6960dbd",
           "duration": {
-            "dist_type": "Constant",
+            "dist_type": "Exponential",
             "params": {
-              "value": {
+              "mean": {
                 "kind": "constant",
-                "value": 480.0
+                "value": 1.0
               }
             }
           },
@@ -1804,9 +1801,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1839,6 +1836,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_110b4e16"
@@ -1849,8 +1847,8 @@
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        3168.303449671229,
-        -233.92743365650642
+        3168.3034496712294,
+        -236.86589713995525
       ]
     },
     {
@@ -1966,9 +1964,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2001,6 +1999,7 @@
       "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_0f2b0dc8"
@@ -2049,124 +2048,34 @@
       "name": "MACHINEMARQUAGELASER",
       "models_configs": [
         {
-          "model": "model_c1c20e4c",
+          "model": "model_f6960dbd",
           "duration": {
             "dist_type": "Constant",
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 18.0
+                "value": 1.0
               }
             }
           },
           "resources": [],
-          "min_carrier_capacity": 16,
-          "max_carrier_capacity": 16
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
         },
         {
-          "model": "model_f551538b",
+          "model": "model_3853af8a",
           "duration": {
             "dist_type": "Constant",
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 18.0
+                "value": 1.0
               }
             }
           },
           "resources": [],
-          "min_carrier_capacity": 12,
-          "max_carrier_capacity": 12
-        },
-        {
-          "model": "model_f8a1d4ad",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 6,
-          "max_carrier_capacity": 6
-        },
-        {
-          "model": "model_742fd366",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 6,
-          "max_carrier_capacity": 6
-        },
-        {
-          "model": "model_300990ff",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 28,
-          "max_carrier_capacity": 28
-        },
-        {
-          "model": "model_e093ec36",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 28,
-          "max_carrier_capacity": 28
-        },
-        {
-          "model": "model_02d3ef7d",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 28,
-          "max_carrier_capacity": 28
-        },
-        {
-          "model": "model_256d4101",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 5,
-          "max_carrier_capacity": 5
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
         }
       ],
       "startup_duration": {
@@ -2241,9 +2150,9 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2271,11 +2180,12 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 28.0,
+      "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_6ffdb86b"
@@ -2349,7 +2259,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 1.5
+                "value": 0.43
               }
             }
           },
@@ -2455,9 +2365,9 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2490,7 +2400,8 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
-      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
+      "admin": false,
+      "collector_type": "DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_38e4202f"
       ],
@@ -2817,9 +2728,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2852,6 +2763,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_6beb763a"
@@ -2948,7 +2860,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 5.0
+                "value": 0.43
               }
             }
           },
@@ -3054,9 +2966,9 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3089,7 +3001,8 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
-      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
+      "admin": false,
+      "collector_type": "DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_b8b3f7d4"
       ],
@@ -3119,7 +3032,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 5.0
+                "value": 0.43
               }
             }
           },
@@ -3225,9 +3138,9 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3260,6 +3173,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_79e94d3c"
@@ -3286,7 +3200,7 @@
             "params": {
               "value": {
                 "kind": "constant",
-                "value": 5.0
+                "value": 0.43
               }
             }
           },
@@ -3392,9 +3306,9 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3427,6 +3341,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_79e94d3c"
@@ -3509,9 +3424,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3544,6 +3459,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_dc32b97e"
@@ -3554,7 +3470,7 @@
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        9183.360951624785,
+        9185.967291212319,
         -8.0462808912215
       ]
     },
@@ -3720,9 +3636,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3755,6 +3671,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_bb06c997"
@@ -3910,9 +3827,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3945,6 +3862,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_dfda3dbf"
@@ -4099,9 +4017,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -4134,6 +4052,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_70baa0d8"
@@ -4144,7 +4063,7 @@
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        7126.998429050894,
+        7129.604768638425,
         -335.8413749248625
       ]
     },
@@ -4231,9 +4150,9 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -4266,6 +4185,7 @@
       "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_430ed3f8",

@@ -31,7 +31,7 @@ int main() {
     std::fprintf(stderr, "\n");
 
     auto* b0 = new Buffer("B0", {model_a}, BufferType::PASSAGE);
-    auto* gen = sim::make<PieceGenerator>({}, std::vector<std::pair<Model*, int>>{{model_a, 40}},
+    auto* gen = sim::make<GoalPieceGenerator>({}, std::vector<std::pair<Model*, int>>{{model_a, 40}},
                                           gen_shifts, std::vector<Outlet*>{b0});
 
     auto* og1 = new OperatorGroup("og1", 1, Intervals{interval(360, 840), interval(840, 1320)},

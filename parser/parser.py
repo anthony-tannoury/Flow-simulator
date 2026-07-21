@@ -4,7 +4,7 @@ import shutil
 import salabim as sim
 
 from time import perf_counter
-from simulation import env, kpis, graphs
+from simulation import env, kpis, graphs, reseed
 
 from datetime import date, time, datetime, timedelta
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
@@ -217,6 +217,11 @@ class Parser:
         # written faithfully to the report CSVs. The flow JSON is always UTF-8.
         with open(filename, 'r', encoding='utf-8') as file:
             self.data = json.load(file)
+        # Re-seed the shared environment before anything is built or drawn, so the
+        # run is reproducible for the flow's seed (0 by default) and differs between
+        # seeds. Must happen here, ahead of load_all's object construction.
+        self.seed = int(self.data.get('seed', 0))
+        reseed(self.seed)
         self.sim_start = to_datetime(self.data['start_date'])
         self.discriminate()
         self.by_id = {n['id']: n for n in self.data['nodes']}
@@ -277,7 +282,8 @@ class Parser:
             piece_generator=self.piece_generator,
             run_info=run_info,
             sim_start=self.sim_start,
-            operator_groups=list(self.operator_groups.values())
+            operator_groups=list(self.operator_groups.values()),
+            resources=list(self.resources.values())
         )
         graphs.write_graphs(
             os.path.join(directory, 'graphes'),
@@ -338,6 +344,7 @@ class Parser:
             'buffers': {id_: kpis.buffer_kpis(b) for id_, b in self.outlets.items()
                         if isinstance(b, Buffer)},
             'operators': {id_: kpis.operator_kpis(g) for id_, g in self.operator_groups.items()},
+            'resources': {id_: kpis.resource_kpis(r) for id_, r in self.resources.items()},
             'flux': flux,
             'flux_modeles': flux_modeles,
             'graphs': {
@@ -442,35 +449,85 @@ class Parser:
         for closing_day in self.data['closing_days']:
             self.closing_days[closing_day['id']] = to_date(closing_day['date'])
 
+    @staticmethod
+    def _shift_date(when, k: int, rep: dict):
+        """`when` (a date or datetime) moved forward by k repeat-translations: k*years
+        and k*months as calendar arithmetic (the day is clamped to the target month, so
+        29 Feb in a non-leap year lands on 28 Feb), then k*(weeks*7 + days) fixed days.
+        Returns the same type as `when`, so a yearly repeat keeps the calendar date."""
+        import calendar as _calendar
+        months = k * (int(rep.get('years', 0)) * 12 + int(rep.get('months', 0)))
+        total = when.year * 12 + (when.month - 1) + months
+        year, month0 = divmod(total, 12)
+        month = month0 + 1
+        day = min(when.day, _calendar.monthrange(year, month)[1])
+        shifted = when.replace(year=year, month=month, day=day)
+        fixed = k * (int(rep.get('weeks', 0)) * 7 + int(rep.get('days', 0)))
+        return shifted + timedelta(days=fixed) if fixed else shifted
+
+    def _generate_shift(self, shift: dict, days_off: set,
+                        custom_intervals=None, horizon=None) -> list[Interval]:
+        """Generate one shift's intervals. The source dates (weekly horizon or custom
+        intervals) and the days off may be overridden to render a translated copy."""
+        match canon_name(shift['mode']):
+            case 'weekly':
+                working_days = [d['working'] for d in shift['days']]
+                shifts_per_day = [[(to_minutes(s['start']), to_minutes(s['end'])) for s in d['intervals']]
+                                  for d in shift['days']]
+                start, end = horizon if horizon is not None else (to_date(shift['horizon']['start']),
+                                                                  to_date(shift['horizon']['end']))
+                return ShiftManager.generate_weekly_shifts(
+                    sim_start=self.sim_start, shifts_per_day=shifts_per_day,
+                    working_days=working_days, days_off=days_off, start=start, end=end)
+            case 'custom':
+                intervals = (custom_intervals if custom_intervals is not None
+                             else [(to_datetime(i['start']), to_datetime(i['end']))
+                                   for i in shift['custom_intervals']])
+                return ShiftManager.generate_custom_shifts(
+                    sim_start=self.sim_start, shifts=intervals, days_off=days_off)
+            case _:
+                raise NotImplementedError()
+
     def load_shifts(self) -> None:
         self.shifts: dict[str, list[Interval]] = {}
 
         for shift in self.data['shifts']:
-            days_off = {self.closing_days[d] for d in shift['days_off']}
+            base_days_off = {self.closing_days[d] for d in shift['days_off']}
+            intervals = self._generate_shift(shift, base_days_off)
 
-            match canon_name(shift['mode']):
-                case 'weekly':
-                    working_days = [d['working'] for d in shift['days']]
-                    shifts_per_day = [[(to_minutes(s['start']), to_minutes(s['end'])) for s in d['intervals']] for d in shift['days']]
-                    start = to_date(shift['horizon']['start'])
-                    end = to_date(shift['horizon']['end'])
-                    self.shifts[shift['id']] = ShiftManager.generate_weekly_shifts(
-                        sim_start=self.sim_start,
-                        shifts_per_day=shifts_per_day,
-                        working_days=working_days,
-                        days_off=days_off,
-                        start=start,
-                        end=end
-                    )
-                case 'custom':
-                    intervals = [(to_datetime(i['start']), to_datetime(i['end'])) for i in shift['custom_intervals']]
-                    self.shifts[shift['id']] = ShiftManager.generate_custom_shifts(
-                        sim_start=self.sim_start,
-                        shifts=intervals,
-                        days_off=days_off
-                    )
-                case _:
-                    raise NotImplementedError()
+            # Repeat: append `count` translated copies of the whole shift. Each copy k
+            # is regenerated from source dates moved forward by k translations (see
+            # _shift_date), with its days off shifted the same way — so a December block
+            # repeated yearly keeps its dates (leap years handled) and gets that year's
+            # equivalent days off. Union-merge keeps the result sorted and disjoint.
+            rep = shift.get('repeat') or {}
+            count = int(rep.get('count', 0))
+            has_translation = any(int(rep.get(u, 0)) for u in ('years', 'months', 'weeks', 'days'))
+            if count > 0 and has_translation:
+                weekly = canon_name(shift['mode']) == 'weekly'
+                pieces = list(intervals)
+                for k in range(1, count + 1):
+                    days_off_k = {self._shift_date(d, k, rep) for d in base_days_off}
+                    if weekly:
+                        horizon = (self._shift_date(to_date(shift['horizon']['start']), k, rep),
+                                   self._shift_date(to_date(shift['horizon']['end']), k, rep))
+                        pieces += self._generate_shift(shift, days_off_k, horizon=horizon)
+                    else:
+                        ci = [(self._shift_date(to_datetime(i['start']), k, rep),
+                               self._shift_date(to_datetime(i['end']), k, rep))
+                              for i in shift['custom_intervals']]
+                        pieces += self._generate_shift(shift, days_off_k, custom_intervals=ci)
+                pieces.sort(key=lambda iv: iv.start)
+                merged: list[Interval] = []
+                for iv in pieces:
+                    if merged and iv.start <= merged[-1].end:
+                        if iv.end > merged[-1].end:
+                            merged[-1] = Interval(merged[-1].start, iv.end)
+                    else:
+                        merged.append(iv)
+                intervals = merged
+
+            self.shifts[shift['id']] = intervals
 
     def load_resources(self) -> None:
         self.resources: dict[str, Resource] = {}

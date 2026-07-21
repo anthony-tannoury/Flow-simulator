@@ -345,6 +345,39 @@ def operator_kpis(group) -> dict:
     }
 
 
+def resource_kpis(resource) -> dict:
+    """Per-resource stock metrics, read from the available_quantity ("stock")
+    monitor. Consumption is the total downward movement of the stock; entrées is
+    the total upward movement (restocks for a restockable input, output for a
+    resource produced by a task). A rupture is a fall to an empty stock."""
+    tt = env.now()
+    stock = resource.available_quantity
+    values, _times = stock.xt()
+    consommation = entrees = 0.0
+    ruptures = 0
+    for i in range(1, len(values)):
+        delta = values[i] - values[i - 1]
+        if delta < 0:
+            consommation -= delta
+        else:
+            entrees += delta
+        if values[i] == 0 and values[i - 1] > 0:
+            ruptures += 1
+    return {
+        'ressource': resource.name(),
+        'capacite': resource.capacity(),
+        'stock_moyen': round(stock.mean(), 3),
+        'stock_min': round(stock.minimum(), 3),
+        'stock_max': round(stock.maximum(), 3),
+        'stock_final': round(stock(), 3),
+        'consommation_totale': round(consommation, 3),
+        'entrees_totales': round(entrees, 3),
+        'consommation_j': round(consommation / tt * 1440, 3) if tt else '',
+        'nb_ruptures': ruptures,
+        'temps_rupture': round(stock.value_duration(0), 3),
+    }
+
+
 def lead_time_rows(buffers) -> list[dict]:
     from .outlet import BufferType
     rows = []
@@ -524,7 +557,7 @@ DUREE_COLS = {
     'heures_machine', 'heures_main_oeuvre', 'heures_en_poste', 'heures_hors_poste',
     'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
-    'temps_traversee', 'tc_ideal', 'duree_simulee',
+    'temps_traversee', 'tc_ideal', 'duree_simulee', 'temps_rupture',
 }
 PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
             'trs', 'trg', 'tre', 'taux_rebut', 'atteinte', 'taux_occupation'}
@@ -560,7 +593,7 @@ def _write_csv(path: str, rows: list[dict], sim_start: datetime | None = None) -
 
 def write_report(directory: str, tasks: list, buffers: list, piece_generator=None,
                  run_info: dict | None = None, sim_start: datetime | None = None,
-                 operator_groups: list | None = None) -> str:
+                 operator_groups: list | None = None, resources: list | None = None) -> str:
     os.makedirs(directory, exist_ok=True)
 
     run = {'genere_le': datetime.now().isoformat(timespec='seconds'),
@@ -582,6 +615,8 @@ def write_report(directory: str, tasks: list, buffers: list, piece_generator=Non
 
     _write_csv(os.path.join(directory, 'operateurs.csv'),
                [operator_kpis(g) for g in (operator_groups or [])], sim_start)
+    _write_csv(os.path.join(directory, 'ressources.csv'),
+               [resource_kpis(r) for r in (resources or [])], sim_start)
 
     flux, par_modele = flow_kpis(buffers, piece_generator)
     _write_csv(os.path.join(directory, 'flux.csv'),
