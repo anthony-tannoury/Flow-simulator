@@ -1765,6 +1765,9 @@ inline sim::Process Task::request_task_operators() {
     std::optional<Alternative::OpsList> got;
     co_await call(config->operators.request(this, &got, deadline));
     task_operators = got.value_or(Alternative::OpsList{});
+    set_mode("");  // §4: clear the "wait_operators" mode the request set, so it does
+                   // not keep accruing to attente_operateurs while the crew is held
+                   // and working (Python: request_task_operators' self.set_mode(""))
     if (failed()) {
         is_frozen.set(true);
     } else {
