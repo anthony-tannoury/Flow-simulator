@@ -197,7 +197,13 @@ class RatePieceGenerator(PieceGenerator):
         self.freeloader_index = model_probs.index(None) if None in model_probs else -1
 
     def current_gap(self) -> float:
-        return self.gap if isinstance(self.gap, (int, float)) else self.gap(env.now())
+        gap = self.gap if isinstance(self.gap, (int, float)) else self.gap(env.now())
+        if gap <= 0:
+            # A gap function that crosses zero mid-run (e.g. a decreasing linear
+            # one) would otherwise emit unboundedly at a frozen instant (or, in
+            # the C++ engine, schedule into the past). Fail loudly instead.
+            raise ValueError(f"Rate generator gap must stay > 0; got {gap:.4f} at t={env.now():.1f}")
+        return gap
 
     def current_probs(self) -> list[float]:
         probs = [0.0 if p is None else (p if isinstance(p, (int, float)) else p(env.now()))
