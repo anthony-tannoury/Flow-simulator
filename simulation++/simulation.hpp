@@ -966,8 +966,14 @@ inline RatePieceGenerator::RatePieceGenerator(
 }
 
 inline double RatePieceGenerator::current_gap() {
-    return std::holds_alternative<double>(gap) ? std::get<double>(gap)
-                                               : std::get<TimeFn>(gap)(env->now());
+    double g = std::holds_alternative<double>(gap) ? std::get<double>(gap)
+                                                   : std::get<TimeFn>(gap)(env->now());
+    if (g <= 0)
+        // A gap function crossing zero mid-run would schedule into the past here
+        // (and emit unboundedly in the Python engine). Fail loudly instead. (piece.py)
+        throw std::invalid_argument("Rate generator gap must stay > 0; got " + std::to_string(g)
+                                    + " at t=" + std::to_string(env->now()));
+    return g;
 }
 
 inline std::vector<double> RatePieceGenerator::current_probs() {
