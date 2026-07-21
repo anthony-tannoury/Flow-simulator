@@ -1225,19 +1225,21 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.rep_count.setValidator(QtGui.QIntValidator(0, 100000, self))
         self.rep_count.setMaximumWidth(80)
         rf.addRow("Repetitions (extra copies)", self.rep_count)
-        m = int(rep.get("translation", 0))
         trans = QtWidgets.QHBoxLayout()
-        self.rep_w = QtWidgets.QLineEdit(str(m // 10080))
-        self.rep_d = QtWidgets.QLineEdit(str(m % 10080 // 1440))
-        self.rep_h = QtWidgets.QLineEdit(str(m % 1440 // 60))
-        self.rep_m = QtWidgets.QLineEdit(str(m % 60))
-        for w, unit in ((self.rep_w, "wk"), (self.rep_d, "d"), (self.rep_h, "h"), (self.rep_m, "m")):
-            w.setValidator(QtGui.QIntValidator(0, 10000000, self)); w.setMaximumWidth(56)
+        self.rep_y = QtWidgets.QLineEdit(str(int(rep.get("years", 0))))
+        self.rep_mo = QtWidgets.QLineEdit(str(int(rep.get("months", 0))))
+        self.rep_w = QtWidgets.QLineEdit(str(int(rep.get("weeks", 0))))
+        self.rep_d = QtWidgets.QLineEdit(str(int(rep.get("days", 0))))
+        for w, unit in ((self.rep_y, "yr"), (self.rep_mo, "mo"), (self.rep_w, "wk"), (self.rep_d, "d")):
+            w.setValidator(QtGui.QIntValidator(0, 100000, self)); w.setMaximumWidth(56)
             trans.addWidget(w); trans.addWidget(QtWidgets.QLabel(unit))
         trans.addStretch(1)
         tw = QtWidgets.QWidget(); tw.setLayout(trans)
         rf.addRow("Translation (each copy is this much later)", tw)
-        rf.addRow("", QtWidgets.QLabel("≈ 1 year: 52 wk (keeps weekdays) or 365 d (keeps dates)."))
+        rf.addRow("", QtWidgets.QLabel(
+            "Years and months are calendar-aware: +1 yr is the same date next year\n"
+            "(leap years handled). Each copy's days off are the ones you pick here,\n"
+            "shifted into that copy's period."))
         lay.addWidget(rep_box)
 
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -1254,10 +1256,10 @@ class ShiftEditorDialog(QtWidgets.QDialog):
             "custom_intervals": self.custom.value(),
         }
         count = as_int(self.rep_count.text())
-        translation = (as_int(self.rep_w.text()) * 10080 + as_int(self.rep_d.text()) * 1440
-                       + as_int(self.rep_h.text()) * 60 + as_int(self.rep_m.text()))
-        if count > 0 and translation > 0:
-            out["repeat"] = {"count": count, "translation": translation}
+        repeat = {"count": count, "years": as_int(self.rep_y.text()), "months": as_int(self.rep_mo.text()),
+                  "weeks": as_int(self.rep_w.text()), "days": as_int(self.rep_d.text())}
+        if count > 0 and any(repeat[k] for k in ("years", "months", "weeks", "days")):
+            out["repeat"] = repeat
         return out
 
 
@@ -4892,8 +4894,59 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 # Entrypoint
 # ============================================================
 
+def _cap_dialog_height(dialog, max_frac=0.9):
+    """Keep a dialog reachable on small screens: if it is taller than the screen,
+    move its content into a scroll area (with any trailing OK/Cancel box kept fixed
+    below) and cap the height, so the buttons never fall off the bottom. Runs once."""
+    if getattr(dialog, "_height_capped", False):
+        return
+    screen = QtWidgets.QApplication.primaryScreen()
+    lay = dialog.layout()
+    if screen is None or lay is None:
+        return
+    max_h = int(screen.availableGeometry().height() * max_frac)
+    if dialog.sizeHint().height() <= max_h:
+        return
+    dialog._height_capped = True
+    bb = None  # detach a trailing button box so it stays visible below the scroll area
+    if lay.count():
+        last = lay.itemAt(lay.count() - 1).widget()
+        if isinstance(last, QtWidgets.QDialogButtonBox):
+            bb = last
+            lay.removeWidget(bb)
+    content = QtWidgets.QWidget()
+    content.setLayout(lay)  # reparents the whole layout into content; dialog loses its layout
+    scroll = QtWidgets.QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+    scroll.setWidget(content)
+    outer = QtWidgets.QVBoxLayout(dialog)
+    outer.setContentsMargins(0, 0, 0, 0)
+    outer.addWidget(scroll)
+    if bb is not None:
+        bb.setParent(dialog)
+        outer.addWidget(bb)
+    dialog.setMaximumHeight(max_h)
+    dialog.resize(dialog.width(), min(dialog.height() or max_h, max_h))
+
+
+class _DialogHeightCapper(QtCore.QObject):
+    """Application-wide: caps every custom config dialog to the screen height the
+    first time it is shown (native message/file dialogs are left alone)."""
+    _NATIVE = (QtWidgets.QMessageBox, QtWidgets.QFileDialog, QtWidgets.QInputDialog,
+               QtWidgets.QColorDialog, QtWidgets.QFontDialog, QtWidgets.QProgressDialog)
+
+    def eventFilter(self, obj, event):
+        if (event.type() == QtCore.QEvent.Show and isinstance(obj, QtWidgets.QDialog)
+                and not isinstance(obj, self._NATIVE)):
+            _cap_dialog_height(obj)
+        return False
+
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
+    app._height_capper = _DialogHeightCapper()  # kept alive on the app
+    app.installEventFilter(app._height_capper)
     window = FlowEditorWindow()
     window.show()
     return app.exec()

@@ -241,6 +241,28 @@ inline ShiftManager::DateTime parse_datetime(const std::string& s) {  // "dd-mm-
             hh, mm};
 }
 
+// A sys_days moved forward by k repeat-translations: k*years and k*months as
+// calendar arithmetic (the day is clamped to the target month, so 29 Feb in a
+// non-leap year lands on 28 Feb), then k*(weeks*7 + days) fixed days. Mirrors
+// parser.py's Parser._shift_date so a yearly repeat keeps the calendar date.
+inline std::chrono::sys_days shift_sysdays(std::chrono::sys_days d, long long k, const json& rep) {
+    using namespace std::chrono;
+    year_month_day ymd{d};
+    long long months = k * (rep.value("years", 0LL) * 12 + rep.value("months", 0LL));
+    long long total = static_cast<long long>(static_cast<int>(ymd.year())) * 12
+                      + (static_cast<unsigned>(ymd.month()) - 1) + months;
+    int y = static_cast<int>(total / 12);
+    unsigned mo = static_cast<unsigned>(total % 12) + 1;
+    year_month_day target = year{y} / month{mo} / ymd.day();
+    sys_days base = target.ok() ? sys_days{target} : sys_days{year{y} / month{mo} / std::chrono::last};
+    long long fixed = k * (rep.value("weeks", 0LL) * 7 + rep.value("days", 0LL));
+    return base + days{fixed};
+}
+
+inline ShiftManager::DateTime shift_datetime(const ShiftManager::DateTime& dt, long long k, const json& rep) {
+    return {shift_sysdays(dt.date, k, rep), dt.hour, dt.minute};
+}
+
 inline double to_minutes(const std::string& s) {  // "hh:mm"
     int hh = 0, mm = 0;
     std::sscanf(s.c_str(), "%d:%d", &hh, &mm);
@@ -409,14 +431,18 @@ class Parser {
 
     void load_shifts() {
         for (const auto& shift : data.at("shifts")) {
-            std::set<long long> days_off;
-            for (const auto& d : shift.at("days_off"))
-                days_off.insert(closing_days.at(d.get<std::string>()).time_since_epoch().count());
+            const std::string sid = shift.at("id").get<std::string>();
+            const std::string mode = canon_name(shift.at("mode").get<std::string>());
+            const json rep = shift.contains("repeat") ? shift.at("repeat") : json::object();
 
-            std::string mode = canon_name(shift.at("mode").get<std::string>());
+            std::set<long long> base_days_off;
+            for (const auto& d : shift.at("days_off"))
+                base_days_off.insert(closing_days.at(d.get<std::string>()).time_since_epoch().count());
+
+            // parse the weekly weekday config once (it does not move between copies)
+            std::vector<bool> working_days;
+            std::vector<std::vector<std::pair<double, double>>> shifts_per_day;
             if (mode == "weekly") {
-                std::vector<bool> working_days;
-                std::vector<std::vector<std::pair<double, double>>> shifts_per_day;
                 for (const auto& d : shift.at("days")) {
                     working_days.push_back(d.at("working").get<bool>());
                     std::vector<std::pair<double, double>> day;
@@ -425,48 +451,60 @@ class Parser {
                                        to_minutes(s.at("end").get<std::string>())});
                     shifts_per_day.push_back(std::move(day));
                 }
-                shifts[shift.at("id").get<std::string>()] = ShiftManager::generate_weekly_shifts(
-                    sim_start, shifts_per_day, working_days, days_off,
-                    parse_date(shift.at("horizon").at("start").get<std::string>()),
-                    parse_date(shift.at("horizon").at("end").get<std::string>()));
-            } else if (mode == "custom") {
-                std::vector<std::pair<ShiftManager::DateTime, ShiftManager::DateTime>> intervals;
-                for (const auto& i : shift.at("custom_intervals"))
-                    intervals.push_back({parse_datetime(i.at("start").get<std::string>()),
-                                         parse_datetime(i.at("end").get<std::string>())});
-                shifts[shift.at("id").get<std::string>()] =
-                    ShiftManager::generate_custom_shifts(sim_start, intervals, days_off);
-            } else {
+            } else if (mode != "custom") {
                 throw std::invalid_argument("unknown shift mode: " + shift.at("mode").get<std::string>());
             }
 
-            // Repeat: duplicate the generated intervals `count` extra times, each copy
-            // shifted later by `translation` minutes, then union-merge so the result
-            // stays sorted and disjoint. Mirrors parser.py.
-            if (shift.contains("repeat")) {
-                const auto& rep = shift.at("repeat");
-                long long count = rep.value("count", 0LL);
-                double translation = rep.value("translation", 0.0);
-                if (count > 0 && translation > 0) {
-                    const std::string sid = shift.at("id").get<std::string>();
-                    Intervals base = shifts[sid];
-                    Intervals pieces = base;
-                    for (long long k = 1; k <= count; ++k)
-                        for (const auto& iv : base)
-                            pieces.push_back(interval(iv->start + k * translation, iv->end + k * translation));
-                    std::sort(pieces.begin(), pieces.end(),
-                              [](const IntervalPtr& a, const IntervalPtr& b) { return a->start < b->start; });
-                    Intervals merged;
-                    for (const auto& iv : pieces) {
-                        if (!merged.empty() && iv->start <= merged.back()->end) {
-                            if (iv->end > merged.back()->end) merged.back()->end = iv->end;
-                        } else {
-                            merged.push_back(interval(iv->start, iv->end));  // copy: never mutate base
-                        }
-                    }
-                    shifts[sid] = merged;
+            // Generate one instance (k=0 base, k>0 a copy shifted by k translations):
+            // the source dates and the days off are moved forward by k, so a copy keeps
+            // its calendar dates (leap years handled) and gets that period's days off.
+            auto generate = [&](long long k) -> Intervals {
+                std::set<long long> days_off;
+                for (long long c : base_days_off)
+                    days_off.insert(k == 0 ? c
+                        : shift_sysdays(std::chrono::sys_days{std::chrono::days(c)}, k, rep)
+                              .time_since_epoch().count());
+                if (mode == "weekly") {
+                    auto start = parse_date(shift.at("horizon").at("start").get<std::string>());
+                    auto end = parse_date(shift.at("horizon").at("end").get<std::string>());
+                    if (k > 0) { start = shift_sysdays(start, k, rep); end = shift_sysdays(end, k, rep); }
+                    return ShiftManager::generate_weekly_shifts(sim_start, shifts_per_day, working_days,
+                                                                days_off, start, end);
                 }
+                std::vector<std::pair<ShiftManager::DateTime, ShiftManager::DateTime>> intervals;
+                for (const auto& i : shift.at("custom_intervals")) {
+                    auto s = parse_datetime(i.at("start").get<std::string>());
+                    auto e = parse_datetime(i.at("end").get<std::string>());
+                    if (k > 0) { s = shift_datetime(s, k, rep); e = shift_datetime(e, k, rep); }
+                    intervals.push_back({s, e});
+                }
+                return ShiftManager::generate_custom_shifts(sim_start, intervals, days_off);
+            };
+
+            Intervals result = generate(0);
+
+            long long count = rep.value("count", 0LL);
+            bool has_translation = rep.value("years", 0LL) || rep.value("months", 0LL)
+                                   || rep.value("weeks", 0LL) || rep.value("days", 0LL);
+            if (count > 0 && has_translation) {
+                Intervals pieces = result;
+                for (long long k = 1; k <= count; ++k) {
+                    Intervals copy = generate(k);
+                    pieces.insert(pieces.end(), copy.begin(), copy.end());
+                }
+                std::sort(pieces.begin(), pieces.end(),
+                          [](const IntervalPtr& a, const IntervalPtr& b) { return a->start < b->start; });
+                Intervals merged;
+                for (const auto& iv : pieces) {
+                    if (!merged.empty() && iv->start <= merged.back()->end) {
+                        if (iv->end > merged.back()->end) merged.back()->end = iv->end;
+                    } else {
+                        merged.push_back(interval(iv->start, iv->end));  // copy: never mutate base
+                    }
+                }
+                result = merged;
             }
+            shifts[sid] = result;
         }
     }
 
