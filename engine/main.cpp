@@ -234,6 +234,11 @@ int main(int argc, char** argv) {
                 kpis::ojson t = kpis::ojson::array(), v = kpis::ojson::array();
                 const auto& tr = m.t_raw(); const auto& xr = m.x_raw();
                 for (size_t i = 0; i < tr.size(); ++i) { t.push_back(tr[i] - off); v.push_back(xr[i]); }
+                // salabim's Monitor.xt() appends the still-current value at now, so
+                // Python graphs run to the end of the sim even when nothing changed
+                // late in the run; mirror that or the plots stop at the last change.
+                if (!tr.empty() && tr.back() - off < e.now())
+                    { t.push_back(e.now()); v.push_back(xr.back()); }
                 return kpis::ojson{{"t", t}, {"v", v}};
             };
             kpis::ojson gd;

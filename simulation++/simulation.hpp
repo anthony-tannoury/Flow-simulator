@@ -1098,9 +1098,11 @@ class Delivery : public Component {
   public:
     RestockableResource* stock;
     SamplerPtr delivery_duration;
+    double order_duration = 0.0;
 
-    Delivery(RestockableResource* stock_, SamplerPtr delivery_duration_)
-        : stock(stock_), delivery_duration(std::move(delivery_duration_)) {}
+    Delivery(RestockableResource* stock_, SamplerPtr delivery_duration_, double order_duration_ = 0.0)
+        : stock(stock_), delivery_duration(std::move(delivery_duration_)),
+          order_duration(order_duration_) {}
 
     sim::Process process() override;  // body below
 };
@@ -1123,13 +1125,21 @@ class RestockableResource : public Resource {
     sim::Process restock(Component* demander) {
         if (!active_order && available_quantity() < threshold) {
             active_order = true;
-            co_await demander->hold(order_duration->sample_now(), {.mode = "wait_materials"});  // §4
-            sim::make<Delivery>({}, this, delivery_duration);
+            // Spawn the delivery BEFORE the demander's order wait: the demander can
+            // be freeze-aborted (breakdown, shutdown, shift end) mid-hold, and when
+            // the delivery was only spawned afterwards, that cancel left active_order
+            // stuck true with no delivery coming — a permanent stock-out. (resource.py)
+            double order = order_duration->sample_now();
+            sim::make<Delivery>({}, this, delivery_duration, order);
+            co_await demander->hold(order, {.mode = "wait_materials"});  // §4
         }
     }
 };
 
 inline sim::Process Delivery::process() {
+    // The delivery owns the whole order timeline (order + transit) so it always
+    // lands and always clears active_order, even if the demander is aborted.
+    co_await hold(order_duration);
     double missing = stock->capacity() - stock->available_quantity();
     co_await hold(delivery_duration->sample_now());
     co_await call(stock->replenish(this, missing));
