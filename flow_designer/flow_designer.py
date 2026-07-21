@@ -1262,6 +1262,20 @@ class ShiftEditorDialog(QtWidgets.QDialog):
             out["repeat"] = repeat
         return out
 
+    def accept(self):
+        # Repetitions without a translation would silently repeat in place (and used
+        # to be dropped): refuse OK until the user gives the copies an offset.
+        count = as_int(self.rep_count.text())
+        translation = any(as_int(w.text()) for w in (self.rep_y, self.rep_mo, self.rep_w, self.rep_d))
+        if count > 0 and not translation:
+            qmessage(self, "Repeat has no translation",
+                     "You set repetitions but the translation is zero, so the copies "
+                     "would land on top of the original.\nGive the copies an offset "
+                     "(e.g. 1 yr for a yearly repeat), or set repetitions back to 0.",
+                     QtWidgets.QMessageBox.Warning)
+            return
+        super().accept()
+
 
 class TranslateShiftDialog(QtWidgets.QDialog):
     """Create a new shift as a copy of an existing one, shifted in time by a chosen
@@ -1910,7 +1924,8 @@ def ensure_ids(entries: list, prefix: str, old_by_name: dict | None = None, key:
 
 def _shift_export_shape(s: dict) -> dict:
     """Only the fields a shift's mode actually uses: weekly keeps days/horizon,
-    custom keeps custom_intervals; both keep days_off. mode is always present."""
+    custom keeps custom_intervals; both keep days_off and the optional repeat.
+    mode is always present."""
     mode = s.get("mode", "weekly")
     out = {"id": s.get("id"), "name": s.get("name"), "mode": mode,
            "days_off": s.get("days_off", [])}
@@ -1919,6 +1934,8 @@ def _shift_export_shape(s: dict) -> dict:
     else:
         out["days"] = s.get("days", [])
         out["horizon"] = s.get("horizon", {})
+    if s.get("repeat", {}).get("count", 0):
+        out["repeat"] = s["repeat"]
     return out
 
 
