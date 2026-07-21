@@ -227,12 +227,57 @@
       "date": "25-12-2026",
       "name": "",
       "id": "closingday_bc9e8f7e"
+    },
+    {
+      "date": "01-01-2027",
+      "name": "",
+      "id": "closingday_c88ccb49"
+    },
+    {
+      "date": "01-05-2027",
+      "name": "",
+      "id": "closingday_957e31e8"
+    },
+    {
+      "date": "08-05-2027",
+      "name": "",
+      "id": "closingday_9f120071"
+    },
+    {
+      "date": "14-05-2027",
+      "name": "",
+      "id": "closingday_749732f0"
+    },
+    {
+      "date": "14-07-2027",
+      "name": "",
+      "id": "closingday_cfc73909"
+    },
+    {
+      "date": "21-08-2027",
+      "name": "",
+      "id": "closingday_bd997f74"
+    },
+    {
+      "date": "01-11-2027",
+      "name": "",
+      "id": "closingday_ba94c349"
+    },
+    {
+      "date": "11-11-2027",
+      "name": "",
+      "id": "closingday_f7e12ba7"
+    },
+    {
+      "date": "25-12-2027",
+      "name": "",
+      "id": "closingday_1058ef60"
     }
   ],
   "shifts": [
     {
-      "id": "shift_c01ba51b",
-      "name": "Temps d'ouverture P1",
+      "id": "shift_fb48ecf0",
+      "name": "Temps d'ouverture P1 - 2026",
       "mode": "weekly",
       "days_off": [
         "closingday_fcd95861"
@@ -298,8 +343,8 @@
       }
     },
     {
-      "id": "shift_191d58b8",
-      "name": "Temps d'ouverture P3",
+      "id": "shift_617bdd37",
+      "name": "Temps d'ouverture P3 - 2026",
       "mode": "weekly",
       "days_off": [
         "closingday_c040805a",
@@ -372,8 +417,8 @@
       }
     },
     {
-      "id": "shift_43a68d28",
-      "name": "Temps d'ouverture P2",
+      "id": "shift_30a10726",
+      "name": "Temps d'ouverture P2 - 2026",
       "mode": "custom",
       "days_off": [
         "closingday_f5ba34fa",
@@ -399,10 +444,19 @@
         "closingday_8389bb93",
         "closingday_745a3415",
         "closingday_9e5d6ccf",
+        "closingday_61cc949d",
         "closingday_c040805a",
         "closingday_914d12ae",
-        "closingday_61cc949d",
-        "closingday_bc9e8f7e"
+        "closingday_bc9e8f7e",
+        "closingday_c88ccb49",
+        "closingday_957e31e8",
+        "closingday_9f120071",
+        "closingday_749732f0",
+        "closingday_cfc73909",
+        "closingday_bd997f74",
+        "closingday_ba94c349",
+        "closingday_f7e12ba7",
+        "closingday_1058ef60"
       ],
       "days": [
         {
@@ -461,7 +515,7 @@
       ],
       "horizon": {
         "start": "01-01-2026",
-        "end": "31-12-2026"
+        "end": "31-12-2027"
       }
     },
     {
@@ -477,7 +531,16 @@
         "closingday_61cc949d",
         "closingday_c040805a",
         "closingday_914d12ae",
-        "closingday_bc9e8f7e"
+        "closingday_bc9e8f7e",
+        "closingday_c88ccb49",
+        "closingday_957e31e8",
+        "closingday_9f120071",
+        "closingday_749732f0",
+        "closingday_cfc73909",
+        "closingday_bd997f74",
+        "closingday_ba94c349",
+        "closingday_f7e12ba7",
+        "closingday_1058ef60"
       ],
       "days": [
         {
@@ -536,7 +599,7 @@
       ],
       "horizon": {
         "start": "01-01-2026",
-        "end": "31-12-2026"
+        "end": "31-12-2027"
       }
     },
     {
@@ -552,7 +615,16 @@
         "closingday_61cc949d",
         "closingday_c040805a",
         "closingday_914d12ae",
-        "closingday_bc9e8f7e"
+        "closingday_bc9e8f7e",
+        "closingday_c88ccb49",
+        "closingday_957e31e8",
+        "closingday_9f120071",
+        "closingday_749732f0",
+        "closingday_cfc73909",
+        "closingday_bd997f74",
+        "closingday_ba94c349",
+        "closingday_f7e12ba7",
+        "closingday_1058ef60"
       ],
       "days": [
         {
@@ -627,7 +699,7 @@
       ],
       "horizon": {
         "start": "01-01-2026",
-        "end": "31-12-2026"
+        "end": "31-12-2027"
       }
     },
     {
@@ -643,7 +715,16 @@
         "closingday_61cc949d",
         "closingday_c040805a",
         "closingday_914d12ae",
-        "closingday_bc9e8f7e"
+        "closingday_bc9e8f7e",
+        "closingday_c88ccb49",
+        "closingday_957e31e8",
+        "closingday_9f120071",
+        "closingday_749732f0",
+        "closingday_cfc73909",
+        "closingday_bd997f74",
+        "closingday_ba94c349",
+        "closingday_f7e12ba7",
+        "closingday_1058ef60"
       ],
       "days": [
         {
@@ -682,68 +763,230 @@
       ],
       "horizon": {
         "start": "01-01-2026",
-        "end": "31-12-2026"
+        "end": "31-12-2027"
+      }
+    },
+    {
+      "id": "shift_98605aef",
+      "name": "Temps d'ouverture P1 - 2027",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_c88ccb49"
+      ],
+      "days": [
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2027",
+        "end": "30-04-2027"
+      }
+    },
+    {
+      "id": "shift_bc819d00",
+      "name": "Temps d'ouverture P2 - 2027",
+      "mode": "custom",
+      "days_off": [
+        "closingday_957e31e8",
+        "closingday_9f120071",
+        "closingday_749732f0",
+        "closingday_cfc73909",
+        "closingday_bd997f74"
+      ],
+      "custom_intervals": [
+        {
+          "start": "01-05-2027 08:00",
+          "end": "30-09-2027 17:00"
+        }
+      ]
+    },
+    {
+      "id": "shift_c331f0d1",
+      "name": "Temps d'ouverture P3 - 2027",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_ba94c349",
+        "closingday_f7e12ba7",
+        "closingday_1058ef60"
+      ],
+      "days": [
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "08:00",
+              "end": "16:00"
+            }
+          ]
+        }
+      ],
+      "horizon": {
+        "start": "01-10-2027",
+        "end": "31-12-2027"
       }
     }
   ],
   "stopping_criterion": {
     "type": "ByPiecesProduced",
-    "timeout": 525600.0,
+    "timeout": 1051200.0,
     "grace_period": 30000.0,
     "models_goals": [
       {
         "model": "model_c1c20e4c",
-        "goal": 3000
+        "goal": 1000
       },
       {
         "model": "model_f551538b",
-        "goal": 3000
+        "goal": 1000
       },
       {
         "model": "model_f8a1d4ad",
-        "goal": 3000
+        "goal": 1000
       },
       {
         "model": "model_742fd366",
-        "goal": 3000
+        "goal": 1000
       },
       {
         "model": "model_300990ff",
-        "goal": 4500
+        "goal": 1500
       },
       {
         "model": "model_e093ec36",
-        "goal": 4500
+        "goal": 1500
       },
       {
         "model": "model_02d3ef7d",
-        "goal": 4500
+        "goal": 1500
       },
       {
         "model": "model_256d4101",
-        "goal": 4500
+        "goal": 1500
       }
     ]
   },
   "start_date": "01-01-2026 00:00",
-  "seed": 67,
+  "seed": 1,
   "nodes": [
     {
       "id": "piecegenerator_590444be",
       "kind": "PieceGenerator",
       "name": "Piece Generator",
       "shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "outlets": [
         "buffer_81433f15",
         "buffer_a2f5ab52"
       ],
       "position": [
-        273.96968580714,
-        604.2307455658138
+        270.3322687112232,
+        606.0494541137721
       ]
     },
     {
@@ -844,9 +1087,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1014,9 +1260,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1194,9 +1443,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1342,9 +1594,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1514,9 +1769,12 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1666,9 +1924,12 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1751,11 +2012,11 @@
         {
           "model": "model_f6960dbd",
           "duration": {
-            "dist_type": "Constant",
+            "dist_type": "Exponential",
             "params": {
-              "value": {
+              "mean": {
                 "kind": "constant",
-                "value": 480.0
+                "value": 1.0
               }
             }
           },
@@ -1811,9 +2072,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -1857,8 +2121,8 @@
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        3168.303449671229,
-        -233.92743365650642
+        3168.3034496712294,
+        -236.86589713995525
       ]
     },
     {
@@ -1974,9 +2238,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2160,9 +2427,12 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2375,9 +2645,12 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2738,9 +3011,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -2976,9 +3252,12 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3148,9 +3427,12 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3316,9 +3598,12 @@
         ]
       ],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3434,9 +3719,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3480,7 +3768,7 @@
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        9183.360951624785,
+        9185.967291212319,
         -8.0462808912215
       ]
     },
@@ -3646,9 +3934,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -3837,9 +4128,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -4027,9 +4321,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
@@ -4073,7 +4370,7 @@
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        7126.998429050894,
+        7129.604768638425,
         -335.8413749248625
       ]
     },
@@ -4160,9 +4457,12 @@
       ],
       "startup_operators": [],
       "task_shifts": [
-        "shift_c01ba51b",
-        "shift_191d58b8",
-        "shift_43a68d28"
+        "shift_fb48ecf0",
+        "shift_617bdd37",
+        "shift_30a10726",
+        "shift_98605aef",
+        "shift_bc819d00",
+        "shift_c331f0d1"
       ],
       "policies": {
         "pending_carriers_pre_flexible_shutdowns": {
