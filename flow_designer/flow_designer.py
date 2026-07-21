@@ -1061,6 +1061,83 @@ class CustomIntervalListWidget(QtWidgets.QWidget):
         return [r.data() for r in self._rows]
 
 
+def _hhmm_to_min(text):
+    hh, _, mm = str(text).partition(":")
+    return as_int(hh) * 60 + as_int(mm)
+
+
+def _min_to_hhmm(m):
+    return f"{m // 60:02d}:{m % 60:02d}"  # 1440 -> "24:00", the end-of-day convention
+
+
+def _merge_day_intervals(intervals):
+    """Merge overlapping or touching (start, end) minute intervals; sorted result."""
+    out = []
+    for s, e in sorted(intervals):
+        if out and s <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], e))
+        else:
+            out.append((s, e))
+    return out
+
+
+def translate_shift_entry(entry, minutes, name=None):
+    """A deep copy of a shift definition with every interval shifted by `minutes`
+    (positive later, negative earlier). Weekly intervals move in a periodic week
+    (mod 7 days): an interval that ends up crossing a day boundary is split, and the
+    week end wraps back to its start — so e.g. a Mon-Fri 06:00-14:00 shift + 16 h
+    becomes the matching night coverage (22:00-24:00 that day, 00:00-06:00 the next),
+    exactly as such shifts are authored by hand. Custom intervals shift their
+    absolute datetimes. The horizon and the days off are left unchanged."""
+    WEEK = 7 * 1440
+    e = copy.deepcopy(entry)
+    if name is not None:
+        e["name"] = name
+
+    # Weekly: rebuild the seven weekday rows from the shifted, day-split pieces.
+    days = e.get("days", [])
+    per_day = [[] for _ in range(7)]  # (start_min, end_min) pieces landing on each weekday
+    for i, d in enumerate(days[:7]):
+        if not d.get("working"):
+            continue
+        for iv in d.get("intervals", []):
+            start = i * 1440 + _hhmm_to_min(iv.get("start", "00:00"))
+            end = i * 1440 + _hhmm_to_min(iv.get("end", "00:00"))
+            length = end - start
+            if length <= 0:
+                continue
+            cursor = (start + minutes) % WEEK
+            while length > 0:
+                day = cursor // 1440
+                into_day = cursor % 1440
+                take = min(1440 - into_day, length)
+                per_day[day].append((into_day, into_day + take))
+                length -= take
+                cursor = (cursor + take) % WEEK
+    if days:
+        e["days"] = [
+            {"working": bool(merged),
+             "intervals": [{"start": _min_to_hhmm(s), "end": _min_to_hhmm(en)}
+                           for s, en in merged]}
+            for merged in (_merge_day_intervals(p) for p in per_day)
+        ]
+
+    # Custom: shift each absolute interval by the same duration.
+    delta = timedelta(minutes=minutes)
+    if e.get("custom_intervals"):
+        shifted = []
+        for iv in e["custom_intervals"]:
+            s, en = parse_date_time(iv.get("start")), parse_date_time(iv.get("end"))
+            if s and en:
+                shifted.append({"start": (s + delta).strftime(PY_DATE_TIME_FORMAT),
+                                "end": (en + delta).strftime(PY_DATE_TIME_FORMAT)})
+            else:
+                shifted.append(dict(iv))  # leave a malformed interval untouched
+        e["custom_intervals"] = shifted
+
+    return e
+
+
 class ShiftEditorDialog(QtWidgets.QDialog):
     """A shift definition is either 'weekly' (the recurring weekday creator) or
     'custom' (an explicit list of absolute date intervals). A type dropdown picks
@@ -1149,6 +1226,85 @@ class ShiftEditorDialog(QtWidgets.QDialog):
             "horizon": {"start": self.h_start.get_value(), "end": self.h_end.get_value()},
             "custom_intervals": self.custom.value(),
         }
+
+
+class TranslateShiftDialog(QtWidgets.QDialog):
+    """Create a new shift as a copy of an existing one, shifted in time by a chosen
+    duration (days / hours / minutes, either direction). The daily pattern moves as a
+    whole — intervals that cross midnight after the shift are split across weekdays —
+    which is the quick way to build, say, an afternoon or night shift from a morning
+    one (the atelier's APREM = MATIN + 8 h, NUIT = MATIN + 16 h)."""
+
+    def __init__(self, parent, entries):
+        super().__init__(parent)
+        self.setWindowTitle("New shift from existing (translated)")
+        self._entries = entries
+        self._name_auto = True
+        lay = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+
+        self.source = QtWidgets.QComboBox()
+        for i, entry in enumerate(entries):
+            self.source.addItem(entry.get("name") or f"(shift {i + 1})", i)
+        form.addRow("Copy from", self.source)
+
+        self.direction = QtWidgets.QComboBox()
+        self.direction.addItem("Later (+)", 1)
+        self.direction.addItem("Earlier (−)", -1)
+        form.addRow("Direction", self.direction)
+
+        dur = QtWidgets.QHBoxLayout()
+        self.days = QtWidgets.QLineEdit("0")
+        self.hours = QtWidgets.QLineEdit("8")
+        self.minutes = QtWidgets.QLineEdit("0")
+        for w, unit in ((self.days, "d"), (self.hours, "h"), (self.minutes, "m")):
+            w.setMaximumWidth(56)
+            w.setValidator(QtGui.QIntValidator(0, 100000, self))
+            dur.addWidget(w); dur.addWidget(QtWidgets.QLabel(unit))
+        dur.addStretch(1)
+        dw = QtWidgets.QWidget(); dw.setLayout(dur)
+        form.addRow("Translate by", dw)
+
+        self.name = QtWidgets.QLineEdit()
+        self.name.setPlaceholderText("New shift name")
+        self.name.textEdited.connect(lambda *_: setattr(self, "_name_auto", False))
+        form.addRow("Name", self.name)
+        lay.addLayout(form)
+
+        for w in (self.days, self.hours, self.minutes):
+            w.textChanged.connect(self._suggest_name)
+        self.source.currentIndexChanged.connect(self._suggest_name)
+        self.direction.currentIndexChanged.connect(self._suggest_name)
+        self._suggest_name()
+
+        bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def total_minutes(self):
+        total = (as_int(self.days.text()) * 1440 + as_int(self.hours.text()) * 60
+                 + as_int(self.minutes.text()))
+        return self.direction.currentData() * total
+
+    def _duration_tag(self):
+        m = self.total_minutes()
+        d, rem = divmod(abs(m), 1440)
+        h, mn = divmod(rem, 60)
+        parts = [f"{d}d"] * bool(d) + [f"{h}h"] * bool(h) + [f"{mn}m"] * bool(mn)
+        return ("+" if m >= 0 else "−") + ("".join(parts) or "0")
+
+    def _suggest_name(self, *_):
+        if not self._entries or not self._name_auto:
+            return
+        src = self._entries[self.source.currentData()].get("name") or "shift"
+        self.name.setText(f"{src} {self._duration_tag()}")
+
+    def result_entry(self):
+        src = self._entries[self.source.currentData()]
+        name = self.name.text().strip() or f"{src.get('name', 'shift')} {self._duration_tag()}"
+        entry = translate_shift_entry(src, self.total_minutes(), name=name)
+        entry.pop("id", None)  # a translated copy is a brand-new shift, not the source
+        return entry
 
 
 class OperatorEditorDialog(QtWidgets.QDialog):
@@ -1308,9 +1464,25 @@ class ShiftRegistryDialog(_RegistryDialog):
     def __init__(self, parent=None, entries=None, closing_days=None):
         self._closing_days = closing_days or []
         super().__init__(parent, entries)
+        # A shift can also be created as a time-shifted copy of an existing one.
+        btn = QtWidgets.QPushButton("New from existing (translated)…")
+        btn.clicked.connect(self._add_translated)
+        self.layout().insertWidget(self.layout().count() - 1, btn)  # above OK/Cancel
 
     def _make_editor(self, entry):
         return ShiftEditorDialog(self, entry, closing_days=self._closing_days)
+
+    def _add_translated(self):
+        if not self._entries:
+            qmessage(self, "No shifts yet",
+                     "Add a shift first, then you can create a translated copy of it.",
+                     QtWidgets.QMessageBox.Information)
+            return
+        dlg = TranslateShiftDialog(self, self._entries)
+        if dlg.exec():
+            self._entries.append(dlg.result_entry())
+            self._refresh()
+            self.listw.setCurrentRow(len(self._entries) - 1)
 
 
 class ClosingDaysRegistryDialog(QtWidgets.QDialog):
