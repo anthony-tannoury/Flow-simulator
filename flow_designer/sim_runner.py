@@ -65,6 +65,22 @@ def main(argv: list) -> int:
         else:
             emit("ERROR", {"message": f"unknown stopping criterion {type(criterion).__name__}"})
             return 1
+
+        # The piece generator's gap (minutes between two pieces), so the run window
+        # can show it. It is "automatic" only for a goal generator whose criterion
+        # set no explicit gap (then gap = (shift time - grace) / total goal); a set
+        # gap, or any rate generator, is "manual"; a time-varying rate gap has no
+        # single value ("function").
+        generator = getattr(parser, "piece_generator", None)
+        gap = getattr(generator, "gap", None) if generator is not None else None
+        if isinstance(gap, (int, float)):
+            meta["gap"] = gap
+            criterion_block = parser.data.get("stopping_criterion", {})
+            meta["gap_mode"] = ("manual" if not isinstance(criterion, ByPiecesProduced)
+                                or "gap" in criterion_block else "automatic")
+        elif generator is not None:
+            meta["gap_mode"] = "function"
+
         emit("META", meta)
 
         def snapshot() -> dict:

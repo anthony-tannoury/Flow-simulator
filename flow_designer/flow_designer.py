@@ -2739,11 +2739,15 @@ class RunSimulationDialog(QtWidgets.QDialog):
         self.timeout_lbl = QtWidgets.QLabel("-")
         self._timeout_row = form.rowCount()
         form.addRow("Timeout", self.timeout_lbl)
+        self.gap_lbl = QtWidgets.QLabel("-")
+        self._gap_row = form.rowCount()
+        form.addRow("Piece gap", self.gap_lbl)
         lay.addLayout(form)
         self._form = form
         self._last_progress = {}
         self._set_form_row_visible(self._pieces_row, self.pieces_lbl, False)
         self._set_form_row_visible(self._timeout_row, self.timeout_lbl, False)
+        self._set_form_row_visible(self._gap_row, self.gap_lbl, False)
 
         self.caption_lbl = QtWidgets.QLabel("")
         self.caption_lbl.setAlignment(QtCore.Qt.AlignHCenter)
@@ -2836,6 +2840,15 @@ class RunSimulationDialog(QtWidgets.QDialog):
                 else:
                     self.timeout_lbl.setText(f"{timeout:g} minutes")
                 self._set_form_row_visible(self._timeout_row, self.timeout_lbl, True)
+            # piece generator's gap (minutes between two pieces): manual / automatic / function
+            gap = info.get("gap")
+            gap_mode = info.get("gap_mode")
+            if gap_mode == "function":
+                self.gap_lbl.setText("function of time")
+                self._set_form_row_visible(self._gap_row, self.gap_lbl, True)
+            elif isinstance(gap, (int, float)):
+                self.gap_lbl.setText(f"{gap:g} min between pieces  ({gap_mode})")
+                self._set_form_row_visible(self._gap_row, self.gap_lbl, True)
             self.status_lbl.setText("Simulation running...")
         elif tag == "PROGRESS":
             self._show_progress(info)
