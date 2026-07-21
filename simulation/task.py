@@ -307,7 +307,6 @@ class Task(Component, HasShifts, ABC):
         self.requested_per_task_operators = False  # whether the PER_TASK crew is currently held
         self.labor_minutes = 0.0        # operator-minutes booked on this task, all crews
         self._task_crew_since = None    # claim start of the held PER_TASK crew
-        self._awaiting_carrier = None   # the pending carrier the process is parked on
         self.pending_carriers = CarrierTracker()
         self.active_carriers = CarrierTracker()
 
@@ -371,6 +370,23 @@ class Task(Component, HasShifts, ABC):
         self.task_operators = []
         self.requested_per_task_operators = False
 
+    def hand_off_crew_at_shift_end(self) -> None:
+        """A group this task may hold as its PER_TASK crew has just gone off shift.
+        Release the crew when it is held, idle (no carrier mid-run) and shift-
+        constrained past this boundary, so an idle crew is not reserved — and
+        booked as off-shift labour — while the task sits parked between carriers
+        (waiting for one to load, or blocked at the top of its loop). A crew that
+        may work past the boundary (NotConstrainedByShift, or PartiallyConstrained
+        within tolerance) is kept: it starts/finishes the carrier and is released
+        afterwards instead. Called from the operator shift manager's on_leave."""
+        if (self.config.operator_scope is not Scope.PER_TASK
+                or not self.requested_per_task_operators or not self.task_operators
+                or self.active_carriers):
+            return
+        crew_shift = self.task_operators[0][0].current_or_last_shift()
+        if self.config.protocols.operator_shift_constraint.deadline(crew_shift) <= env.now():
+            self.release_task_operators()
+
     def labor_minutes_total(self) -> float:
         """Booked operator-minutes on this task (loading, processing and startup
         crews), a still-held PER_TASK crew's open claim included."""
@@ -410,18 +426,12 @@ class Task(Component, HasShifts, ABC):
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
             self.all_carriers.append(new_carrier)
-            # While parked here waiting for the collector, a held PER_TASK crew
-            # must still hand off at its shift end: the operator shift manager
-            # wakes this task (activate breaks the wait), the crew is released,
-            # and the wait resumes until the carrier actually loads.
-            self._awaiting_carrier = new_carrier
+            # A held PER_TASK crew that goes off shift while we wait for the carrier
+            # to load is released at the boundary by the operator shift manager's
+            # hand-off (see OperatorShiftManager.on_leave); here we just wait until
+            # the carrier actually loads.
             while not new_carrier.loaded():
                 self.wait(new_carrier.loaded)
-                if (self.config.operator_scope is Scope.PER_TASK
-                        and self.requested_per_task_operators and not self.active_carriers
-                        and any(group.is_in_downtime() for group, _ in self.task_operators)):
-                    self.release_task_operators()
-            self._awaiting_carrier = None
 
             # a crew handed off during the wait is re-acquired before dispatching
             # (whichever group is on shift now); a failed request freezes as usual

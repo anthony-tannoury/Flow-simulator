@@ -4,7 +4,7 @@ import shutil
 import salabim as sim
 
 from time import perf_counter
-from simulation import env, kpis, graphs
+from simulation import env, kpis, graphs, reseed
 
 from datetime import date, time, datetime, timedelta
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
@@ -217,6 +217,11 @@ class Parser:
         # written faithfully to the report CSVs. The flow JSON is always UTF-8.
         with open(filename, 'r', encoding='utf-8') as file:
             self.data = json.load(file)
+        # Re-seed the shared environment before anything is built or drawn, so the
+        # run is reproducible for the flow's seed (0 by default) and differs between
+        # seeds. Must happen here, ahead of load_all's object construction.
+        self.seed = int(self.data.get('seed', 0))
+        reseed(self.seed)
         self.sim_start = to_datetime(self.data['start_date'])
         self.discriminate()
         self.by_id = {n['id']: n for n in self.data['nodes']}
