@@ -31,6 +31,7 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -71,6 +72,14 @@ inline int piece_generators = 0;  // PieceGenerator.COUNT
 inline int exit_buffers = 0;      // Buffer.EXIT_BUFFERS
 }  // namespace counters
 
+// Global work-in-progress level monitor (kpis.WIP): +1 when a piece is born,
+// -1 when it reaches an EXIT or SCRAP buffer. A level Monitor integrates the
+// running level over time (mean/maximum); wip_level is the current level.
+namespace kpis_state {
+inline sim::Monitor* WIP = nullptr;
+inline int wip_level = 0;
+}  // namespace kpis_state
+
 // Create a fresh environment + reset all module state (Python: import time).
 inline sim::Environment& init(long long seed = 0, bool trace = false) {
     delete env;
@@ -79,6 +88,8 @@ inline sim::Environment& init(long long seed = 0, bool trace = false) {
     counters::piece_id = 0;
     counters::piece_generators = 0;
     counters::exit_buffers = 0;
+    kpis_state::WIP = new sim::Monitor("wip", sim::MonitorOpts{.level = true});
+    kpis_state::wip_level = 0;
     return *env;
 }
 
@@ -284,6 +295,20 @@ struct Bathtub {
     }
 };
 
+// Staircase following the line through (x1,y1)-(x2,y2) but holding each value
+// for `step_size` on the x axis (Python: function_generator.Step).
+struct Step {
+    static TimeFn generate(double x1, double y1, double x2, double y2, double step_size) {
+        if (x1 == x2) throw std::invalid_argument("Cannot generate a step function over a vertical span");
+        if (step_size <= 0) throw std::invalid_argument("Step size must be > 0");
+        return [=](double t) {
+            double slope = (y2 - y1) / (x2 - x1);
+            double anchor = x1 + std::floor((t - x1) / step_size) * step_size;
+            return y1 + slope * (anchor - x1);
+        };
+    }
+};
+
 // ============================================================================
 // sampler.py
 // ============================================================================
@@ -292,6 +317,10 @@ struct Sampler {
     virtual ~Sampler() = default;
     virtual double sample(double t) = 0;
     double sample_now() { return sample(env->now()); }
+    // Distribution.mean(t): the mean at the params evaluated at t (used by
+    // kpis for tc_ideal and by the fastest-duration focus policy).
+    virtual double mean(double /*t*/) { throw std::logic_error("mean() is not defined for this sampler"); }
+    double mean_now() { return mean(env->now()); }
 };
 
 using SamplerPtr = std::shared_ptr<Sampler>;
@@ -328,8 +357,31 @@ class Distribution : public Sampler {
             case DistType::Exponential: return sim::Exponential(p.at(0)).sample();
             case DistType::Triangular:  return sim::Triangular(p.at(0), p.at(1), p.at(2)).sample();
             case DistType::IntUniform:  return sim::IntUniform((long long)p.at(0), (long long)p.at(1)).sample();
-            case DistType::Lognormal:   // CPython lognormvariate == exp(normalvariate(mu, sigma))
-                return std::exp(sim::Normal(p.at(0), p.at(1)).sample());
+            case DistType::Lognormal: {
+                // Real-space parameters: p[0]=mean, p[1]=std of the VALUES (like
+                // Normal), converted to the underlying normal's (mu, sigma). Must
+                // match simulation/sampler.py LogNormal.
+                double m = p.at(0), sd = p.at(1);
+                if (m <= 0) throw std::invalid_argument("LogNormal mean must be > 0");
+                if (sd < 0) throw std::invalid_argument("LogNormal standard deviation must be >= 0");
+                double sigma_sq = std::log(1.0 + (sd * sd) / (m * m));
+                double mu = std::log(m) - sigma_sq / 2.0;
+                return std::exp(sim::Normal(mu, std::sqrt(sigma_sq)).sample());
+            }
+        }
+        throw std::invalid_argument("unknown distribution type");
+    }
+
+    double mean(double t) override {
+        auto p = sample_params_at(t);
+        switch (distr_type) {
+            case DistType::Constant:    return sim::Constant(p.at(0)).mean();
+            case DistType::Uniform:     return sim::Uniform(p.at(0), p.at(1)).mean();
+            case DistType::Normal:      return sim::Normal(p.at(0), p.at(1)).mean();
+            case DistType::Exponential: return sim::Exponential(p.at(0)).mean();
+            case DistType::Triangular:  return sim::Triangular(p.at(0), p.at(1), p.at(2)).mean();
+            case DistType::IntUniform:  return sim::IntUniform((long long)p.at(0), (long long)p.at(1)).mean();
+            case DistType::Lognormal:   return p.at(0);  // real-space mean parameter
         }
         throw std::invalid_argument("unknown distribution type");
     }
@@ -530,15 +582,24 @@ class Piece : public sim::Component {  // data component (no process)
   public:
     Model* model;
     std::string id;
+    struct JournalEntry { std::string kind, name; double t; };  // 'in' | 'out' | 'task'
+    std::vector<JournalEntry> journal;  // §5: buffer in/out + task stamps, for trajectory graphs
 
     explicit Piece(Model* model_) : model(model_) {
         char buf[8];
         std::snprintf(buf, sizeof buf, "%06d", counters::piece_id);
         id = buf;
         counters::piece_id += 1;
+        if (kpis_state::WIP) kpis_state::WIP->tally(++kpis_state::wip_level);  // §4 WIP +1
     }
 
     void enter(Buffer& q);  // defined after Buffer (trigger + scrap-return + base enter)
+
+    using sim::Component::leave;
+    // §5: mirror Python Piece.leave — stamp 'out' whenever the piece leaves a Buffer.
+    // leave(Queue&) is virtual in salabim++, and both removal paths (explicit
+    // piece->leave(buffer) and from_store) route through it. Defined after Buffer.
+    sim::Component& leave(sim::Queue& q) override;
 };
 
 class PickyPieceTaker {
@@ -576,29 +637,59 @@ class PickyPieceTaker {
     }
 };
 
-class PieceGenerator : public Component, public PickyPieceTaker, public HasShifts {
+// §9: abstract base shared by GoalPieceGenerator (a fixed goal paced over the
+// shifts) and RatePieceGenerator (a stream at a given gap + mix, until ByTime).
+// §13: Triggerable — scrap buffers pulse `trigger` when they take a piece so a
+// goal generator sleeping with nothing left to make wakes for the remake.
+class PieceGenerator : public Component, public PickyPieceTaker, public HasShifts, public Triggerable {
   public:
     std::vector<Model*> models;
     std::vector<Outlet*> outlets;
-    std::vector<int> goals;
-    std::vector<double> probs;
     std::vector<int> generated;
-    int total_goal = 0;
-    double gap = 0;
+    std::vector<int> total_generated;  // per-model physical births (scrap remakes included)
     ShiftManager* shift_manager = nullptr;
 
-    PieceGenerator(std::vector<std::pair<Model*, int>> models_goals, Intervals shifts_,
-                   std::vector<Outlet*> outlets_);  // body after outlet.py (check_outlet_validity)
+    PieceGenerator(std::vector<Model*> models_, Intervals shifts_, std::vector<Outlet*> outlets_);
 
-    void update_probs() {
-        int total_generated = 0;
-        for (int g : generated) total_generated += g;
-        for (size_t i = 0; i < models.size(); ++i)
-            probs[i] = double(goals[i] - generated[i]) / double(total_goal - total_generated);
-    }
+    void emit(int idx);  // build a Piece, place it, bump both counters (defined after place())
 
-    int total_generated() const;
-    sim::Process process() override;  // body after outlet.py (place)
+    // hold for gap, unless it would spill past the current shift — then hold to
+    // the shift end and report false via *held_full so the caller re-checks.
+    sim::Process hold_within_shift(double gap, bool* held_full);
+
+    sim::Process process() override = 0;  // abstract
+};
+
+class GoalPieceGenerator : public PieceGenerator {
+  public:
+    std::vector<int> goals;
+    std::vector<double> probs;
+    int total_goal = 0;
+    double gap = 0;
+
+    GoalPieceGenerator(std::vector<std::pair<Model*, int>> models_goals, Intervals shifts_,
+                       std::vector<Outlet*> outlets_, double grace_period = 0.0,
+                       std::optional<double> gap_ = std::nullopt);
+
+    void update_probs();
+    sim::Process process() override;
+};
+
+class RatePieceGenerator : public PieceGenerator {
+  public:
+    // gap and per-model probabilities are each a constant or a function of time;
+    // exactly one probability may be nullopt = the freeloader (1 - sum(others)).
+    std::variant<double, TimeFn> gap;
+    std::vector<std::optional<std::variant<double, TimeFn>>> model_probs;
+    int freeloader_index = -1;
+
+    RatePieceGenerator(std::vector<Model*> models_, Intervals shifts_, std::vector<Outlet*> outlets_,
+                       std::variant<double, TimeFn> gap_,
+                       std::vector<std::optional<std::variant<double, TimeFn>>> model_probs_);
+
+    double current_gap();
+    std::vector<double> current_probs();
+    sim::Process process() override;
 };
 
 // ============================================================================
@@ -700,13 +791,23 @@ class Router : public Outlet {
 
 inline void Piece::enter(Buffer& q) {
     q.trigger.trigger();
-    if (q.piece_generator != nullptr) {
+    if (q.piece_generator != nullptr) {  // scrap buffer: re-open the model's goal
         auto& models = q.piece_generator->models;
         auto it = std::find(models.begin(), models.end(), model);
         assert(it != models.end());
         q.piece_generator->generated[it - models.begin()] -= 1;
+        q.piece_generator->trigger.trigger();  // §13: wake a generator sleeping between remakes
     }
+    if (q.buffer_type == BufferType::EXIT || q.buffer_type == BufferType::SCRAP)  // §4 WIP -1
+        if (kpis_state::WIP) kpis_state::WIP->tally(--kpis_state::wip_level);
+    journal.push_back({"in", q.name(), env->now()});  // §5
     sim::Component::enter(q);
+}
+
+inline sim::Component& Piece::leave(sim::Queue& q) {
+    if (auto* b = dynamic_cast<Buffer*>(&q))
+        journal.push_back({"out", b->name(), env->now()});
+    return sim::Component::leave(q);
 }
 
 inline void check_outlet_validity(const PickyPieceTaker& giver, const std::vector<Outlet*>& outlets) {
@@ -747,38 +848,91 @@ inline std::vector<Model*> models_of_(const std::vector<std::pair<Model*, int>>&
     return out;
 }
 
-inline PieceGenerator::PieceGenerator(std::vector<std::pair<Model*, int>> models_goals,
-                                      Intervals shifts_, std::vector<Outlet*> outlets_)
-    : PickyPieceTaker(models_of_(models_goals)), HasShifts(std::move(shifts_)) {
+inline PieceGenerator::PieceGenerator(std::vector<Model*> models_, Intervals shifts_,
+                                      std::vector<Outlet*> outlets_)
+    : PickyPieceTaker(std::move(models_)), HasShifts(std::move(shifts_)) {
     if (counters::piece_generators > 0)
         throw std::invalid_argument("Cannot have more than one piece generator");
     counters::piece_generators += 1;
 
-    models = valid_models;  // PickyPieceTaker was built from the goal keys
+    models = valid_models;  // PickyPieceTaker was built from the models list
     check_outlet_validity(*this, outlets_);
 
     shift_manager = sim::make<ShiftManager>({}, static_cast<HasShifts*>(this));
 
     outlets = std::move(outlets_);
+    generated.assign(models.size(), 0);
+    total_generated.assign(models.size(), 0);
+}
+
+inline void PieceGenerator::emit(int idx) {
+    Piece* piece = sim::make<Piece>({}, models[idx]);
+    place({piece}, outlets);
+    generated[idx] += 1;
+    total_generated[idx] += 1;
+}
+
+inline sim::Process PieceGenerator::hold_within_shift(double gap, bool* held_full) {
+    const Interval* current_shift = current_or_last_shift();
+    double shift_time_left = current_shift != nullptr ? current_shift->end - env->now() : sim::inf;
+    if (gap > shift_time_left) {
+        co_await hold(shift_time_left);
+        *held_full = false;
+        co_return;
+    }
+    co_await hold(gap);
+    *held_full = true;
+}
+
+// ---- GoalPieceGenerator ----
+inline GoalPieceGenerator::GoalPieceGenerator(std::vector<std::pair<Model*, int>> models_goals,
+                                              Intervals shifts_, std::vector<Outlet*> outlets_,
+                                              double grace_period, std::optional<double> gap_)
+    : PieceGenerator(models_of_(models_goals), std::move(shifts_), std::move(outlets_)) {
     for (auto& [m, g] : models_goals) goals.push_back(g);
     probs.assign(models.size(), 0.0);
-    generated.assign(models.size(), 0);
-
     for (int g : goals) total_goal += g;
-    double shift_len = 0;
-    for (const auto& s : shifts) shift_len += s->length();
-    gap = shift_len / total_goal;
+
+    if (gap_.has_value()) {  // user-fixed pacing: may finish early or spill past the shifts
+        if (grace_period != 0.0)
+            throw std::invalid_argument("Grace period only applies to the automatic gap");
+        if (*gap_ <= 0) throw std::invalid_argument("Gap must be > 0");
+        gap = *gap_;
+    } else {  // automatic: pace the goal over the shifts minus the grace-period reserve
+        double working_time = 0;
+        for (const auto& s : shifts) working_time += s->length();
+        if (grace_period < 0) throw std::invalid_argument("Grace period must be >= 0");
+        if (grace_period >= working_time)
+            throw std::invalid_argument(
+                "Grace period must be smaller than the generator's total shift time");
+        gap = (working_time - grace_period) / total_goal;
+    }
 }
 
-inline int PieceGenerator::total_generated() const {
-    int s = 0;
-    for (int g : generated) s += g;
-    return s;
+inline void GoalPieceGenerator::update_probs() {
+    int total_gen = 0;
+    for (int g : generated) total_gen += g;
+    if (total_goal == total_gen) {
+        probs.assign(models.size(), 0.0);
+    } else {
+        for (size_t i = 0; i < models.size(); ++i)
+            probs[i] = double(goals[i] - generated[i]) / double(total_goal - total_gen);
+    }
 }
 
-inline sim::Process PieceGenerator::process() {
-    while (total_generated() < total_goal) {
+inline sim::Process GoalPieceGenerator::process() {
+    while (true) {
         co_await wait({{is_in_downtime, false}});
+
+        // everything asked for is out: sleep until a scrap buffer takes a piece
+        // (its trigger pulse re-opens that model's goal), instead of polling
+        update_probs();
+        double sum_probs = 0;
+        for (double p : probs) sum_probs += p;
+        if (sum_probs == 0) {
+            co_await wait(trigger);
+            continue;
+        }
 
         const Interval* current_shift = current_or_last_shift();
         double shift_time_left =
@@ -788,12 +942,59 @@ inline sim::Process PieceGenerator::process() {
             continue;
         }
 
-        update_probs();
         co_await hold(gap);
         int idx = weighted_choice(probs);
-        Piece* piece = sim::make<Piece>({}, models[idx]);
-        place({piece}, outlets);
-        generated[idx] += 1;
+        emit(idx);
+    }
+}
+
+// ---- RatePieceGenerator ----
+inline RatePieceGenerator::RatePieceGenerator(
+    std::vector<Model*> models_, Intervals shifts_, std::vector<Outlet*> outlets_,
+    std::variant<double, TimeFn> gap_,
+    std::vector<std::optional<std::variant<double, TimeFn>>> model_probs_)
+    : PieceGenerator(std::move(models_), std::move(shifts_), std::move(outlets_)),
+      gap(std::move(gap_)), model_probs(std::move(model_probs_)) {
+    int none_count = 0;
+    for (size_t i = 0; i < model_probs.size(); ++i)
+        if (!model_probs[i].has_value()) {
+            ++none_count;
+            freeloader_index = static_cast<int>(i);
+        }
+    if (none_count > 1)
+        throw std::invalid_argument("At most one model can be the freeloader in a rate generator");
+}
+
+inline double RatePieceGenerator::current_gap() {
+    return std::holds_alternative<double>(gap) ? std::get<double>(gap)
+                                               : std::get<TimeFn>(gap)(env->now());
+}
+
+inline std::vector<double> RatePieceGenerator::current_probs() {
+    std::vector<double> probs(model_probs.size(), 0.0);
+    for (size_t i = 0; i < model_probs.size(); ++i) {
+        if (!model_probs[i].has_value()) continue;  // freeloader stays 0 for now
+        const auto& p = *model_probs[i];
+        probs[i] = std::holds_alternative<double>(p) ? std::get<double>(p)
+                                                     : std::get<TimeFn>(p)(env->now());
+    }
+    if (freeloader_index != -1) {
+        double sum = 0;
+        for (double p : probs) sum += p;
+        probs[freeloader_index] = 1 - sum;
+    }
+    check_probabilities(probs);
+    return probs;
+}
+
+inline sim::Process RatePieceGenerator::process() {
+    while (true) {
+        co_await wait({{is_in_downtime, false}});
+        bool held_full = false;
+        co_await call(hold_within_shift(current_gap(), &held_full));
+        if (!held_full) continue;
+        int idx = weighted_choice(current_probs());
+        emit(idx);
     }
 }
 
@@ -922,7 +1123,7 @@ class RestockableResource : public Resource {
     sim::Process restock(Component* demander) {
         if (!active_order && available_quantity() < threshold) {
             active_order = true;
-            co_await demander->hold(order_duration->sample_now());
+            co_await demander->hold(order_duration->sample_now(), {.mode = "wait_materials"});  // §4
             sim::make<Delivery>({}, this, delivery_duration);
         }
     }
@@ -956,6 +1157,7 @@ class OperatorGroup : public sim::Resource, public Triggerable, public HasShifts
     SamplerPtr productivity;
     double n_operators;
     OperatorShiftManager* manager = nullptr;
+    std::vector<Task*> dependent_tasks;  // tasks to unfreeze / hand off when this group returns/leaves
 
     OperatorGroup(const std::string& name, double capacity, Intervals shifts_, SamplerPtr productivity_)
         : sim::Resource(name, capacity, sim::ResourceOpts{.anonymous = false}),
@@ -969,19 +1171,7 @@ class OperatorGroup : public sim::Resource, public Triggerable, public HasShifts
 
 inline OperatorShiftManager::OperatorShiftManager(OperatorGroup* operator_group)
     : ShiftManager(static_cast<HasShifts*>(operator_group)) {}
-
-inline void OperatorShiftManager::on_enter() {
-    auto* g = static_cast<OperatorGroup*>(entity);
-    g->set_capacity(g->n_operators);
-    g->trigger.trigger();
-    ShiftManager::on_enter();
-}
-
-inline void OperatorShiftManager::on_leave() {
-    auto* g = static_cast<OperatorGroup*>(entity);
-    g->set_capacity(0);
-    ShiftManager::on_leave();
-}
+// on_enter / on_leave bodies are defined after Task (they touch Task members).
 
 class Alternative {
   public:
@@ -1013,15 +1203,17 @@ class Alternative {
         }
 
         if (alternatives.size() == 1) {
-            co_await demander->call(
-                demander->request(reqspecs_(alternatives[0]), {.fail_at = fail_at, .cap_now = cap_now}));
+            co_await demander->call(demander->request(
+                reqspecs_(alternatives[0]),
+                {.fail_at = fail_at, .mode = "wait_operators", .cap_now = cap_now}));  // §4
             *out = demander->failed() ? std::nullopt : std::optional<OpsList>(alternatives[0]);
             co_return;
         }
 
         while (true) {
             for (const auto& alt : alternatives) {
-                co_await demander->call(demander->request(reqspecs_(alt), {.fail_delay = 0}));
+                co_await demander->call(
+                    demander->request(reqspecs_(alt), {.fail_delay = 0, .mode = "wait_operators"}));  // §4
                 if (!demander->failed()) {
                     *out = alt;
                     co_return;
@@ -1030,8 +1222,8 @@ class Alternative {
 
             std::vector<sim::WaitSpec> specs;
             for (auto* t : triggers) specs.push_back(sim::WaitSpec(*t));
-            co_await demander->sim::Component::wait(std::move(specs),
-                                                    {.fail_at = fail_at, .cap_now = cap_now});
+            co_await demander->sim::Component::wait(
+                std::move(specs), {.fail_at = fail_at, .mode = "wait_operators", .cap_now = cap_now});  // §4
             if (demander->failed()) {
                 *out = std::nullopt;
                 co_return;
@@ -1054,6 +1246,8 @@ class Alternative {
 
 enum class Action { ABORT, WAIT, LAUNCH };
 enum class ConsciousnessState { CONSCIOUS, UNCONSCIOUS };
+enum class ExitOrder { FIRST_IN_FIRST_OUT, FIRST_CREATED_FIRST_OUT };
+enum class ModelChoice { MOST_PRESENT, FASTEST_TASK_DURATION, SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY };
 
 struct PendingCarriers {
     virtual ~PendingCarriers() = default;
@@ -1120,6 +1314,36 @@ struct Conscious : SelfConsciousness {
 
 struct Unconscious : SelfConsciousness {
     ConsciousnessState decide() const override { return ConsciousnessState::UNCONSCIOUS; }
+};
+
+struct PieceExitOrder {
+    virtual ~PieceExitOrder() = default;
+    virtual ExitOrder decide() const = 0;
+};
+
+struct FirstInFirstOut : PieceExitOrder {
+    ExitOrder decide() const override { return ExitOrder::FIRST_IN_FIRST_OUT; }
+};
+
+struct FirstCreatedFirstOut : PieceExitOrder {
+    ExitOrder decide() const override { return ExitOrder::FIRST_CREATED_FIRST_OUT; }
+};
+
+struct ModelChoiceCriteria {
+    virtual ~ModelChoiceCriteria() = default;
+    virtual ModelChoice decide() const = 0;
+};
+
+struct MostPresent : ModelChoiceCriteria {
+    ModelChoice decide() const override { return ModelChoice::MOST_PRESENT; }
+};
+
+struct FastestTaskDuration : ModelChoiceCriteria {
+    ModelChoice decide() const override { return ModelChoice::FASTEST_TASK_DURATION; }
+};
+
+struct SmallestGapToMinCarrierCapacity : ModelChoiceCriteria {
+    ModelChoice decide() const override { return ModelChoice::SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY; }
 };
 
 // ============================================================================
@@ -1291,6 +1515,7 @@ struct TaskConfig {
     bool independent_carriers = false;
     double timeout = sim::inf;
     int priority = 5;
+    bool admin = false;  // §19: administrative task — a reporting classification only, no behaviour
 
     Protocols protocols;
 
@@ -1317,10 +1542,15 @@ class Carrier : public Component, public Dispatchable, public Donnable {
     virtual double get_ideal_loading_duration() = 0;
     virtual double get_ideal_duration() = 0;
 
+    // §17: shift-fit decision, re-run after the materials step; deadline helper.
+    sim::Process check_shift_fit(const Alternative::OpsList& operators, double duration);
+    double operator_fit_deadline(const Alternative::OpsList& operators);
+
     sim::Process handle_operators(const Alternative::OpsList& operators, double ideal_duration,
                                   double* out);
     sim::Process handle_batch_operators(Alternative& operators, double earliest_deadline,
-                                        double ideal_duration, double fail_before, bool do_restock);
+                                        double ideal_duration, double fail_before, bool do_restock,
+                                        const char* work_mode);  // §4: "loading" / "processing"
     sim::Process handle_task_operators(double earliest_deadline, double ideal_duration);
 
     sim::Process process() override;
@@ -1337,6 +1567,7 @@ class TaskShiftManager : public ShiftManager {
   public:
     explicit TaskShiftManager(HasShifts* entity_) : ShiftManager(entity_) {}
     void on_enter() override;  // needs Task
+    void on_leave() override;  // needs Task (resets started_up: re-warm each shift)
 };
 
 class Task : public Component, public HasShifts {
@@ -1353,8 +1584,18 @@ class Task : public Component, public HasShifts {
     Alternative::OpsList task_operators;
     std::unique_ptr<sim::Resource> vacant_slots;
     bool started_up = false;
+    bool requested_per_task_operators = false;      // whether the PER_TASK crew is currently held
+    double labor_minutes = 0.0;                     // operator-minutes booked on this task, all crews
+    std::optional<double> task_crew_since;          // claim start of the held PER_TASK crew (Python None)
     CarrierTracker pending_carriers;
     CarrierTracker active_carriers;
+
+    // §4 KPI instrumentation: finished carriers stay readable, tallies fill on deposit
+    std::vector<Carrier*> all_carriers;
+    sim::Monitor batch_sizes{"batch_sizes"};
+    sim::Monitor cycle_times{"cycle_times"};
+    sim::Monitor startup_times{"startup_times"};
+    int pieces_in = 0;  // pieces physically taken from the inlets (retries included)
 
     bool skip_frozen_check = false;
     bool skip_downtime_check = false;
@@ -1378,6 +1619,22 @@ class Task : public Component, public HasShifts {
         non_flexible_shutdowns = sim::make<NonFlexibleShutdowns>({}, this, Intervals{});
         flexible_shutdowns = sim::make<FlexibleShutdowns>({}, this, Intervals{});
         vacant_slots = std::make_unique<sim::Resource>("", config->max_capacity);
+
+        // Register on every operator group so it can unfreeze this task (on return)
+        // or hand off its PER_TASK crew (on leave). Dedup is per-alternative-object
+        // (Python dict.fromkeys within each alternative; a group in two of the three
+        // alternatives is appended once per alternative), and iteration order follows
+        // insertion so the shift-boundary wake-up order stays process-independent.
+        for (Alternative* alt : {&config->operators, &config->loading_operators,
+                                 &config->startup_operators}) {
+            std::vector<OperatorGroup*> seen;
+            for (const auto& a : alt->alternatives)
+                for (const auto& [g, c] : a)
+                    if (std::find(seen.begin(), seen.end(), g) == seen.end()) {
+                        seen.push_back(g);
+                        g->dependent_tasks.push_back(this);
+                    }
+        }
     }
 
     virtual Carrier* make_carrier() = 0;  // Python: self.carrier_type(task=self)
@@ -1390,7 +1647,30 @@ class Task : public Component, public HasShifts {
         return s != nullptr ? s->start : sim::inf;
     }
 
-    sim::Process handle_startup();
+    sim::Process handle_startup();  // §7: warm-up only (PER_TASK crew handled separately)
+    sim::Process request_task_operators();  // §7: request + hold the PER_TASK crew
+    void release_task_operators();          // §7/§16: release the held crew (idempotent)
+    double labor_minutes_total() const;     // §12: booked minutes incl. a still-held crew
+    bool any_task_operator_in_downtime() const {
+        for (const auto& [g, c] : task_operators)
+            if (g->is_in_downtime()) return true;
+        return false;
+    }
+    // §16: a group this task may hold as its PER_TASK crew has just gone off shift.
+    // Release the crew when it is held, idle (no carrier mid-run) and shift-
+    // constrained past this boundary, so an idle crew is not reserved — and booked
+    // as off-shift labour — while the task sits parked between carriers (waiting for
+    // one to load, or blocked at the top of its loop). A crew that may work past the
+    // boundary (NotConstrainedByShift, or PartiallyConstrained within tolerance) is
+    // kept: it starts/finishes the carrier and is released afterwards instead.
+    void hand_off_crew_at_shift_end() {
+        if (config->operator_scope != Scope::PER_TASK || !requested_per_task_operators ||
+            task_operators.empty() || !active_carriers.empty())
+            return;
+        const Interval* crew_shift = task_operators[0].first->current_or_last_shift();
+        if (config->protocols.operator_shift_constraint->deadline(crew_shift) <= env->now())
+            release_task_operators();
+    }
     sim::Process process() override;
 };
 
@@ -1422,6 +1702,11 @@ inline sim::Process TaskStarter::process() {
     }
 
     co_await hold(duration);
+    task->startup_times.tally(duration);  // §6: the setup work itself, not the wait for the crew
+    double booked = 0;  // §12: the startup crew's operator-minutes
+    if (got.has_value())
+        for (const auto& [g, c] : *got) booked += c;
+    task->labor_minutes += booked * duration;
     done.set(true);
 }
 
@@ -1430,21 +1715,84 @@ inline void TaskShiftManager::on_enter() {
     ShiftManager::on_enter();
 }
 
-inline sim::Process Task::handle_startup() {
+inline void TaskShiftManager::on_leave() {
+    static_cast<Task*>(dynamic_cast<Component*>(entity))->started_up = false;  // re-warm next shift
+    ShiftManager::on_leave();
+}
+
+// §7/§16: OperatorShiftManager on_enter/on_leave — defined here (they touch Task).
+inline void OperatorShiftManager::on_enter() {
+    auto* g = static_cast<OperatorGroup*>(entity);
+    g->set_capacity(g->n_operators);
+    g->trigger.trigger();
+    // a task frozen because these operators left resumes when they come back,
+    // instead of staying frozen until its own (possibly weeks-away) shift start
+    for (Task* task : g->dependent_tasks) task->is_frozen.set(false);
+    ShiftManager::on_enter();
+}
+
+inline void OperatorShiftManager::on_leave() {
+    auto* g = static_cast<OperatorGroup*>(entity);
+    g->set_capacity(0);
+    // A crew supervising a task PER_TASK goes home when its group leaves shift.
+    // Release it from any dependent task that is holding it as its crew while idle
+    // (no carrier mid-run) — whether the task is parked in its loaded-wait starving
+    // for pieces or blocked at the top of its loop — so the crew is not reserved
+    // (and booked as off-shift labour) past the boundary. The task re-acquires
+    // whichever group is on shift when it next needs one.
+    for (Task* task : g->dependent_tasks) {
+        bool holds_this = false;
+        for (const auto& [group, count] : task->task_operators)
+            if (group == g) { holds_this = true; break; }
+        if (holds_this) task->hand_off_crew_at_shift_end();
+    }
+    ShiftManager::on_leave();
+}
+
+inline sim::Process Task::handle_startup() {  // §7: warm-up only
     TaskStarter* task_starter = sim::make<TaskStarter>({}, this);
     co_await wait(task_starter->done);
     if (is_frozen()) co_return;
-
     started_up = true;
+}
 
-    if (config->operator_scope == Scope::PER_TASK) {
-        double deadline =
-            std::min(non_flexible_shutdowns->get_deadline(), flexible_shutdowns->get_deadline());
-        std::optional<Alternative::OpsList> got;
-        co_await call(config->operators.request(this, &got, deadline));
-        task_operators = got.value_or(Alternative::OpsList{});
-        if (failed()) is_frozen.set(true);
+// §7: PER_TASK crew — one crew supervises every carrier; requested once, reused
+// across carriers, re-requested only after a release (its shift end). The flag
+// keeps it from being claimed twice without a release (which used to hoard pools).
+inline sim::Process Task::request_task_operators() {
+    double deadline =
+        std::min(non_flexible_shutdowns->get_deadline(), flexible_shutdowns->get_deadline());
+    std::optional<Alternative::OpsList> got;
+    co_await call(config->operators.request(this, &got, deadline));
+    task_operators = got.value_or(Alternative::OpsList{});
+    if (failed()) {
+        is_frozen.set(true);
+    } else {
+        requested_per_task_operators = true;
+        task_crew_since = env->now();
     }
+}
+
+inline void Task::release_task_operators() {
+    if (!task_operators.empty() && task_crew_since.has_value()) {
+        double booked = 0;
+        for (const auto& [g, c] : task_operators) booked += c;
+        labor_minutes += booked * (env->now() - *task_crew_since);
+    }
+    task_crew_since.reset();
+    if (!task_operators.empty()) release(Alternative::reqspecs_(task_operators));
+    task_operators.clear();
+    requested_per_task_operators = false;
+}
+
+inline double Task::labor_minutes_total() const {
+    double total = labor_minutes;
+    if (task_crew_since.has_value()) {
+        double booked = 0;
+        for (const auto& [g, c] : task_operators) booked += c;
+        total += booked * (env->now() - *task_crew_since);
+    }
+    return total;
 }
 
 inline sim::Process Task::process() {
@@ -1456,13 +1804,38 @@ inline sim::Process Task::process() {
         if (!skip_downtime_check) specs.push_back(sim::WaitSpec(is_in_downtime, false));
         co_await wait(std::move(specs), {.all = true});
 
+        // §16: PER_TASK crew hands off at operator-shift boundaries — once no
+        // carrier is mid-run, drop a crew that has gone off shift so the next
+        // round re-picks whichever group is on shift now.
+        if (config->operator_scope == Scope::PER_TASK && requested_per_task_operators &&
+            active_carriers.empty() && any_task_operator_in_downtime())
+            release_task_operators();
+
         if (!started_up) co_await call(handle_startup());
+
+        if (config->operator_scope == Scope::PER_TASK && started_up && !is_frozen() &&
+            !requested_per_task_operators)
+            co_await call(request_task_operators());
 
         if ((is_frozen() && !skip_frozen_check) || !started_up) continue;
 
         Carrier* new_carrier = make_carrier();
         pending_carriers.add(new_carrier);
-        co_await wait(new_carrier->loaded);
+        all_carriers.push_back(new_carrier);  // §4: finished carriers stay readable for KPIs
+        // §16: a held PER_TASK crew that goes off shift while we wait for the carrier
+        // to load is released at the boundary by the operator shift manager's hand-off
+        // (see OperatorShiftManager::on_leave); here we just wait until it loads.
+        while (!new_carrier->loaded()) {
+            co_await wait(new_carrier->loaded);
+        }
+
+        // a crew handed off during the wait is re-acquired before dispatching
+        // (whichever group is on shift now); a failed request freezes as usual
+        if (config->operator_scope == Scope::PER_TASK && started_up && !is_frozen() &&
+            !requested_per_task_operators) {
+            co_await call(request_task_operators());
+            if (is_frozen() && !skip_frozen_check) continue;
+        }
 
         if (static_cast<int>(pending_carriers.size()) >= config->min_carriers) {
             std::vector<Carrier*> dispatched;
@@ -1502,33 +1875,45 @@ inline sim::Process Task::process() {
 
 inline sim::Process Carrier::handle_operators(const Alternative::OpsList& operators,
                                               double ideal_duration, double* out) {
+    double duration = ideal_duration;
+    if (!operators.empty()) {
+        SamplerPtr productivity = operators[0].first->productivity;
+        switch (task->config->protocols.operators_self_conscious->decide()) {
+            case ConsciousnessState::CONSCIOUS: duration = ideal_duration / productivity->sample_now(); break;
+            case ConsciousnessState::UNCONSCIOUS: duration = ideal_duration; break;
+        }
+    }
+    co_await call(check_shift_fit(operators, duration));
+    *out = duration;
+}
+
+// §17: the shift-fit decision, split out of handle_operators so it can be re-run
+// after the materials step (a restock order or stock-out wait can outdate the
+// first approval). Same decisions, same order: task constraint only when no crew,
+// operator + task constraints otherwise.
+inline sim::Process Carrier::check_shift_fit(const Alternative::OpsList& operators, double duration) {
+    Action task_d =
+        task->config->protocols.task_shift_constraint->decide(task->current_or_last_shift(), duration);
     if (operators.empty()) {
-        Action d = task->config->protocols.task_shift_constraint->decide(task->current_or_last_shift(),
-                                                                         ideal_duration);
-        co_await call(freeze_abort_if(d == Action::ABORT));
-        *out = ideal_duration;
+        co_await call(freeze_abort_if(task_d == Action::ABORT));
         co_return;
     }
-
-    SamplerPtr productivity = operators[0].first->productivity;
-
-    double duration = 0;
-    switch (task->config->protocols.operators_self_conscious->decide()) {
-        case ConsciousnessState::CONSCIOUS: duration = ideal_duration / productivity->sample_now(); break;
-        case ConsciousnessState::UNCONSCIOUS: duration = ideal_duration; break;
-    }
-
     const Interval* current_operator_shift = operators[0].first->current_or_last_shift();
-    Action od = task->config->protocols.operator_shift_constraint->decide(current_operator_shift, duration);
-    Action td = task->config->protocols.task_shift_constraint->decide(task->current_or_last_shift(), duration);
+    Action op_d =
+        task->config->protocols.operator_shift_constraint->decide(current_operator_shift, duration);
+    co_await call(freeze_abort_if(op_d == Action::ABORT || task_d == Action::ABORT));
+}
 
-    co_await call(freeze_abort_if(od == Action::ABORT || td == Action::ABORT));
-    *out = duration;
+inline double Carrier::operator_fit_deadline(const Alternative::OpsList& operators) {
+    return operators.empty()
+               ? sim::inf
+               : task->config->protocols.operator_shift_constraint->deadline(
+                     operators[0].first->current_or_last_shift());
 }
 
 inline sim::Process Carrier::handle_batch_operators(Alternative& operators, double earliest_deadline,
                                                     double ideal_duration, double fail_before,
-                                                    bool do_restock) {
+                                                    bool do_restock, const char* work_mode) {
     std::optional<Alternative::OpsList> recuperated;
     co_await call(operators.request(this, &recuperated, earliest_deadline - fail_before, true));
     co_await call(freeze_abort_if(failed()));
@@ -1539,10 +1924,19 @@ inline sim::Process Carrier::handle_batch_operators(Alternative& operators, doub
 
     if (do_restock) {
         co_await call(handle_restock());
-        co_await call(request_resources(earliest_deadline - duration - (fail_before - ideal_duration)));
+        // §17: a materials wait that cannot end before the crew's fit deadline can
+        // never pass the re-check below — give up (freeing the crew) the moment
+        // success becomes impossible, not when the materials show up.
+        double base = earliest_deadline - duration - (fail_before - ideal_duration);
+        double fit = operator_fit_deadline(*recuperated) - duration;
+        co_await call(request_resources(std::min(base, fit)));
+        co_await call(check_shift_fit(*recuperated, duration));  // §17: re-check after materials
     }
 
-    co_await hold(duration);
+    co_await hold(duration, {.mode = work_mode});  // §4: "loading" / "processing"
+    double booked = 0;  // §12: operator-minutes booked by this batch crew
+    for (const auto& [g, c] : *recuperated) booked += c;
+    task->labor_minutes += booked * duration;
     release(Alternative::reqspecs_(*recuperated));
 }
 
@@ -1550,8 +1944,10 @@ inline sim::Process Carrier::handle_task_operators(double earliest_deadline, dou
     double duration = 0;
     co_await call(handle_operators(task->task_operators, ideal_duration, &duration));
     co_await call(handle_restock());
-    co_await call(request_resources(earliest_deadline - duration));
-    co_await hold(duration);
+    double fit = std::min(earliest_deadline, operator_fit_deadline(task->task_operators));
+    co_await call(request_resources(fit - duration));               // §17: tighten by the crew deadline
+    co_await call(check_shift_fit(task->task_operators, duration));  // §17: re-check after materials
+    co_await hold(duration, {.mode = "processing"});                // §4
 }
 
 inline sim::Process Carrier::process() {
@@ -1579,23 +1975,25 @@ inline sim::Process Carrier::process() {
 
     co_await call(freeze_abort_if(env->now() > earliest_deadline - (ideal_duration + ideal_loading_duration)));
     co_await wait(allow_dispatch,
-                  {.fail_at = earliest_deadline - (ideal_duration + ideal_loading_duration), .cap_now = true});
+                  {.fail_at = earliest_deadline - (ideal_duration + ideal_loading_duration),
+                   .mode = "wait_dispatch", .cap_now = true});  // §4
     co_await call(freeze_abort_if(failed()));
 
     bool delegate_restock_to_loading = !static_cast<bool>(task->config->operators);
     co_await call(handle_batch_operators(task->config->loading_operators, earliest_deadline,
                                          ideal_loading_duration, ideal_duration + ideal_loading_duration,
-                                         delegate_restock_to_loading));
+                                         delegate_restock_to_loading, "loading"));
     if (task->config->operator_scope == Scope::PER_BATCH) {
         co_await call(handle_batch_operators(task->config->operators, earliest_deadline, ideal_duration,
-                                             ideal_duration, !delegate_restock_to_loading));
+                                             ideal_duration, !delegate_restock_to_loading, "processing"));
     } else {
         co_await call(handle_task_operators(earliest_deadline, ideal_duration));
     }
 
     if (task->flexible_shutdowns->adapt(Interval(start_time, env->now()))) task->is_frozen.set(true);
 
-    if (task->is_frozen() && !task->skip_frozen_check && !task->skip_downtime_check) task->release();
+    if (task->is_frozen() && !task->skip_frozen_check && !task->skip_downtime_check)
+        task->release_task_operators();
 
     co_await call(successfully_end_process());
 }
@@ -1702,6 +2100,14 @@ struct PieceTaskConfig : TaskConfig {
     std::vector<std::pair<Model*, ModelConfig>> models_configs;  // dict, insertion-ordered
     PieceCollectorType piece_collector_type = PieceCollectorType::NON_DISCRIMINATING_GREEDY;
 
+    // Python has `PieceProtocols(Protocols)` — piece tasks carry two extra
+    // protocols on top of the shared five in `protocols`. C++ stores TaskConfig's
+    // `protocols` by value (would slice a derived struct), so the two piece-only
+    // protocols live here on the config instead. Defaults mirror the parser's
+    // (FirstInFirstOut / MostPresent) so scenario tests that don't set them build.
+    std::shared_ptr<PieceExitOrder> piece_exit_order = std::make_shared<FirstInFirstOut>();
+    std::shared_ptr<ModelChoiceCriteria> batch_model_choice = std::make_shared<MostPresent>();
+
     const ModelConfig& get_model_config(const Model* model) const {
         const Model* m = model;
         while (m != nullptr) {
@@ -1726,6 +2132,11 @@ class PieceCollector : public Component, public Dispatchable, public Donnable {
     std::vector<sim::Store*> inlet_stores();    // the task's inlets as stores
     sim::Resource& vacant_slots();
 
+    // snapshot the inlets, pick one piece by the exit-order policy, take it via
+    // from_store (result in *out; check failed() after). Replaces the direct
+    // from_store calls so FIFO/FCFO ordering is honored.
+    sim::Process pick_piece(PieceFilter piece_filter, sim::StoreOpts opts, Piece** out);
+    Model* get_focus_model(const std::vector<Model*>& present_models);
     sim::Process collect_until(double deadline, int target, PieceFilter piece_filter, bool* timed_out);
     sim::Process ensure_one();
     sim::Process top_up(int limit, PieceFilter piece_filter);
@@ -1782,6 +2193,8 @@ class PieceTask : public Task, public PickyPieceTaker {
   public:
     std::vector<Buffer*> inlets;
     std::vector<Outlet*> outlets;
+    std::map<Model*, int> deposited;  // §4: pieces deposited per model
+    std::map<Model*, int> scrapped;   // §4: of those, how many landed in a SCRAP buffer
 
     PieceTask(std::shared_ptr<PieceTaskConfig> config_, std::vector<Buffer*> inlets_,
               std::vector<Outlet*> outlets_)
@@ -1812,7 +2225,7 @@ class PieceTask : public Task, public PickyPieceTaker {
             if (outs != nullptr) c->abort_to(*outs);
             else c->abort();
         }
-        release();
+        release_task_operators();  // §7/§16: release the held PER_TASK crew (idempotent)
         started_up = false;
     }
 
@@ -1855,54 +2268,131 @@ inline std::vector<sim::Store*> PieceCollector::inlet_stores() {
 
 inline sim::Resource& PieceCollector::vacant_slots() { return *task->vacant_slots; }
 
+inline Model* most_common_model_(const std::vector<Model*>& models);  // defined below
+
+// Python PieceCollector.pick_piece: snapshot the (piece, buffer) pairs passing
+// the filter; if any, choose the one the exit-order policy prefers (FIFO by
+// buffer enter_time, FCFO by creation_time) and narrow the from_store filter to
+// that exact piece (no scheduling point between the snapshot and the take, so it
+// is honored immediately); if none, a plain from_store with the original filter
+// keeps fail_at / fail_delay working. Result goes to *out; check failed() after.
+inline sim::Process PieceCollector::pick_piece(PieceFilter piece_filter, sim::StoreOpts opts,
+                                               Piece** out) {
+    std::vector<std::pair<Piece*, Buffer*>> pieces;
+    for (Buffer* buffer : task->inlets)
+        for (sim::Component* c : *buffer) {
+            Piece* p = static_cast<Piece*>(c);
+            if (piece_filter(p)) pieces.push_back({p, buffer});
+        }
+
+    PieceFilter effective = piece_filter;
+    if (!pieces.empty()) {
+        Piece* target = nullptr;
+        double best = sim::inf;
+        // min(pieces, key=...) — first piece achieving the minimum wins on ties.
+        switch (cfg().piece_exit_order->decide()) {
+            case ExitOrder::FIRST_IN_FIRST_OUT:
+                for (auto& [p, b] : pieces) {
+                    double t = p->enter_time(*b);
+                    if (t < best) { best = t; target = p; }
+                }
+                break;
+            case ExitOrder::FIRST_CREATED_FIRST_OUT:
+                for (auto& [p, b] : pieces) {
+                    double t = p->creation_time();
+                    if (t < best) { best = t; target = p; }
+                }
+                break;
+        }
+        effective = [target](Piece* p) { return p == target; };
+    }
+
+    if (!opts.mode) opts.mode = "wait_pieces";
+    opts.filter = [effective](sim::Component* c) { return effective(static_cast<Piece*>(c)); };
+    sim::Component* piece = co_await from_store(inlet_stores(), opts);
+    if (!failed()) *out = static_cast<Piece*>(piece);
+}
+
+// Python PieceCollector.get_focus_model: the model the discriminating collectors
+// build the batch around, per the batch_model_choice policy.
+inline Model* PieceCollector::get_focus_model(const std::vector<Model*>& present_models) {
+    switch (cfg().batch_model_choice->decide()) {
+        case ModelChoice::MOST_PRESENT:
+            return most_common_model_(present_models);
+        case ModelChoice::FASTEST_TASK_DURATION: {
+            Model* best = nullptr;
+            double best_key = sim::inf;
+            for (Model* m : present_models) {
+                double k = cfg().get_model_config(m).duration->mean_now();
+                if (k < best_key) { best_key = k; best = m; }
+            }
+            return best;
+        }
+        case ModelChoice::SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY: {
+            Model* best = nullptr;
+            double best_key = sim::inf;
+            for (Model* m : present_models) {
+                int count = 0;
+                for (Model* mm : present_models)
+                    if (mm == m) ++count;
+                double k = cfg().get_model_config(m).min_carrier_capacity - count;
+                if (k < best_key) { best_key = k; best = m; }
+            }
+            return best;
+        }
+    }
+    return nullptr;  // unreachable
+}
+
 inline sim::Process PieceCollector::collect_until(double deadline, int target, PieceFilter piece_filter,
                                                   bool* timed_out) {
     while (static_cast<int>(collected_pieces.size()) < target) {
-        co_await call(request({{vacant_slots(), 1}},
-                              {.fail_at = deadline, .request_priority = task->request_priority}));
+        co_await call(request({{vacant_slots(), 1}}, {.fail_at = deadline,
+                                                      .mode = "wait_slot",
+                                                      .request_priority = task->request_priority}));  // §4
         if (failed()) {
             *timed_out = true;
             co_return;
         }
-        sim::Component* piece = co_await from_store(
-            inlet_stores(), {.fail_at = deadline, .request_priority = task->request_priority,
-                             .filter = [&piece_filter](sim::Component* c) {
-                                 return piece_filter(static_cast<Piece*>(c));
-                             }});
+        Piece* piece = nullptr;
+        co_await call(pick_piece(piece_filter,
+                                 {.fail_at = deadline, .request_priority = task->request_priority},
+                                 &piece));
         if (failed()) {
             release({{vacant_slots(), 1}});
             *timed_out = true;
             co_return;
         }
-        collected_pieces.push_back(static_cast<Piece*>(piece));
+        collected_pieces.push_back(piece);
+        task->pieces_in += 1;  // §4
     }
     *timed_out = false;
 }
 
 inline sim::Process PieceCollector::ensure_one() {
     if (collected_pieces.empty()) {
-        co_await call(request({{vacant_slots(), 1}}, {.request_priority = task->request_priority}));
-        sim::Component* piece = co_await from_store(
-            inlet_stores(), {.request_priority = task->request_priority,
-                             .filter = [this](sim::Component* c) {
-                                 return task->can_take(static_cast<Piece*>(c));
-                             }});
-        collected_pieces.push_back(static_cast<Piece*>(piece));
+        co_await call(request({{vacant_slots(), 1}},
+                              {.mode = "wait_slot", .request_priority = task->request_priority}));  // §4
+        Piece* piece = nullptr;
+        co_await call(pick_piece([this](Piece* p) { return task->can_take(p); },
+                                 {.request_priority = task->request_priority}, &piece));
+        collected_pieces.push_back(piece);
+        task->pieces_in += 1;  // §4
     }
 }
 
 inline sim::Process PieceCollector::top_up(int limit, PieceFilter piece_filter) {
     while (vacant_slots().available_quantity() > 0 &&
            static_cast<int>(collected_pieces.size()) < limit) {
-        sim::Component* piece = co_await from_store(
-            inlet_stores(), {.fail_delay = 0, .request_priority = task->request_priority,
-                             .filter = [&piece_filter](sim::Component* c) {
-                                 return piece_filter(static_cast<Piece*>(c));
-                             }});
+        Piece* piece = nullptr;
+        co_await call(pick_piece(piece_filter,
+                                 {.fail_delay = 0, .request_priority = task->request_priority}, &piece));
         if (failed()) break;
 
-        co_await call(request({{vacant_slots(), 1}}, {.request_priority = task->request_priority}));
-        collected_pieces.push_back(static_cast<Piece*>(piece));
+        co_await call(request({{vacant_slots(), 1}},
+                              {.mode = "wait_slot", .request_priority = task->request_priority}));  // §4
+        collected_pieces.push_back(piece);
+        task->pieces_in += 1;  // §4
     }
 }
 
@@ -1910,7 +2400,7 @@ inline sim::Process PieceCollector::block_remainder(int max_carrier_capacity) {
     if (!cfg().contiguous_carriers) {
         int remainder = max_carrier_capacity - static_cast<int>(collected_pieces.size());
         co_await call(request({{vacant_slots(), double(remainder)}},
-                              {.request_priority = task->request_priority}));
+                              {.mode = "wait_slot", .request_priority = task->request_priority}));  // §4
     }
 }
 
@@ -1918,7 +2408,8 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
                                                   int max_carrier_capacity, PieceFilter piece_filter,
                                                   bool* timed_out) {
     co_await call(request({{vacant_slots(), double(min_carrier_capacity)}},
-                          {.fail_at = deadline, .request_priority = task->request_priority}));
+                          {.fail_at = deadline, .mode = "wait_slot",
+                           .request_priority = task->request_priority}));  // §4
     if (failed()) {
         *timed_out = true;
         co_return;
@@ -1930,6 +2421,22 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
             for (sim::Component* c : *buffer)
                 if (piece_filter(static_cast<Piece*>(c)))
                     valid_pieces.push_back({static_cast<Piece*>(c), buffer});
+        // exit-order policy before truncation (stable_sort: Python list.sort is stable)
+        switch (cfg().piece_exit_order->decide()) {
+            case ExitOrder::FIRST_IN_FIRST_OUT:
+                std::stable_sort(valid_pieces.begin(), valid_pieces.end(),
+                                 [](const auto& a, const auto& b) {
+                                     return a.first->enter_time(*a.second) <
+                                            b.first->enter_time(*b.second);
+                                 });
+                break;
+            case ExitOrder::FIRST_CREATED_FIRST_OUT:
+                std::stable_sort(valid_pieces.begin(), valid_pieces.end(),
+                                 [](const auto& a, const auto& b) {
+                                     return a.first->creation_time() < b.first->creation_time();
+                                 });
+                break;
+        }
         int truncate = static_cast<int>(std::min(
             double(max_carrier_capacity), vacant_slots().available_quantity() + min_carrier_capacity));
         if (static_cast<int>(valid_pieces.size()) > truncate) valid_pieces.resize(truncate);
@@ -1938,7 +2445,8 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
             int additional = static_cast<int>(valid_pieces.size()) - min_carrier_capacity;
             if (additional > 0) {
                 co_await call(request({{vacant_slots(), double(additional)}},
-                                      {.fail_delay = 0, .request_priority = task->request_priority}));
+                                      {.fail_delay = 0, .mode = "wait_slot",
+                                       .request_priority = task->request_priority}));  // §4
                 if (failed()) {
                     additional = 0;
                     valid_pieces.resize(min_carrier_capacity);
@@ -1962,18 +2470,19 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
             for (auto& [piece, buffer] : valid_pieces) {
                 piece->leave(*buffer);
                 collected_pieces.push_back(piece);
+                task->pieces_in += 1;  // §4
             }
 
             if (!cfg().contiguous_carriers) {
                 co_await call(
                     request({{vacant_slots(), double(max_carrier_capacity -
                                                      static_cast<int>(valid_pieces.size()))}},
-                            {.request_priority = task->request_priority}));
+                            {.mode = "wait_slot", .request_priority = task->request_priority}));  // §4
             }
         } else {
             std::vector<sim::WaitSpec> specs;
             for (Buffer* inlet : task->inlets) specs.push_back(sim::WaitSpec(inlet->trigger));
-            co_await sim::Component::wait(std::move(specs), {.fail_at = deadline});
+            co_await sim::Component::wait(std::move(specs), {.fail_at = deadline, .mode = "wait_pieces"});  // §4
             if (failed()) {
                 release({{vacant_slots(), double(min_carrier_capacity)}});
                 *timed_out = true;
@@ -2024,6 +2533,7 @@ inline sim::Process NonDiscriminatingGreedyPieceCollector::process() {
     }
 
     co_await call(block_remainder(model_config.max_carrier_capacity));
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2040,7 +2550,7 @@ inline sim::Process DiscriminatingGreedyPieceCollector::process() {
 
     Model* focus_on = nullptr;
     if (!present_models.empty()) {
-        focus_on = most_common_model_(present_models);
+        focus_on = get_focus_model(present_models);
     } else {
         bool timed_out = false;
         co_await call(collect_until(deadline, 1, [this](Piece* p) { return task->can_take(p); },
@@ -2063,6 +2573,7 @@ inline sim::Process DiscriminatingGreedyPieceCollector::process() {
     }
 
     co_await call(block_remainder(model_config.max_carrier_capacity));
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2079,6 +2590,7 @@ inline sim::Process NonDiscriminatingAltruisticPieceCollector::process() {
                                 [this](Piece* p) { return task->can_take(p); }, &timed_out));
     if (timed_out) co_await call(ensure_one());
 
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2099,7 +2611,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
 
         std::vector<sim::WaitSpec> specs;
         for (Buffer* inlet : task->inlets) specs.push_back(sim::WaitSpec(inlet->trigger));
-        co_await sim::Component::wait(std::move(specs), {.fail_at = deadline});
+        co_await sim::Component::wait(std::move(specs), {.fail_at = deadline, .mode = "wait_pieces"});  // §4
         if (failed()) {
             timed_out = true;
             break;
@@ -2107,7 +2619,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
     }
 
     if (!timed_out) {
-        Model* focus_on = most_common_model_(present_models);
+        Model* focus_on = get_focus_model(present_models);
         const ModelConfig& model_config = cfg().get_model_config(focus_on);
         co_await call(collect_batch(deadline, model_config.min_carrier_capacity,
                                     model_config.max_carrier_capacity,
@@ -2119,6 +2631,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
 
     if (timed_out) co_await call(ensure_one());
 
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2151,14 +2664,19 @@ inline sim::Process PieceCarrier::handle_restock() {
 
 inline void PieceCarrier::abort_to(const std::vector<Outlet*>& outlets) {
     place(piece_collector->collected_pieces, outlets);
+    piece_collector->set_mode("");  // §4: stop accruing the last mode on abort
     piece_collector->done.set(true);
     piece_collector->cancel();
 
+    set_mode("");  // §4
     loaded.set(true);
     done.set(true);
 
     task->pending_carriers.remove(this);
     task->active_carriers.remove(this);
+    // §16: a freeze-abort must not keep the PER_TASK crew reserved through the
+    // frozen wait, but only once no other carrier is still mid-run with it.
+    if (task->active_carriers.empty()) task->release_task_operators();
     cancel();
 }
 
@@ -2178,7 +2696,7 @@ inline sim::Process PieceCarrier::freeze_abort_if(bool condition) {
 
 inline sim::Process PieceCarrier::wait_for_collector(double fail_at) {
     piece_collector->allow_dispatch.set(true);
-    co_await wait(piece_collector->done, {.fail_at = fail_at});
+    co_await wait(piece_collector->done, {.fail_at = fail_at, .mode = "collecting"});  // §4
 }
 
 inline double PieceCarrier::get_ideal_loading_duration() {
@@ -2199,13 +2717,30 @@ inline sim::Process PieceCarrier::request_resources(double fail_at) {
     std::vector<sim::ReqSpec> resources;
     for (const auto& [r, q] : ptask_()->pconfig()->get_model_config(model).resources)
         resources.push_back(sim::ReqSpec(*r, q * mult));
-    co_await call(request(std::move(resources), {.fail_at = fail_at, .cap_now = true}));
+    co_await call(request(std::move(resources),
+                          {.fail_at = fail_at, .mode = "wait_materials", .cap_now = true}));  // §4
     co_await call(freeze_abort_if(failed()));
 }
 
 inline sim::Process PieceCarrier::successfully_end_process() {
+    set_mode("");  // §4: stop the last work mode accruing to now
     piece_collector->cancel();
-    place(piece_collector->collected_pieces, ptask_()->outlets);
+
+    auto& pieces = piece_collector->collected_pieces;
+    task->batch_sizes.tally(static_cast<double>(pieces.size()));            // §4
+    task->cycle_times.tally(env->now() - creation_time());                 // §4
+    for (Piece* piece : pieces)                                            // §5: trajectory stamp
+        piece->journal.push_back({"task", task->name(), env->now()});
+    place(pieces, ptask_()->outlets);
+    for (Piece* piece : pieces) {                                          // §4
+        ptask_()->deposited[piece->model] += 1;
+        for (sim::Queue* q : piece->queues())
+            if (auto* b = dynamic_cast<Buffer*>(q);
+                b != nullptr && b->buffer_type == BufferType::SCRAP) {
+                ptask_()->scrapped[piece->model] += 1;
+                break;
+            }
+    }
     done.set(true);
 
     task->pending_carriers.remove(this);
@@ -2301,7 +2836,7 @@ class ResourceTask : public Task {
         for (Carrier* c : pending_carriers) all.push_back(c);
         for (Carrier* c : active_carriers) all.push_back(c);
         for (Carrier* c : all) c->abort();
-        release();
+        release_task_operators();  // §7/§16: release the held PER_TASK crew (idempotent)
         started_up = false;
     }
 
@@ -2430,6 +2965,7 @@ inline sim::Process GreedyResourceCollector::process() {
         co_await call(top_up());
     }
 
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2463,6 +2999,7 @@ inline sim::Process AltruisticResourceCollector::process() {
         co_await call(top_up());
     }
 
+    set_mode("");  // §4: stop the last wait mode accruing to now after passivate
     done.set(true);
     co_await passivate();
 }
@@ -2496,14 +3033,18 @@ inline void ResourceCarrier::abort() {
         if (transformed[i].salvageable)
             transformed[i].resource->replenish_nb(this, resource_collector->requested_quantities[i]);
 
+    resource_collector->set_mode("");  // §4
     resource_collector->done.set(true);
     resource_collector->cancel();
 
+    set_mode("");  // §4
     loaded.set(true);
     done.set(true);
 
     task->pending_carriers.remove(this);
     task->active_carriers.remove(this);
+    // §16: free the PER_TASK crew on a freeze-abort once no carrier is mid-run.
+    if (task->active_carriers.empty()) task->release_task_operators();
     cancel();
 }
 
@@ -2524,7 +3065,7 @@ inline sim::Process ResourceCarrier::wait_for_collector(double fail_at) {
     }
 
     resource_collector->allow_dispatch.set(true);
-    co_await wait(resource_collector->done, {.fail_at = fail_at, .cap_now = true});
+    co_await wait(resource_collector->done, {.fail_at = fail_at, .mode = "collecting", .cap_now = true});  // §4
 }
 
 inline double ResourceCarrier::get_ideal_loading_duration() {
@@ -2542,7 +3083,8 @@ inline sim::Process ResourceCarrier::request_resources(double fail_at) {
     std::vector<sim::ReqSpec> resources;
     for (const auto& [r, q] : rtask_()->rconfig()->non_transformed_resources)
         resources.push_back(sim::ReqSpec(*r, q * mult));
-    co_await call(request(std::move(resources), {.fail_at = fail_at, .cap_now = true}));
+    co_await call(request(std::move(resources),
+                          {.fail_at = fail_at, .mode = "wait_materials", .cap_now = true}));  // §4
     co_await call(freeze_abort_if(failed()));
 }
 
@@ -2550,7 +3092,12 @@ inline sim::Process ResourceCarrier::successfully_end_process() {
     for (const auto& [resource_out, distr] : rtask_()->rconfig()->resources_out_distr)
         co_await call(resource_out->replenish(this, distr.sample() * resource_collector->requested_quantity));
 
+    task->batch_sizes.tally(resource_collector->requested_quantity);  // §4
+    task->cycle_times.tally(env->now() - creation_time());            // §4
+
+    resource_collector->set_mode("");  // §4: stop accruing modes to now
     resource_collector->cancel();
+    set_mode("");  // §4
     done.set(true);
     task->pending_carriers.remove(this);
     task->active_carriers.remove(this);

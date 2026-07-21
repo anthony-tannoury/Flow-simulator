@@ -10,7 +10,7 @@ Last sync: the port matches the Python simulation as it was just before commit
 the RNG simplification are already in. Commits `b48db69..ecc1b5e` are covered
 by the entries below.
 
-## 1. Piece exit-order policy (`protocols.py`, `piece_task.py`)
+## 1. Piece exit-order policy (`protocols.py`, `piece_task.py`)  — ✅ ported to simulation.hpp
 
 * `protocols.py`: `ExitOrder` enum (`FIRST_IN_FIRST_OUT`, `FIRST_CREATED_FIRST_OUT`),
   `PieceExitOrder` protocol, `FirstInFirstOut` / `FirstCreatedFirstOut` classes.
@@ -31,8 +31,14 @@ by the entries below.
   stores — mirror this snapshot approach instead.
 * `AltruisticMixin.collect_batch`: `valid_pieces` are `(piece, buffer)` pairs,
   sorted by the same policy key before truncation to `truncate`.
+* C++ note: TaskConfig stores `protocols` by value, so a `PieceProtocols`
+  subclass would slice. The two piece-only protocols (`piece_exit_order`,
+  `batch_model_choice`) therefore live as `shared_ptr` fields on
+  `PieceTaskConfig` itself (defaults FirstInFirstOut / MostPresent); the shared
+  five stay on the base `protocols`. `collect_batch`'s sort uses `std::stable_sort`
+  to match Python's stable `list.sort` (first-in-snapshot wins on ties).
 
-## 2. Focus-model policy for discriminating collectors (`protocols.py`, `piece_task.py`)
+## 2. Focus-model policy for discriminating collectors (`protocols.py`, `piece_task.py`)  — ✅ ported to simulation.hpp
 
 * `protocols.py`: `ModelChoice` enum (`MOST_PRESENT`, `FASTEST_TASK_DURATION`,
   `SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY`), `ModelChoiceCriteria` protocol,
@@ -49,13 +55,45 @@ by the entries below.
   `DiscriminatingAltruisticPieceCollector` in place of the inline
   `Counter(...).most_common` pick.
 
-## 3. Distribution mean (`sampler.py`)
+## 3. Distribution mean (`sampler.py`)  — ✅ ported to simulation.hpp
 
 * `Distribution.mean(t)` = distribution constructed with params evaluated at
   `t`, `.mean()`; `Distribution.mean_now()` = `mean(env.now())`.
   (salabim++ distributions already expose `mean()`.)
 
-## 4. KPI instrumentation (`kpis.py` + hooks across the simulation)
+## 4. KPI instrumentation (`kpis.py` + hooks across the simulation)  — ⏳ partial
+
+sim.hpp so far has the mode-INDEPENDENT tallies: Task `batch_sizes` / `cycle_times`
+/ `startup_times` monitors, `all_carriers`, `pieces_in` (bumped in every collector
+take), PieceTask `deposited` / `scrapped` (SCRAP detected via `piece->queues()`),
+tallied in `PieceCarrier::successfully_end_process` and `TaskStarter`.
+
+SIM SIDE DONE: the mode tags are on the sim's holds / requests / waits (loading /
+processing / wait_operators / wait_materials / wait_dispatch / wait_pieces /
+wait_slot / collecting), carriers and collectors reset to "" on end / abort /
+passivate so a finished component's last mode does not accrue to now, and the
+global WIP level monitor (`kpis_state::WIP` + `wip_level`) is +1 at Piece birth,
+-1 on entering an EXIT/SCRAP buffer. salabim++ Component keeps the mode-over-time
+timeline (`mode_log()`). Verified on sample_flow: the timeline carries
+loading/processing/wait_dispatch/wait_materials/wait_operators/collecting and WIP
+moves (mean 1.44, max 6).
+
+READER DONE: `engine/kpis.hpp` mirrors kpis.py — the monitor-timeline helpers
+(`mode_total` / `union_mode_duration` / `rising_edges` / `level_during` /
+`overlap_duration` over `x_raw()`/`t_raw()`/`mode_log()`), all the collectors
+(`task_kpis`, `task_model_rows`, `buffer_kpis`, `operator_kpis`, `flow_kpis`,
+`admin_summary`), the utf-8-sig CSV writer, and `main.cpp` builds the rich
+report.json. Verified vs Python (seed 0) on sample_flow @60000: every column
+lands within statistical equivalence — e.g. Paint Line produites 932 vs 918,
+TRS 0.937 vs 0.931; Weld heures_machine 183 vs 191.
+
+DONE (§5): `Piece.journal` is now ported (buffer in/out via a virtual
+`Piece::leave`, task stamp in `PieceCarrier::successfully_end_process`). The
+engine writes `graph_data.json` (monitor series + finished-piece journals +
+production tallies); `simulation/render_from_data.py` feeds it to the unchanged
+`graphs.py` and fills report.json's `graphs` map, so a C++ run shows the same
+figures — trajectories and production histogram included — as a Python run.
+
 
 New module `simulation/kpis.py`: post-run collectors + CSV writer
 (`write_report(directory, tasks, buffers, piece_generator, run_info)` →
@@ -150,7 +188,7 @@ Data hooks needed:
   `TRG = TRS * (TR/TO)`, `TRE = TRS * (TR/TT)`; the old `TU`-based identity is
   dropped. `Do = TF_union / TR` is unchanged.
 
-## 7. Freeze/startup lifecycle fixes
+## 7. Freeze/startup lifecycle fixes  — ✅ ported to simulation.hpp
 
 * `operator.py`: `OperatorGroup` gets `dependent_tasks: list`; `Task.setup`
   registers itself on every group it uses (operators + loading_operators +
@@ -182,7 +220,7 @@ Data hooks needed:
   Now the crew is released the moment it goes off shift (after the current carrier)
   and the next on-shift pool is picked up; at most one crew is held at a time.
 
-## 8. Step time-function (`function_generator.py`)
+## 8. Step time-function (`function_generator.py`)  — ✅ ported to simulation.hpp
 
 * New `Step` class alongside `Linear`/`Exponential`/`Bathtub`:
   `Step.generate(x1, y1, x2, y2, step_size)` returns a staircase that follows
@@ -192,7 +230,7 @@ Data hooks needed:
   vertical span (`x1 == x2`) or `step_size <= 0`. (`function_generator.py`
   gained `import math`.)
 
-## 9. Piece-generator split: goal vs rate (`piece.py`)
+## 9. Piece-generator split: goal vs rate (`piece.py`)  — ✅ ported to simulation.hpp
 
 The single `PieceGenerator` became an abstract base with two concrete flavours;
 the stopping criterion now drives which is built.
@@ -241,7 +279,7 @@ the stopping criterion now drives which is built.
   produites) and CSV with an `objectif` column; without goals, a two-bar chart
   (générées/produites) and a CSV without `objectif`.
 
-## 12. Labor and machine hours (`task.py`, `kpis.py`)
+## 12. Labor and machine hours (`task.py`, `kpis.py`)  — ⏳ task.py side ported (labor_minutes + task_crew_since + labor_minutes_total, and the accrual points in the PER_TASK crew, handle_batch_operators and TaskStarter); kpis.py side (heures_machine union + heures_main_oeuvre columns) still pending
 
 * `Task` gains `labor_minutes` (operator-minutes booked on the task by every
   crew) filled at three points: `Carrier.handle_batch_operators` adds
@@ -260,7 +298,7 @@ the stopping criterion now drives which is built.
   `heures_main_oeuvre` (= `labor_minutes_total()`, which does sum: operators
   x duration).
 
-## 13. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)
+## 13. Goal generator: grace period + scrap-triggered remakes (`piece.py`, `outlet.py` path, `parser.py`)  — ✅ sim.hpp done (parser++ pending)
 
 * `PieceGenerator` is now `Triggerable` (gains a `trigger` state). `Piece.enter`
   into a scrap buffer, right after decrementing `generated[idx]`, pulses
@@ -335,7 +373,7 @@ the stopping criterion now drives which is built.
   read side. The C++ port must likewise read the JSON as UTF-8 explicitly, never
   via a locale-dependent default.
 
-## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)
+## 16. PER_TASK crew: hand-off while starving + release on freeze-abort (`task.py`, `operator.py`, `piece_task.py`, `resource_task.py`)  — ✅ ported to simulation.hpp
 
 * Bug fixed: a PER_TASK crew stayed claimed across its own shift end whenever
   the task could not cycle its loop — parked on an empty carrier (starving for
@@ -365,7 +403,7 @@ the stopping criterion now drives which is built.
   off-shift "ghost work" disappears (atelier exits moved 2629 -> 2568; the
   difference was work done by crews whose operators had gone home).
 
-## 17. Shift-fit re-checked after the materials step (`task.py`)
+## 17. Shift-fit re-checked after the materials step (`task.py`)  — ✅ ported to simulation.hpp
 
 * Gap fixed: `ConstrainedByShift` approved a work hold BEFORE `handle_restock`
   + `request_resources`. A restock-order hold or a stock-out wait between the
@@ -395,7 +433,7 @@ the stopping criterion now drives which is built.
   the same). Startup holds (`TaskStarter`) remain outside the shift
   constraint, as before.
 
-## 18. LogNormal distribution (`sampler.py`, `parser.py`) — mirror-worthy
+## 18. LogNormal distribution (`sampler.py`, `parser.py`) — mirror-worthy  — ✅ sim.hpp done (parser++ pending)
 
 * The flow designer offered `LogNormal` (fields `mean`, `sigma`) but the parser
   never mapped it, so any flow using it raised "unknown distribution type".
@@ -422,7 +460,7 @@ the stopping criterion now drives which is built.
   distribution table. This is the full designer distribution set (Constant,
   Uniform, Normal, Exponential, Triangular, LogNormal); the two sides now match.
 
-## 19. Administrative task flag + admin/productive roll-up (`task.py`, `kpis.py`, `parser.py`) — mirror-worthy
+## 19. Administrative task flag + admin/productive roll-up (`task.py`, `kpis.py`, `parser.py`) — mirror-worthy  — ⏳ sim.hpp `admin` field on TaskConfig done; parser read + kpis columns/roll-up pending
 
 * `TaskConfig` gains a boolean `admin` field (reporting classification only, no
   effect on the simulation). The parser reads `pt.get('admin', False)` for both

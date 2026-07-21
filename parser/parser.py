@@ -4,7 +4,7 @@ import shutil
 import salabim as sim
 
 from time import perf_counter
-from simulation import env, kpis, graphs
+from simulation import env, kpis, graphs, reseed
 
 from datetime import date, time, datetime, timedelta
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
@@ -217,6 +217,11 @@ class Parser:
         # written faithfully to the report CSVs. The flow JSON is always UTF-8.
         with open(filename, 'r', encoding='utf-8') as file:
             self.data = json.load(file)
+        # Re-seed the shared environment before anything is built or drawn, so the
+        # run is reproducible for the flow's seed (0 by default) and differs between
+        # seeds. Must happen here, ahead of load_all's object construction.
+        self.seed = int(self.data.get('seed', 0))
+        reseed(self.seed)
         self.sim_start = to_datetime(self.data['start_date'])
         self.discriminate()
         self.by_id = {n['id']: n for n in self.data['nodes']}
@@ -277,7 +282,8 @@ class Parser:
             piece_generator=self.piece_generator,
             run_info=run_info,
             sim_start=self.sim_start,
-            operator_groups=list(self.operator_groups.values())
+            operator_groups=list(self.operator_groups.values()),
+            resources=list(self.resources.values())
         )
         graphs.write_graphs(
             os.path.join(directory, 'graphes'),
@@ -338,6 +344,7 @@ class Parser:
             'buffers': {id_: kpis.buffer_kpis(b) for id_, b in self.outlets.items()
                         if isinstance(b, Buffer)},
             'operators': {id_: kpis.operator_kpis(g) for id_, g in self.operator_groups.items()},
+            'resources': {id_: kpis.resource_kpis(r) for id_, r in self.resources.items()},
             'flux': flux,
             'flux_modeles': flux_modeles,
             'graphs': {

@@ -33,6 +33,7 @@ DUREE_COLS = {
     'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee', 'sim_end_minutes',
+    'temps_rupture',
 }
 PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
             'trs', 'trg', 'tre', 'taux_rebut', 'atteinte', 'taux_occupation'}
@@ -51,6 +52,9 @@ LABEL_OVERRIDES = {
     'heures_machine': 'Heures machine',
     'heures_en_poste': 'Heures en poste', 'heures_hors_poste': 'Heures hors poste',
     'heures_main_oeuvre': "Heures main-d'\u0153uvre",
+    'capacite': 'Capacit\u00e9', 'consommation_totale': 'Consommation totale',
+    'consommation_j': 'Consommation / jour', 'entrees_totales': 'Entr\u00e9es totales',
+    'nb_ruptures': 'Nb ruptures', 'temps_rupture': 'Temps rupture',
 }
 
 
@@ -125,6 +129,7 @@ class ResultsData:
         self.tasks_models = data.get('tasks_models', {})
         self.buffers = data.get('buffers', {})
         self.operators = data.get('operators', {})
+        self.resources = data.get('resources', {})
         self.flux = data.get('flux', {})
         self.flux_modeles = data.get('flux_modeles', [])
         self.admin_summary = data.get('admin_summary', {})
@@ -439,6 +444,31 @@ class ResultsDock(QtWidgets.QDockWidget):
             hb = QtWidgets.QHBoxLayout(); hb.addStretch(1); hb.addWidget(show)
             ol.addLayout(hb)
             tabs.addTab(op_host, "Opérateurs")
+
+        if results.resources:
+            res_host = QtWidgets.QWidget()
+            rl = QtWidgets.QVBoxLayout(res_host)
+            res_ids = list(results.resources.keys())
+            res_keys = list(next(iter(results.resources.values())).keys())
+            res_table = _make_table(
+                [pretty_label(k) for k in res_keys],
+                [[fmt_value(k, results.resources[i].get(k)) for k in res_keys] for i in res_ids])
+            rl.addWidget(res_table)
+            res_show = QtWidgets.QPushButton("Show stock graph")
+
+            def _show_resource(_=None, table=res_table, ids=res_ids):
+                row = table.currentRow()
+                if row < 0:
+                    return
+                uid = ids[row]
+                name = results.resources[uid].get('ressource', uid)
+                dlg = ResultsCardDialog(parent, f"Results: {name}",
+                                        [("Stock", PngView(results.graph_path('resources', uid)))])
+                dlg.exec()
+            res_show.clicked.connect(_show_resource)
+            rhb = QtWidgets.QHBoxLayout(); rhb.addStretch(1); rhb.addWidget(res_show)
+            rl.addLayout(rhb)
+            tabs.addTab(res_host, "Ressources")
 
         line_tabs = QtWidgets.QTabWidget()
         line_tabs.addTab(PngView(results.graph_path('encours')), "Encours")

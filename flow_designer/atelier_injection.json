@@ -688,40 +688,40 @@
   ],
   "stopping_criterion": {
     "type": "ByPiecesProduced",
-    "timeout": "inf",
+    "timeout": 525600.0,
     "grace_period": 30000.0,
     "models_goals": [
       {
         "model": "model_c1c20e4c",
-        "goal": 300
+        "goal": 3000
       },
       {
         "model": "model_f551538b",
-        "goal": 300
+        "goal": 3000
       },
       {
         "model": "model_f8a1d4ad",
-        "goal": 300
+        "goal": 3000
       },
       {
         "model": "model_742fd366",
-        "goal": 300
+        "goal": 3000
       },
       {
         "model": "model_300990ff",
-        "goal": 450
+        "goal": 4500
       },
       {
         "model": "model_e093ec36",
-        "goal": 450
+        "goal": 4500
       },
       {
         "model": "model_02d3ef7d",
-        "goal": 450
+        "goal": 4500
       },
       {
         "model": "model_256d4101",
-        "goal": 450
+        "goal": 4500
       }
     ]
   },
@@ -2194,8 +2194,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
-      "admin": false,
-      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
+      "collector_type": "DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_6ffdb86b"
       ],
@@ -2409,8 +2408,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
-      "admin": false,
-      "collector_type": "DISCRIMINATING_ALTRUISTIC",
+      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_38e4202f"
       ],
@@ -3010,8 +3008,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
-      "admin": false,
-      "collector_type": "DISCRIMINATING_ALTRUISTIC",
+      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_b8b3f7d4"
       ],
