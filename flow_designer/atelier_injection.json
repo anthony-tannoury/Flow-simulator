@@ -878,6 +878,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_81433f15"
@@ -1047,6 +1048,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_81433f15"
@@ -1226,6 +1228,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_064a900c"
@@ -1373,6 +1376,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_064a900c"
@@ -1544,6 +1548,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_a2f5ab52"
@@ -1695,6 +1700,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_a2f5ab52"
@@ -1839,6 +1845,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_110b4e16"
@@ -2001,6 +2008,7 @@
       "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_0f2b0dc8"
@@ -2049,7 +2057,7 @@
       "name": "MACHINEMARQUAGELASER",
       "models_configs": [
         {
-          "model": "model_c1c20e4c",
+          "model": "model_f6960dbd",
           "duration": {
             "dist_type": "Constant",
             "params": {
@@ -2060,11 +2068,11 @@
             }
           },
           "resources": [],
-          "min_carrier_capacity": 16,
-          "max_carrier_capacity": 16
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
         },
         {
-          "model": "model_f551538b",
+          "model": "model_3853af8a",
           "duration": {
             "dist_type": "Constant",
             "params": {
@@ -2075,98 +2083,8 @@
             }
           },
           "resources": [],
-          "min_carrier_capacity": 12,
-          "max_carrier_capacity": 12
-        },
-        {
-          "model": "model_f8a1d4ad",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 6,
-          "max_carrier_capacity": 6
-        },
-        {
-          "model": "model_742fd366",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 6,
-          "max_carrier_capacity": 6
-        },
-        {
-          "model": "model_300990ff",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 28,
-          "max_carrier_capacity": 28
-        },
-        {
-          "model": "model_e093ec36",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 28,
-          "max_carrier_capacity": 28
-        },
-        {
-          "model": "model_02d3ef7d",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 28,
-          "max_carrier_capacity": 28
-        },
-        {
-          "model": "model_256d4101",
-          "duration": {
-            "dist_type": "Constant",
-            "params": {
-              "value": {
-                "kind": "constant",
-                "value": 18.0
-              }
-            }
-          },
-          "resources": [],
-          "min_carrier_capacity": 5,
-          "max_carrier_capacity": 5
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
         }
       ],
       "startup_duration": {
@@ -2271,12 +2189,13 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 28.0,
+      "max_capacity": 1.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
-      "collector_type": "DISCRIMINATING_ALTRUISTIC",
+      "admin": false,
+      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_6ffdb86b"
       ],
@@ -2490,7 +2409,8 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
-      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
+      "admin": false,
+      "collector_type": "DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_38e4202f"
       ],
@@ -2852,6 +2772,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_6beb763a"
@@ -3089,7 +3010,8 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
-      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
+      "admin": false,
+      "collector_type": "DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_b8b3f7d4"
       ],
@@ -3260,6 +3182,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_79e94d3c"
@@ -3427,6 +3350,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_79e94d3c"
@@ -3544,6 +3468,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_dc32b97e"
@@ -3755,6 +3680,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_bb06c997"
@@ -3945,6 +3871,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_dfda3dbf"
@@ -4134,6 +4061,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_70baa0d8"
@@ -4266,6 +4194,7 @@
       "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_430ed3f8",
