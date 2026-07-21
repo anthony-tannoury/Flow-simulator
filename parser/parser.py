@@ -479,6 +479,28 @@ class Parser:
                 case _:
                     raise NotImplementedError()
 
+            # Repeat: duplicate the generated intervals `count` extra times, each copy
+            # shifted later by `translation` minutes, then union-merge so the result
+            # stays sorted and disjoint (a too-small translation that overlaps a copy
+            # onto the base is fused rather than double-counted).
+            rep = shift.get('repeat') or {}
+            count, translation = int(rep.get('count', 0)), float(rep.get('translation', 0) or 0)
+            if count > 0 and translation > 0:
+                base = self.shifts[shift['id']]
+                pieces = list(base)
+                for k in range(1, count + 1):
+                    pieces.extend(Interval(iv.start + k * translation, iv.end + k * translation)
+                                  for iv in base)
+                pieces.sort(key=lambda iv: iv.start)
+                merged: list[Interval] = []
+                for iv in pieces:
+                    if merged and iv.start <= merged[-1].end:
+                        if iv.end > merged[-1].end:
+                            merged[-1] = Interval(merged[-1].start, iv.end)
+                    else:
+                        merged.append(iv)
+                self.shifts[shift['id']] = merged
+
     def load_resources(self) -> None:
         self.resources: dict[str, Resource] = {}
 

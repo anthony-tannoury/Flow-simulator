@@ -439,6 +439,34 @@ class Parser {
             } else {
                 throw std::invalid_argument("unknown shift mode: " + shift.at("mode").get<std::string>());
             }
+
+            // Repeat: duplicate the generated intervals `count` extra times, each copy
+            // shifted later by `translation` minutes, then union-merge so the result
+            // stays sorted and disjoint. Mirrors parser.py.
+            if (shift.contains("repeat")) {
+                const auto& rep = shift.at("repeat");
+                long long count = rep.value("count", 0LL);
+                double translation = rep.value("translation", 0.0);
+                if (count > 0 && translation > 0) {
+                    const std::string sid = shift.at("id").get<std::string>();
+                    Intervals base = shifts[sid];
+                    Intervals pieces = base;
+                    for (long long k = 1; k <= count; ++k)
+                        for (const auto& iv : base)
+                            pieces.push_back(interval(iv->start + k * translation, iv->end + k * translation));
+                    std::sort(pieces.begin(), pieces.end(),
+                              [](const IntervalPtr& a, const IntervalPtr& b) { return a->start < b->start; });
+                    Intervals merged;
+                    for (const auto& iv : pieces) {
+                        if (!merged.empty() && iv->start <= merged.back()->end) {
+                            if (iv->end > merged.back()->end) merged.back()->end = iv->end;
+                        } else {
+                            merged.push_back(interval(iv->start, iv->end));  // copy: never mutate base
+                        }
+                    }
+                    shifts[sid] = merged;
+                }
+            }
         }
     }
 

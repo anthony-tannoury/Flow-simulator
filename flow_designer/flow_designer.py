@@ -1213,12 +1213,39 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.days_off.setMaximumHeight(140)
         lay.addWidget(self.days_off)
 
+        # --- Repeat: duplicate the whole configured shift a number of extra times,
+        #     each copy shifted later by a fixed duration. The copies are generated
+        #     at load time (both modes), so a seasonal block — e.g. a December-only
+        #     weekly shift, or a custom date range — can be spread across years
+        #     without authoring one shift per year.
+        rep = entry.get("repeat") or {}
+        rep_box = QtWidgets.QGroupBox("Repeat (duplicate this shift, each copy shifted later)")
+        rf = QtWidgets.QFormLayout(rep_box)
+        self.rep_count = QtWidgets.QLineEdit(str(int(rep.get("count", 0))))
+        self.rep_count.setValidator(QtGui.QIntValidator(0, 100000, self))
+        self.rep_count.setMaximumWidth(80)
+        rf.addRow("Repetitions (extra copies)", self.rep_count)
+        m = int(rep.get("translation", 0))
+        trans = QtWidgets.QHBoxLayout()
+        self.rep_w = QtWidgets.QLineEdit(str(m // 10080))
+        self.rep_d = QtWidgets.QLineEdit(str(m % 10080 // 1440))
+        self.rep_h = QtWidgets.QLineEdit(str(m % 1440 // 60))
+        self.rep_m = QtWidgets.QLineEdit(str(m % 60))
+        for w, unit in ((self.rep_w, "wk"), (self.rep_d, "d"), (self.rep_h, "h"), (self.rep_m, "m")):
+            w.setValidator(QtGui.QIntValidator(0, 10000000, self)); w.setMaximumWidth(56)
+            trans.addWidget(w); trans.addWidget(QtWidgets.QLabel(unit))
+        trans.addStretch(1)
+        tw = QtWidgets.QWidget(); tw.setLayout(trans)
+        rf.addRow("Translation (each copy is this much later)", tw)
+        rf.addRow("", QtWidgets.QLabel("≈ 1 year: 52 wk (keeps weekdays) or 365 d (keeps dates)."))
+        lay.addWidget(rep_box)
+
         bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
         lay.addWidget(bb)
 
     def data(self):
-        return {
+        out = {
             "name": self.name.text().strip(),
             "mode": self.mode.currentData(),
             "days": [r.data() for r in self.day_rows],
@@ -1226,6 +1253,12 @@ class ShiftEditorDialog(QtWidgets.QDialog):
             "horizon": {"start": self.h_start.get_value(), "end": self.h_end.get_value()},
             "custom_intervals": self.custom.value(),
         }
+        count = as_int(self.rep_count.text())
+        translation = (as_int(self.rep_w.text()) * 10080 + as_int(self.rep_d.text()) * 1440
+                       + as_int(self.rep_h.text()) * 60 + as_int(self.rep_m.text()))
+        if count > 0 and translation > 0:
+            out["repeat"] = {"count": count, "translation": translation}
+        return out
 
 
 class TranslateShiftDialog(QtWidgets.QDialog):
