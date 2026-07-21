@@ -103,6 +103,22 @@ int main(int argc, char** argv) {
             emit("ERROR", {{"message", "unknown stopping criterion"}});
             return 1;
         }
+
+        // The piece generator's gap (minutes between two pieces), for the run window.
+        // "automatic" only for a goal generator whose criterion set no explicit gap;
+        // a set gap, or a constant-rate generator, is "manual"; a time-varying rate
+        // gap has no single value ("function"). Mirrors sim_runner.py.
+        if (auto* gg = dynamic_cast<GoalPieceGenerator*>(p.piece_generator)) {
+            meta["gap"] = gg->gap;
+            meta["gap_mode"] = p.data.at("stopping_criterion").contains("gap") ? "manual" : "automatic";
+        } else if (auto* rg = dynamic_cast<RatePieceGenerator*>(p.piece_generator)) {
+            if (std::holds_alternative<double>(rg->gap)) {
+                meta["gap"] = std::get<double>(rg->gap);
+                meta["gap_mode"] = "manual";
+            } else {
+                meta["gap_mode"] = "function";
+            }
+        }
         emit("META", meta);
 
         auto t0 = std::chrono::steady_clock::now();
