@@ -2044,7 +2044,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         per-model probability mix (each constant or a function of time), with one
         model optionally left as the freeloader (probability 1 - sum(others))."""
 
-    def __init__(self, parent, start_date, criterion, model_registry):
+    def __init__(self, parent, start_date, criterion, model_registry, seed=0):
         super().__init__(parent)
         self.setWindowTitle("Simulation settings")
         self._leaf_models = _leaf_model_names(model_registry)
@@ -2056,6 +2056,14 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self.start_date = DateTimeWidget(start_date or "01-01-2026 00:00")
         sl.addWidget(self.start_date); sl.addStretch(1)
         lay.addWidget(start_box)
+
+        seed_box = QtWidgets.QGroupBox("Random seed (the same seed reproduces the same run)")
+        sdl = QtWidgets.QHBoxLayout(seed_box)
+        self.seed_edit = QtWidgets.QLineEdit(str(int(seed) if seed is not None else 0))
+        self.seed_edit.setValidator(QtGui.QIntValidator(0, 2**31 - 1, self))
+        self.seed_edit.setMaximumWidth(120)
+        sdl.addWidget(self.seed_edit); sdl.addStretch(1)
+        lay.addWidget(seed_box)
 
         crit_box = QtWidgets.QGroupBox("Stopping criterion and piece generation")
         cl = QtWidgets.QVBoxLayout(crit_box)
@@ -2083,6 +2091,13 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
 
     def start_value(self):
         return self.start_date.get_value()
+
+    def seed_value(self):
+        text = self.seed_edit.text().strip()
+        try:
+            return int(text)
+        except (ValueError, TypeError):
+            return 0
 
     def _rebuild(self, *_):
         _clear_layout(self._host_lay)
@@ -2853,6 +2868,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.closing_day_registry = []  # [{"id", "date": "dd-mm-yyyy", "name": label}]
         self.stopping_criterion = {}  # {} | {"type": "ByTime"|"ByPiecesProduced", ...}
         self.start_date = "01-01-2026 00:00"  # always set; the calendar anchor of t=0
+        self.seed = 0  # RNG seed for the run; same seed → same run
 
         self.graph.register_nodes([
             ShutdownsNode,
@@ -3482,6 +3498,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.closing_day_registry = []
         self.stopping_criterion = {}
         self.start_date = "01-01-2026 00:00"
+        self.seed = 0
 
     @staticmethod
     def _ids_by_name(entries):
@@ -3538,15 +3555,16 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
     def edit_simulation_settings(self):
         dlg = SimulationSettingsDialog(self, self.start_date, self.stopping_criterion,
-                                       self.model_registry)
+                                       self.model_registry, self.seed)
         if dlg.exec():
-            before = (self.start_date, copy.deepcopy(self.stopping_criterion))
+            before = (self.start_date, self.seed, copy.deepcopy(self.stopping_criterion))
             self.start_date = dlg.start_value()
+            self.seed = dlg.seed_value()
             self.stopping_criterion = dlg.value()
-            self._mark_dirty_if_changed(before, (self.start_date, self.stopping_criterion))
+            self._mark_dirty_if_changed(before, (self.start_date, self.seed, self.stopping_criterion))
             label = sentence_case(self.stopping_criterion.get("type") or "?")
             start = self.start_date or "not set"
-            self.statusBar().showMessage(f"Simulation: start {start}; stops on {label}.")
+            self.statusBar().showMessage(f"Simulation: start {start}; seed {self.seed}; stops on {label}.")
 
     def on_node_double_clicked(self, node):
         kind = node_kind(node)
@@ -3697,6 +3715,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "shifts": shifts,
             "stopping_criterion": criterion,
             "start_date": self.start_date,
+            "seed": self.seed,
             "nodes": nodes,
             "connections": self.connections_clean(),
             "backdrops": backdrops,
@@ -4630,6 +4649,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         if data.get("start_date"):
             # the imported file's dates were authored against its own anchor: adopt it
             self.start_date = data["start_date"]
+        if data.get("seed") is not None:
+            self.seed = int(data["seed"])
 
         id_to_node = self._instantiate_cards(data)
 

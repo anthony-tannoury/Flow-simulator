@@ -71,10 +71,16 @@ int main(int argc, char** argv) {
         buffer << f.rdbuf();
         std::string flow_text = buffer.str();  // nlohmann decodes UTF-8 (no mojibake)
 
-        auto& e = init(0, false);
+        // Parse the flow first (no sim objects are built yet), read its seed
+        // (0 by default), then create the environment with it. init() recreates
+        // the env, so it must run before load_all builds anything or draws.
+        parser::Parser p(flow_text);
+        long long seed = 0;  // default; coerce int or float (matches Python's int(seed))
+        if (p.data.contains("seed") && p.data["seed"].is_number())
+            seed = static_cast<long long>(p.data["seed"].get<double>());
+        auto& e = init(seed, false);
         e.trace(false);
 
-        parser::Parser p(flow_text);
         p.load_all();
         StoppingCriterion* criterion = p.stopping_criterion;
         Buffer* exit_buffer = p.exit_buffer();
