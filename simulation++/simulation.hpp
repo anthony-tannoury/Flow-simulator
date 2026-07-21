@@ -1587,7 +1587,6 @@ class Task : public Component, public HasShifts {
     bool requested_per_task_operators = false;      // whether the PER_TASK crew is currently held
     double labor_minutes = 0.0;                     // operator-minutes booked on this task, all crews
     std::optional<double> task_crew_since;          // claim start of the held PER_TASK crew (Python None)
-    Carrier* awaiting_carrier = nullptr;            // the pending carrier the process is parked on
     CarrierTracker pending_carriers;
     CarrierTracker active_carriers;
 
@@ -1657,6 +1656,21 @@ class Task : public Component, public HasShifts {
             if (g->is_in_downtime()) return true;
         return false;
     }
+    // §16: a group this task may hold as its PER_TASK crew has just gone off shift.
+    // Release the crew when it is held, idle (no carrier mid-run) and shift-
+    // constrained past this boundary, so an idle crew is not reserved — and booked
+    // as off-shift labour — while the task sits parked between carriers (waiting for
+    // one to load, or blocked at the top of its loop). A crew that may work past the
+    // boundary (NotConstrainedByShift, or PartiallyConstrained within tolerance) is
+    // kept: it starts/finishes the carrier and is released afterwards instead.
+    void hand_off_crew_at_shift_end() {
+        if (config->operator_scope != Scope::PER_TASK || !requested_per_task_operators ||
+            task_operators.empty() || !active_carriers.empty())
+            return;
+        const Interval* crew_shift = task_operators[0].first->current_or_last_shift();
+        if (config->protocols.operator_shift_constraint->deadline(crew_shift) <= env->now())
+            release_task_operators();
+    }
     sim::Process process() override;
 };
 
@@ -1720,17 +1734,17 @@ inline void OperatorShiftManager::on_enter() {
 inline void OperatorShiftManager::on_leave() {
     auto* g = static_cast<OperatorGroup*>(entity);
     g->set_capacity(0);
-    // a task holding this group PER_TASK while starving for pieces is parked in
-    // its loaded-wait and would keep the crew reserved for days; wake it so the
-    // hand-off happens at the shift boundary (activate() breaks the wait).
+    // A crew supervising a task PER_TASK goes home when its group leaves shift.
+    // Release it from any dependent task that is holding it as its crew while idle
+    // (no carrier mid-run) — whether the task is parked in its loaded-wait starving
+    // for pieces or blocked at the top of its loop — so the crew is not reserved
+    // (and booked as off-shift labour) past the boundary. The task re-acquires
+    // whichever group is on shift when it next needs one.
     for (Task* task : g->dependent_tasks) {
-        if (task->awaiting_carrier != nullptr && task->requested_per_task_operators &&
-            task->iswaiting()) {
-            bool holds_this = false;
-            for (const auto& [group, count] : task->task_operators)
-                if (group == g) { holds_this = true; break; }
-            if (holds_this) task->activate();  // discard the Yield: side effects are synchronous
-        }
+        bool holds_this = false;
+        for (const auto& [group, count] : task->task_operators)
+            if (group == g) { holds_this = true; break; }
+        if (holds_this) task->hand_off_crew_at_shift_end();
     }
     ShiftManager::on_leave();
 }
@@ -1808,17 +1822,12 @@ inline sim::Process Task::process() {
         Carrier* new_carrier = make_carrier();
         pending_carriers.add(new_carrier);
         all_carriers.push_back(new_carrier);  // §4: finished carriers stay readable for KPIs
-        // §16: while parked on the collector, a held PER_TASK crew must still hand
-        // off at its shift end — the operator shift manager wakes this task
-        // (activate breaks the wait), the crew is released, the wait resumes.
-        awaiting_carrier = new_carrier;
+        // §16: a held PER_TASK crew that goes off shift while we wait for the carrier
+        // to load is released at the boundary by the operator shift manager's hand-off
+        // (see OperatorShiftManager::on_leave); here we just wait until it loads.
         while (!new_carrier->loaded()) {
             co_await wait(new_carrier->loaded);
-            if (config->operator_scope == Scope::PER_TASK && requested_per_task_operators &&
-                active_carriers.empty() && any_task_operator_in_downtime())
-                release_task_operators();
         }
-        awaiting_carrier = nullptr;
 
         // a crew handed off during the wait is re-acquired before dispatching
         // (whichever group is on shift now); a failed request freezes as usual
