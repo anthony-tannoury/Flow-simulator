@@ -726,6 +726,7 @@
     ]
   },
   "start_date": "01-01-2026 00:00",
+  "seed": 67,
   "nodes": [
     {
       "id": "piecegenerator_590444be",
@@ -2194,6 +2195,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_6ffdb86b"
@@ -2408,6 +2410,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_38e4202f"
@@ -3008,6 +3011,7 @@
       "independent_carriers": false,
       "timeout": "inf",
       "priority": 10,
+      "admin": false,
       "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
       "bufs_in": [
         "buffer_b8b3f7d4"
