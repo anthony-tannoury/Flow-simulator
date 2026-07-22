@@ -1,0 +1,1009 @@
+{
+  "editor": {
+    "name": "Simulation Flow Designer",
+    "version": "0.3.0",
+    "format": "clean-json"
+  },
+  "models": [
+    {
+      "name": "M88",
+      "parent": null,
+      "id": "model_f6960dbd"
+    },
+    {
+      "name": "LEAP",
+      "parent": null,
+      "id": "model_3853af8a"
+    },
+    {
+      "name": "MBP M88",
+      "parent": "model_f6960dbd",
+      "id": "model_c1c20e4c"
+    },
+    {
+      "name": "MHP M88",
+      "parent": "model_f6960dbd",
+      "id": "model_f551538b"
+    },
+    {
+      "name": "DHP M88 Dr",
+      "parent": "model_f6960dbd",
+      "id": "model_f8a1d4ad"
+    },
+    {
+      "name": "DHP M88 Gche",
+      "parent": "model_f6960dbd",
+      "id": "model_742fd366"
+    },
+    {
+      "name": "RM1 LEAP 1A",
+      "parent": "model_3853af8a",
+      "id": "model_300990ff"
+    },
+    {
+      "name": "RM2 LEAP 1B",
+      "parent": "model_3853af8a",
+      "id": "model_e093ec36"
+    },
+    {
+      "name": "RM3 LEAP 1B",
+      "parent": "model_3853af8a",
+      "id": "model_02d3ef7d"
+    },
+    {
+      "name": "D1 LEAP 1B",
+      "parent": "model_3853af8a",
+      "id": "model_256d4101"
+    }
+  ],
+  "resources": [
+    {
+      "name": "NOYAU MBP M88",
+      "restockable": true,
+      "lifespan": "inf",
+      "max_capacity": 100.0,
+      "initial_capacity": 50.0,
+      "order_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "delivery_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 100.0
+          }
+        }
+      },
+      "threshold": 20.0,
+      "id": "resource_9de24cdb"
+    },
+    {
+      "name": "CIRE_BRUTE",
+      "restockable": true,
+      "lifespan": "inf",
+      "max_capacity": 100.0,
+      "initial_capacity": 30.0,
+      "order_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 10.0
+          }
+        }
+      },
+      "delivery_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 100.0
+          }
+        }
+      },
+      "threshold": 20.0,
+      "id": "resource_a07d9691"
+    }
+  ],
+  "operators": [
+    {
+      "name": "POOL_CIRE_MATIN",
+      "capacity": 4,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.85
+          }
+        }
+      },
+      "shifts": [
+        "shift_496aeb46"
+      ],
+      "id": "operator_bbad2cd0"
+    },
+    {
+      "name": "POOL_CIRE_APREM",
+      "capacity": 4,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.85
+          }
+        }
+      },
+      "shifts": [
+        "shift_04b8cc03"
+      ],
+      "id": "operator_f0ba684d"
+    },
+    {
+      "name": "POOL_CIRE_NUIT",
+      "capacity": 4,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.8
+          }
+        }
+      },
+      "shifts": [
+        "shift_98ac7b07"
+      ],
+      "id": "operator_97fcb1f5"
+    },
+    {
+      "name": "POOL_CIRE_SAM",
+      "capacity": 4,
+      "productivity": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.85
+          }
+        }
+      },
+      "shifts": [
+        "shift_efa35ddc"
+      ],
+      "id": "operator_796ea384"
+    }
+  ],
+  "closing_days": [
+    {
+      "date": "01-01-2026",
+      "name": "",
+      "id": "closingday_fcd95861"
+    },
+    {
+      "date": "01-05-2026",
+      "name": "",
+      "id": "closingday_f5ba34fa"
+    },
+    {
+      "date": "08-05-2026",
+      "name": "",
+      "id": "closingday_8389bb93"
+    },
+    {
+      "date": "14-05-2026",
+      "name": "",
+      "id": "closingday_745a3415"
+    },
+    {
+      "date": "14-07-2026",
+      "name": "",
+      "id": "closingday_9e5d6ccf"
+    },
+    {
+      "date": "21-08-2026",
+      "name": "",
+      "id": "closingday_61cc949d"
+    },
+    {
+      "date": "01-11-2026",
+      "name": "",
+      "id": "closingday_c040805a"
+    },
+    {
+      "date": "11-11-2026",
+      "name": "",
+      "id": "closingday_914d12ae"
+    },
+    {
+      "date": "25-12-2026",
+      "name": "",
+      "id": "closingday_bc9e8f7e"
+    }
+  ],
+  "shifts": [
+    {
+      "id": "shift_10bc51e7",
+      "name": "Temps d'ouverture P1",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2026",
+        "end": "30-04-2026"
+      },
+      "repeat": {
+        "count": 1,
+        "years": 1,
+        "months": 0,
+        "weeks": 0,
+        "days": 0
+      }
+    },
+    {
+      "id": "shift_4386d987",
+      "name": "Temps d'ouverture P3",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "08:00",
+              "end": "16:00"
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-10-2026",
+        "end": "31-12-2026"
+      },
+      "repeat": {
+        "count": 1,
+        "years": 1,
+        "months": 0,
+        "weeks": 0,
+        "days": 0
+      }
+    },
+    {
+      "id": "shift_a76e9dea",
+      "name": "Temps d'ouverture P2",
+      "mode": "custom",
+      "days_off": [
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d"
+      ],
+      "custom_intervals": [
+        {
+          "start": "01-05-2026 08:00",
+          "end": "30-09-2026 17:00"
+        }
+      ],
+      "repeat": {
+        "count": 1,
+        "years": 1,
+        "months": 0,
+        "weeks": 0,
+        "days": 0
+      }
+    },
+    {
+      "id": "shift_496aeb46",
+      "name": "SHIFT_MATIN",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "14:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "14:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "14:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "14:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "06:00",
+              "end": "14:00"
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2026",
+        "end": "31-12-2026"
+      },
+      "repeat": {
+        "count": 1,
+        "years": 1,
+        "months": 0,
+        "weeks": 0,
+        "days": 0
+      }
+    },
+    {
+      "id": "shift_04b8cc03",
+      "name": "SHIFT_APREM",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_fcd95861",
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d",
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "14:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "14:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "14:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "14:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "14:00",
+              "end": "22:00"
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-01-2026",
+        "end": "31-12-2026"
+      },
+      "repeat": {
+        "count": 1,
+        "years": 1,
+        "months": 0,
+        "weeks": 0,
+        "days": 0
+      }
+    },
+    {
+      "id": "shift_98ac7b07",
+      "name": "SHIFT_NUIT",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_f5ba34fa",
+        "closingday_8389bb93",
+        "closingday_745a3415",
+        "closingday_9e5d6ccf",
+        "closingday_61cc949d"
+      ],
+      "days": [
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "22:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "00:00",
+              "end": "06:00"
+            },
+            {
+              "start": "22:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "00:00",
+              "end": "06:00"
+            },
+            {
+              "start": "22:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "00:00",
+              "end": "06:00"
+            },
+            {
+              "start": "22:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "00:00",
+              "end": "06:00"
+            },
+            {
+              "start": "22:00",
+              "end": "24:00"
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-05-2026",
+        "end": "30-09-2026"
+      },
+      "repeat": {
+        "count": 1,
+        "years": 1,
+        "months": 0,
+        "weeks": 0,
+        "days": 0
+      }
+    },
+    {
+      "id": "shift_efa35ddc",
+      "name": "SHITF_RENFORT_SAM",
+      "mode": "weekly",
+      "days_off": [
+        "closingday_c040805a",
+        "closingday_914d12ae",
+        "closingday_bc9e8f7e"
+      ],
+      "days": [
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": false,
+          "intervals": []
+        },
+        {
+          "working": true,
+          "intervals": [
+            {
+              "start": "08:00",
+              "end": "16:00"
+            }
+          ]
+        },
+        {
+          "working": false,
+          "intervals": []
+        }
+      ],
+      "horizon": {
+        "start": "01-10-2026",
+        "end": "31-12-2026"
+      },
+      "repeat": {
+        "count": 1,
+        "years": 1,
+        "months": 0,
+        "weeks": 0,
+        "days": 0
+      }
+    }
+  ],
+  "stopping_criterion": {
+    "type": "ByPiecesProduced",
+    "timeout": 1051200.0,
+    "grace_period": 43200.0,
+    "models_goals": [
+      {
+        "model": "model_c1c20e4c",
+        "goal": 1000
+      },
+      {
+        "model": "model_f551538b",
+        "goal": 1000
+      },
+      {
+        "model": "model_f8a1d4ad",
+        "goal": 1000
+      },
+      {
+        "model": "model_742fd366",
+        "goal": 1000
+      },
+      {
+        "model": "model_300990ff",
+        "goal": 1500
+      },
+      {
+        "model": "model_e093ec36",
+        "goal": 1500
+      },
+      {
+        "model": "model_02d3ef7d",
+        "goal": 1500
+      },
+      {
+        "model": "model_256d4101",
+        "goal": 1500
+      }
+    ]
+  },
+  "start_date": "01-01-2026 00:00",
+  "seed": 1,
+  "nodes": [
+    {
+      "id": "buffer_8fd44eb3",
+      "kind": "Buffer",
+      "name": "Entrée atelier injection",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366",
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
+      ],
+      "buffer_type": "PASSAGE",
+      "inputs_from": [],
+      "outputs_to": [
+        "task_fd227fa0"
+      ],
+      "position": [
+        4848.563150617815,
+        1150.3230121441059
+      ]
+    },
+    {
+      "id": "task_fd227fa0",
+      "kind": "Task",
+      "name": "Préparation modèles cire",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 1.98
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "operators": [
+        [
+          {
+            "operator": "operator_bbad2cd0",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_f0ba684d",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_97fcb1f5",
+            "count": 1
+          }
+        ],
+        [
+          {
+            "operator": "operator_796ea384",
+            "count": 1
+          }
+        ]
+      ],
+      "loading_operators": [],
+      "startup_operators": [],
+      "task_shifts": [
+        "shift_10bc51e7",
+        "shift_4386d987",
+        "shift_a76e9dea"
+      ],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": "inf",
+      "priority": 10,
+      "admin": false,
+      "collector_type": "NON_DISCRIMINATING_ALTRUISTIC",
+      "bufs_in": [
+        "buffer_8fd44eb3"
+      ],
+      "bufs_out": [],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        5175.6944376961565,
+        1009.8310815639188
+      ]
+    },
+    {
+      "id": "task_d05aba5a",
+      "kind": "Task",
+      "name": "Equipement Assemblage Grappe 1",
+      "models_configs": [
+        {
+          "model": "model_f6960dbd",
+          "duration": {
+            "dist_type": "Constant",
+            "params": {
+              "value": {
+                "kind": "constant",
+                "value": 0.0
+              }
+            }
+          },
+          "resources": [],
+          "min_carrier_capacity": 1,
+          "max_carrier_capacity": 1
+        }
+      ],
+      "startup_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "loading_duration": {
+        "dist_type": "Constant",
+        "params": {
+          "value": {
+            "kind": "constant",
+            "value": 0.0
+          }
+        }
+      },
+      "operators": [],
+      "loading_operators": [],
+      "startup_operators": [],
+      "task_shifts": [],
+      "policies": {
+        "pending_carriers_pre_flexible_shutdowns": {
+          "type": "AbortPendingCarriers"
+        },
+        "pending_carrier_pre_task_shift_end": {
+          "type": "AbortPendingCarriers"
+        },
+        "operator_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "task_shift_constraint": {
+          "type": "ConstrainedByShift"
+        },
+        "operators_self_conscious": {
+          "type": "Conscious"
+        },
+        "piece_exit_order": {
+          "type": "FirstInFirstOut"
+        },
+        "batch_model_choice": {
+          "type": "MostPresent"
+        }
+      },
+      "operator_scope": "PER_BATCH",
+      "resource_scope": "PER_BATCH",
+      "min_carriers": 1,
+      "max_capacity": 1.0,
+      "contiguous_carriers": false,
+      "independent_carriers": false,
+      "timeout": 1000000000.0,
+      "priority": 5,
+      "admin": false,
+      "collector_type": "NON_DISCRIMINATING_GREEDY",
+      "bufs_in": [],
+      "bufs_out": [],
+      "shutdowns": [],
+      "breakdowns": [],
+      "position": [
+        5601.2129401241955,
+        1426.6655329219989
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from_node": "buffer_8fd44eb3",
+      "from_kind": "Buffer",
+      "from_port": "to_task",
+      "to_node": "task_fd227fa0",
+      "to_kind": "Task",
+      "to_port": "bufs_in"
+    }
+  ],
+  "backdrops": []
+}

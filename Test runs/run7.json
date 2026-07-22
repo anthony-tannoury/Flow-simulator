@@ -728,7 +728,7 @@
   "stopping_criterion": {
     "type": "ByPiecesProduced",
     "timeout": 1051200.0,
-    "gap": 20.0,
+    "grace_period": 86400.0,
     "models_goals": [
       {
         "model": "model_c1c20e4c",
@@ -2447,7 +2447,7 @@
       "max_capacity": 5.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 240.0,
+      "timeout": "inf",
       "priority": 10,
       "admin": false,
       "collector_type": "DISCRIMINATING_ALTRUISTIC",
@@ -3048,7 +3048,7 @@
       "max_capacity": 5.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": 240.0,
+      "timeout": "inf",
       "priority": 10,
       "admin": false,
       "collector_type": "DISCRIMINATING_ALTRUISTIC",
@@ -3922,8 +3922,8 @@
       "shutdowns": [],
       "breakdowns": [],
       "position": [
-        7982.201902994219,
-        -431.827029461487
+        7984.041021289465,
+        -431.8270294614869
       ]
     },
     {
