@@ -7,7 +7,8 @@ from .component import Component
 from .interval import Interval, IntervalWaiter
 from .protocols import Action
 from abc import ABC
-from typing import override, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from .compat import override
 
 if TYPE_CHECKING:
     from .task import Task

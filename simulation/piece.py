@@ -38,10 +38,14 @@ class Piece(sim.Component):
         self.journal: list[tuple[str, str, float]] = []
         WIP.tally(WIP() + 1)
 
+    JOURNAL_CAP = 512
+
     def enter(self, q, priority = None):
         from .outlet import Buffer, BufferType
         from .kpis import WIP
-        assert isinstance(q, Buffer)
+        if not isinstance(q, Buffer):
+            raise TypeError(f"piece {self.name()} ({self.model.name}) can only enter a Buffer, got {q!r}")
+        q.model_counts[self.model] = q.model_counts.get(self.model, 0) + 1
         q.trigger.trigger()
         if q.piece_generator is not None:
             idx = q.piece_generator.models.index(self.model)
@@ -49,13 +53,16 @@ class Piece(sim.Component):
             q.piece_generator.trigger.trigger()
         if q.buffer_type in (BufferType.EXIT, BufferType.SCRAP):
             WIP.tally(WIP() - 1)
-        self.journal.append(('in', q.name(), env.now()))
+        if len(self.journal) < Piece.JOURNAL_CAP:
+            self.journal.append(('in', q.name(), env.now()))
         return super().enter(q, priority)
 
     def leave(self, q=None):
         from .outlet import Buffer
         if isinstance(q, Buffer):
-            self.journal.append(('out', q.name(), env.now()))
+            q.model_counts[self.model] -= 1
+            if len(self.journal) < Piece.JOURNAL_CAP:
+                self.journal.append(('out', q.name(), env.now()))
         return super().leave(q)
 
 

@@ -8,7 +8,7 @@ from .interval import Interval
 from .shift_manager import ShiftManager, HasShifts
 from .sampler import Distribution
 
-from typing import override
+from .compat import override
 
 
 class OperatorShiftManager(ShiftManager):
@@ -66,7 +66,8 @@ class Alternative:
 
         self.triggers = [r.trigger for alt in alternatives for r, _ in alt]
 
-    def request(self, demander: sim.Component, **kwargs) -> list[tuple[OperatorGroup, int]] | None:
+    def request(self, demander: sim.Component, request_priority: float = 0,
+                **kwargs) -> list[tuple[OperatorGroup, int]] | None:
         if not self.alternatives:
             return []
 
@@ -80,18 +81,21 @@ class Alternative:
         cap_now = kwargs.get("cap_now", False)
 
         if len(self.alternatives) == 1:
-            demander.request(*self.alternatives[0], fail_at=fail_at, cap_now=cap_now, mode="wait_operators")
+            demander.request(*self.alternatives[0], fail_at=fail_at, cap_now=cap_now,
+                             request_priority=request_priority, mode="wait_operators")
             if not demander.failed():
                 return self.alternatives[0]
             return None
 
         while True:
             for alt in self.alternatives:
-                demander.request(*alt, fail_delay=0, mode="wait_operators")
+                demander.request(*alt, fail_delay=0, request_priority=request_priority,
+                                 mode="wait_operators")
                 if not demander.failed():
                     return alt
 
-            demander.wait(*self.triggers, fail_at=fail_at, cap_now=cap_now, mode="wait_operators")
+            demander.wait(*self.triggers, fail_at=fail_at, cap_now=cap_now,
+                          request_priority=request_priority, mode="wait_operators")
             if demander.failed():
                 return None
 

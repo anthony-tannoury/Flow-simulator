@@ -2,6 +2,7 @@
 #include "parser.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <ctime>
@@ -198,12 +199,39 @@ int main(int argc, char** argv) {
 
         {
             const double off = e.offset_raw_();
+            constexpr size_t MAX_SERIES_POINTS = 50000;
             auto series = [&](sim::Monitor& m) {
                 kpis::ojson t = kpis::ojson::array(), v = kpis::ojson::array();
                 const auto& tr = m.t_raw(); const auto& xr = m.x_raw();
-                for (size_t i = 0; i < tr.size(); ++i) { t.push_back(tr[i] - off); v.push_back(xr[i]); }
-
-
+                const size_t n = tr.size();
+                if (n <= MAX_SERIES_POINTS) {
+                    for (size_t i = 0; i < n; ++i) { t.push_back(tr[i] - off); v.push_back(xr[i]); }
+                } else {
+                    const size_t buckets = MAX_SERIES_POINTS / 4;
+                    const double t0 = tr.front(), t1 = tr.back();
+                    const double width = (t1 - t0) / double(buckets);
+                    size_t i = 0;
+                    for (size_t b = 0; b < buckets && i < n; ++b) {
+                        const double end = (b + 1 == buckets) ? t1 + 1.0 : t0 + width * double(b + 1);
+                        size_t first = i, mini = i, maxi = i, last = i;
+                        bool any = false;
+                        for (; i < n && tr[i] < end; ++i) {
+                            if (!any) { first = mini = maxi = last = i; any = true; continue; }
+                            if (xr[i] < xr[mini]) mini = i;
+                            if (xr[i] > xr[maxi]) maxi = i;
+                            last = i;
+                        }
+                        if (!any) continue;
+                        std::array<size_t, 4> picks{first, mini, maxi, last};
+                        std::sort(picks.begin(), picks.end());
+                        size_t prev = SIZE_MAX;
+                        for (size_t k : picks) {
+                            if (k == prev) continue;
+                            prev = k;
+                            t.push_back(tr[k] - off); v.push_back(xr[k]);
+                        }
+                    }
+                }
                 if (!tr.empty() && tr.back() - off < e.now())
                     { t.push_back(e.now()); v.push_back(xr.back()); }
                 return kpis::ojson{{"t", t}, {"v", v}};

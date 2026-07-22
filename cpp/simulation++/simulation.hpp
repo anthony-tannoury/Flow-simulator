@@ -506,6 +506,7 @@ struct Model {
 
 class Piece : public sim::Component {
   public:
+    static constexpr size_t JOURNAL_CAP = 512;
     Model* model;
     std::string id;
     struct JournalEntry { std::string kind, name; double t; };
@@ -626,6 +627,7 @@ class Buffer : public sim::Store, public Outlet, public Triggerable {
   public:
     BufferType buffer_type;
     PieceGenerator* piece_generator;
+    std::map<Model*, int> model_counts;
 
     Buffer(const std::string& name, std::vector<Model*> valid_models_, BufferType buffer_type_,
            PieceGenerator* piece_generator_ = nullptr)
@@ -707,6 +709,7 @@ class Router : public Outlet {
 
 
 inline void Piece::enter(Buffer& q) {
+    q.model_counts[model] += 1;
     q.trigger.trigger();
     if (q.piece_generator != nullptr) {
         auto& models = q.piece_generator->models;
@@ -717,13 +720,15 @@ inline void Piece::enter(Buffer& q) {
     }
     if (q.buffer_type == BufferType::EXIT || q.buffer_type == BufferType::SCRAP)
         if (kpis_state::WIP) kpis_state::WIP->tally(--kpis_state::wip_level);
-    journal.push_back({"in", q.name(), env->now()});
+    if (journal.size() < JOURNAL_CAP) journal.push_back({"in", q.name(), env->now()});
     sim::Component::enter(q);
 }
 
 inline sim::Component& Piece::leave(sim::Queue& q) {
-    if (auto* b = dynamic_cast<Buffer*>(&q))
-        journal.push_back({"out", b->name(), env->now()});
+    if (auto* b = dynamic_cast<Buffer*>(&q)) {
+        b->model_counts[model] -= 1;
+        if (journal.size() < JOURNAL_CAP) journal.push_back({"out", b->name(), env->now()});
+    }
     return sim::Component::leave(q);
 }
 
@@ -1114,7 +1119,7 @@ class Alternative {
 
 
     sim::Process request(Component* demander, std::optional<OpsList>* out, double fail_at = sim::inf,
-                         std::optional<bool> cap_now = std::nullopt) {
+                         std::optional<bool> cap_now = std::nullopt, double request_priority = 0) {
         if (alternatives.empty()) {
             *out = OpsList{};
             co_return;
@@ -1123,7 +1128,8 @@ class Alternative {
         if (alternatives.size() == 1) {
             co_await demander->call(demander->request(
                 reqspecs_(alternatives[0]),
-                {.fail_at = fail_at, .mode = "wait_operators", .cap_now = cap_now}));
+                {.fail_at = fail_at, .mode = "wait_operators",
+                 .request_priority = request_priority, .cap_now = cap_now}));
             *out = demander->failed() ? std::nullopt : std::optional<OpsList>(alternatives[0]);
             co_return;
         }
@@ -1131,7 +1137,8 @@ class Alternative {
         while (true) {
             for (const auto& alt : alternatives) {
                 co_await demander->call(
-                    demander->request(reqspecs_(alt), {.fail_delay = 0, .mode = "wait_operators"}));
+                    demander->request(reqspecs_(alt), {.fail_delay = 0, .mode = "wait_operators",
+                                                       .request_priority = request_priority}));
                 if (!demander->failed()) {
                     *out = alt;
                     co_return;
@@ -1141,7 +1148,8 @@ class Alternative {
             std::vector<sim::WaitSpec> specs;
             for (auto* t : triggers) specs.push_back(sim::WaitSpec(*t));
             co_await demander->sim::Component::wait(
-                std::move(specs), {.fail_at = fail_at, .mode = "wait_operators", .cap_now = cap_now});
+                std::move(specs), {.fail_at = fail_at, .mode = "wait_operators",
+                                   .request_priority = request_priority, .cap_now = cap_now});
             if (demander->failed()) {
                 *out = std::nullopt;
                 co_return;
@@ -1479,6 +1487,7 @@ class Task : public Component, public HasShifts {
   public:
     std::shared_ptr<TaskConfig> config;
     double request_priority;
+    std::map<Model*, bool> can_take_cache;
     TaskShiftManager* shift_manager = nullptr;
     NonFlexibleShutdowns* non_flexible_shutdowns = nullptr;
     FlexibleShutdowns* flexible_shutdowns = nullptr;
@@ -1589,7 +1598,7 @@ inline sim::Process TaskStarter::process() {
 
     double deadline = task->get_earliest_deadline();
     std::optional<Alternative::OpsList> got;
-    co_await call(task->config->startup_operators.request(this, &got, deadline - duration));
+    co_await call(task->config->startup_operators.request(this, &got, deadline - duration, std::nullopt, task->request_priority));
     if (failed()) {
         task->is_frozen.set(true);
         done.set(true);
@@ -1652,7 +1661,7 @@ inline sim::Process Task::request_task_operators() {
     double deadline =
         std::min(non_flexible_shutdowns->get_deadline(), flexible_shutdowns->get_deadline());
     std::optional<Alternative::OpsList> got;
-    co_await call(config->operators.request(this, &got, deadline));
+    co_await call(config->operators.request(this, &got, deadline, std::nullopt, request_priority));
     task_operators = got.value_or(Alternative::OpsList{});
     set_mode("");
 
@@ -1799,7 +1808,7 @@ inline sim::Process Carrier::handle_batch_operators(Alternative& operators, doub
                                                     double ideal_duration, double fail_before,
                                                     bool do_restock, const char* work_mode) {
     std::optional<Alternative::OpsList> recuperated;
-    co_await call(operators.request(this, &recuperated, earliest_deadline - fail_before, true));
+    co_await call(operators.request(this, &recuperated, earliest_deadline - fail_before, true, task->request_priority));
     co_await call(freeze_abort_if(failed()));
     assert(recuperated.has_value());
 
@@ -2007,7 +2016,8 @@ class PieceCollector : public Component, public Dispatchable, public Donnable {
 
 
     sim::Process pick_piece(PieceFilter piece_filter, sim::StoreOpts opts, Piece** out);
-    Model* get_focus_model(const std::vector<Model*>& present_models);
+    std::map<Model*, int> present_counts();
+    Model* choose_focus_model(const std::map<Model*, int>& counts);
     sim::Process collect_until(double deadline, int target, PieceFilter piece_filter, bool* timed_out);
     sim::Process ensure_one();
     sim::Process top_up(int limit, PieceFilter piece_filter);
@@ -2138,7 +2148,6 @@ inline std::vector<sim::Store*> PieceCollector::inlet_stores() {
 
 inline sim::Resource& PieceCollector::vacant_slots() { return *task->vacant_slots; }
 
-inline Model* most_common_model_(const std::vector<Model*>& models);
 
 
 inline sim::Process PieceCollector::pick_piece(PieceFilter piece_filter, sim::StoreOpts opts,
@@ -2179,33 +2188,46 @@ inline sim::Process PieceCollector::pick_piece(PieceFilter piece_filter, sim::St
 }
 
 
-inline Model* PieceCollector::get_focus_model(const std::vector<Model*>& present_models) {
+inline std::map<Model*, int> PieceCollector::present_counts() {
+    std::map<Model*, int> counts;
+    for (Buffer* inlet : task->inlets)
+        for (const auto& [model, n] : inlet->model_counts) {
+            if (n <= 0) continue;
+            auto it = task->can_take_cache.find(model);
+            if (it == task->can_take_cache.end())
+                it = task->can_take_cache.emplace(model, task->can_take(model)).first;
+            if (it->second) counts[model] += n;
+        }
+    return counts;
+}
+
+inline Model* PieceCollector::choose_focus_model(const std::map<Model*, int>& counts) {
+    std::function<double(Model*)> key;
     switch (cfg().batch_model_choice->decide()) {
         case ModelChoice::MOST_PRESENT:
-            return most_common_model_(present_models);
-        case ModelChoice::FASTEST_TASK_DURATION: {
-            Model* best = nullptr;
-            double best_key = sim::inf;
-            for (Model* m : present_models) {
-                double k = cfg().get_model_config(m).duration->mean_now();
-                if (k < best_key) { best_key = k; best = m; }
-            }
-            return best;
-        }
-        case ModelChoice::SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY: {
-            Model* best = nullptr;
-            double best_key = sim::inf;
-            for (Model* m : present_models) {
-                int count = 0;
-                for (Model* mm : present_models)
-                    if (mm == m) ++count;
-                double k = cfg().get_model_config(m).min_carrier_capacity - count;
-                if (k < best_key) { best_key = k; best = m; }
-            }
-            return best;
-        }
+            key = [&counts](Model* m) { return -double(counts.at(m)); };
+            break;
+        case ModelChoice::FASTEST_TASK_DURATION:
+            key = [this](Model* m) { return cfg().get_model_config(m).duration->mean_now(); };
+            break;
+        case ModelChoice::SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY:
+            key = [this, &counts](Model* m) {
+                return cfg().get_model_config(m).min_carrier_capacity - double(counts.at(m));
+            };
+            break;
     }
-    return nullptr;
+    double best = sim::inf;
+    for (const auto& [m, n] : counts) best = std::min(best, key(m));
+    std::set<Model*> tied;
+    for (const auto& [m, n] : counts)
+        if (key(m) == best) tied.insert(m);
+    if (tied.size() == 1) return *tied.begin();
+    for (Buffer* inlet : task->inlets)
+        for (sim::Component* c : *inlet) {
+            Piece* p = static_cast<Piece*>(c);
+            if (tied.count(p->model)) return p->model;
+        }
+    return *tied.begin();
 }
 
 inline sim::Process PieceCollector::collect_until(double deadline, int target, PieceFilter piece_filter,
@@ -2359,28 +2381,6 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
 }
 
 
-inline Model* most_common_model_(const std::vector<Model*>& models) {
-    std::vector<std::pair<Model*, int>> counts;
-    for (Model* m : models) {
-        bool found = false;
-        for (auto& [mm, c] : counts)
-            if (mm == m) {
-                c += 1;
-                found = true;
-                break;
-            }
-        if (!found) counts.push_back({m, 1});
-    }
-    Model* best = nullptr;
-    int best_count = -1;
-    for (auto& [m, c] : counts)
-        if (c > best_count) {
-            best = m;
-            best_count = c;
-        }
-    return best;
-}
-
 inline sim::Process NonDiscriminatingGreedyPieceCollector::process() {
     const ModelConfig& model_config = cfg().models_configs.front().second;
 
@@ -2406,15 +2406,11 @@ inline sim::Process DiscriminatingGreedyPieceCollector::process() {
     co_await wait(allow_dispatch);
     double deadline = env->now() + cfg().timeout;
 
-    std::vector<Model*> present_models;
-    for (Buffer* inlet : task->inlets)
-        for (sim::Component* c : *inlet)
-            if (task->can_take(static_cast<Piece*>(c)))
-                present_models.push_back(static_cast<Piece*>(c)->model);
+    std::map<Model*, int> counts = present_counts();
 
     Model* focus_on = nullptr;
-    if (!present_models.empty()) {
-        focus_on = get_focus_model(present_models);
+    if (!counts.empty()) {
+        focus_on = choose_focus_model(counts);
     } else {
         bool timed_out = false;
         co_await call(collect_until(deadline, 1, [this](Piece* p) { return task->can_take(p); },
@@ -2464,14 +2460,10 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
     double deadline = env->now() + cfg().timeout;
     bool timed_out = false;
 
-    std::vector<Model*> present_models;
+    std::map<Model*, int> counts;
     while (true) {
-        present_models.clear();
-        for (Buffer* inlet : task->inlets)
-            for (sim::Component* c : *inlet)
-                if (task->can_take(static_cast<Piece*>(c)))
-                    present_models.push_back(static_cast<Piece*>(c)->model);
-        if (!present_models.empty()) break;
+        counts = present_counts();
+        if (!counts.empty()) break;
 
         std::vector<sim::WaitSpec> specs;
         for (Buffer* inlet : task->inlets) specs.push_back(sim::WaitSpec(inlet->trigger));
@@ -2483,7 +2475,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
     }
 
     if (!timed_out) {
-        Model* focus_on = get_focus_model(present_models);
+        Model* focus_on = choose_focus_model(counts);
         const ModelConfig& model_config = cfg().get_model_config(focus_on);
         co_await call(collect_batch(deadline, model_config.min_carrier_capacity,
                                     model_config.max_carrier_capacity,
@@ -2594,7 +2586,8 @@ inline sim::Process PieceCarrier::successfully_end_process() {
     task->batch_sizes.tally(static_cast<double>(pieces.size()));
     task->cycle_times.tally(env->now() - creation_time());
     for (Piece* piece : pieces)
-        piece->journal.push_back({"task", task->name(), env->now()});
+        if (piece->journal.size() < Piece::JOURNAL_CAP)
+            piece->journal.push_back({"task", task->name(), env->now()});
     place(pieces, ptask_()->outlets);
     for (Piece* piece : pieces) {
         ptask_()->deposited[piece->model] += 1;
@@ -3001,12 +2994,22 @@ class ByPiecesProduced : public StoppingCriterion {
             throw std::invalid_argument("Stopping criterion must take an EXIT buffer");
     }
 
+    static constexpr double NO_PROGRESS_GUARD_DAYS = 400.0;
+
     sim::Process process() override {
         co_await wait(allow_dispatch);
         double deadline = timeout + env->now();
+        double guard = NO_PROGRESS_GUARD_DAYS * 1440.0;
         while (static_cast<int>(exit_buffer->size()) < total) {
-            co_await wait(exit_buffer->trigger, {.fail_at = deadline});
+            double fail_at = deadline != sim::inf ? deadline : env->now() + guard;
+            co_await wait(exit_buffer->trigger, {.fail_at = fail_at});
             if (failed()) {
+                if (deadline == sim::inf)
+                    throw std::runtime_error(
+                        "no piece reached the exit for " + std::to_string(int(NO_PROGRESS_GUARD_DAYS)) +
+                        " simulated days while the timeout is infinite (" +
+                        std::to_string(exit_buffer->size()) + "/" + std::to_string(total) +
+                        " produced); stopping a run that can no longer progress");
                 done.set(true);
                 break;
             }

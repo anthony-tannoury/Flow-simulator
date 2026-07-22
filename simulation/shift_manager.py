@@ -5,7 +5,7 @@ from datetime import datetime, date, time, timedelta
 from .helpers import check_disjoint_sorted_intervals, merge_touching_sorted_intervals
 from .interval import Interval, IntervalWaiter
 
-from typing import override
+from .compat import override
 
 
 class HasShifts:

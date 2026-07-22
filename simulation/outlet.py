@@ -8,7 +8,8 @@ from .piece import Model, PickyPieceTaker, PieceGenerator
 from .ables import Triggerable
 from .helpers import check_probabilities
 from abc import ABC, abstractmethod
-from typing import override, Callable
+from typing import Callable
+from .compat import override
 from enum import Enum, auto
 
 
@@ -44,6 +45,7 @@ class Buffer(sim.Store, Outlet, Triggerable):
         Triggerable.__init__(self)
         self.buffer_type = buffer_type
         self.piece_generator = piece_generator
+        self.model_counts = {}
 
     @override
     def get(self) -> Buffer:

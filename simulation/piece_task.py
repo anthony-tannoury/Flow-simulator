@@ -2,7 +2,7 @@ from __future__ import annotations
 import salabim as sim
 
 from dataclasses import dataclass
-from typing import override
+from .compat import override
 from enum import Enum, auto
 from collections import Counter
 
@@ -92,17 +92,42 @@ class PieceCollector(Component, Dispatchable, Donnable):
             remainder = max_carrier_capacity - len(self.collected_pieces)
             self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority, mode="wait_slot")
 
-    def get_focus_model(self, present_models: list[Model]) -> Model:
+    def present_counts(self) -> dict[Model, int]:
+        cache = getattr(self.task, '_can_take_cache', None)
+        if cache is None:
+            cache = self.task._can_take_cache = {}
+        counts: dict[Model, int] = {}
+        for inlet in self.task.inlets:
+            for model, n in inlet.model_counts.items():
+                if n <= 0:
+                    continue
+                ok = cache.get(model)
+                if ok is None:
+                    ok = cache[model] = self.task.can_take(model)
+                if ok:
+                    counts[model] = counts.get(model, 0) + n
+        return counts
+
+    def choose_focus_model(self, counts: dict[Model, int]) -> Model:
         assert isinstance(self.task.config.protocols, PieceProtocols)
         assert isinstance(self.task.config, PieceTaskConfig)
         match self.task.config.protocols.batch_model_choice.decide():
             case ModelChoice.MOST_PRESENT:
-                return Counter(present_models).most_common(1)[0][0]
+                key = lambda model: -counts[model]
             case ModelChoice.FASTEST_TASK_DURATION:
-                return min(present_models, key=lambda model: self.task.config.get_model_config(model).duration.mean_now())
+                key = lambda model: self.task.config.get_model_config(model).duration.mean_now()
             case ModelChoice.SMALLEST_GAP_TO_MIN_CARRIER_CAPACITY:
-                counter = Counter(present_models)
-                return min(present_models, key=lambda model: self.task.config.get_model_config(model).min_carrier_capacity - counter[model])
+                key = lambda model: self.task.config.get_model_config(model).min_carrier_capacity - counts[model]
+        best = min(key(model) for model in counts)
+        tied = [model for model in counts if key(model) == best]
+        if len(tied) == 1:
+            return tied[0]
+        tied_set = set(tied)
+        for inlet in self.task.inlets:
+            for piece in inlet:
+                if piece.model in tied_set:
+                    return piece.model
+        return tied[0]
 
 class NonDiscriminatingGreedyPieceCollector(PieceCollector):
     def process(self):
@@ -129,9 +154,9 @@ class DiscriminatingGreedyPieceCollector(PieceCollector):
         self.wait(self.allow_dispatch)
         deadline = env.now() + self.task.config.timeout
 
-        present_models = [piece.model for inlet in self.task.inlets for piece in inlet if self.task.can_take(piece)]
-        if present_models:
-            focus_on = self.get_focus_model(present_models)
+        counts = self.present_counts()
+        if counts:
+            focus_on = self.choose_focus_model(counts)
         else:
             if self.collect_until(deadline, 1, self.task.can_take):
                 self.ensure_one()
@@ -230,14 +255,14 @@ class DiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
         deadline = env.now() + self.task.config.timeout
         timed_out = False
 
-        while not (present_models := [piece.model for inlet in self.task.inlets for piece in inlet if self.task.can_take(piece)]):
+        while not (counts := self.present_counts()):
             self.wait(*[inlet.trigger for inlet in self.task.inlets], fail_at=deadline, mode="wait_pieces")
             if self.failed():
                 timed_out = True
                 break
 
         if not timed_out:
-            focus_on = self.get_focus_model(present_models)
+            focus_on = self.choose_focus_model(counts)
             model_config = self.task.config.get_model_config(focus_on)
             timed_out = self.collect_batch(deadline, model_config.min_carrier_capacity, model_config.max_carrier_capacity,
                                            lambda p: self.task.can_take(p) and p.model is focus_on)
@@ -363,7 +388,8 @@ class PieceCarrier(Carrier):
         self.task.batch_sizes.tally(len(pieces))
         self.task.cycle_times.tally(env.now() - self.creation_time())
         for piece in pieces:
-            piece.journal.append(('task', self.task.name(), env.now()))
+            if len(piece.journal) < piece.JOURNAL_CAP:
+                piece.journal.append(('task', self.task.name(), env.now()))
         place(pieces, self.task.outlets)
         for piece in pieces:
             self.task.deposited[piece.model] += 1

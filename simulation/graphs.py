@@ -38,6 +38,17 @@ def _out_path(base: str, kind: str, category: str, stem: str, ext: str) -> str:
     return os.path.join(folder, f"{stem}.{ext}")
 
 
+_SERIES_FIG = None
+
+
+def _series_figure():
+    global _SERIES_FIG
+    if _SERIES_FIG is None:
+        _SERIES_FIG = plt.figure(figsize=(11, 4))
+    _SERIES_FIG.clf()
+    return _SERIES_FIG
+
+
 def _write_series(base: str, category: str, stem: str, times, values, sim_start,
                   ylabel: str, title: str, color: str = LINE_COLOR,
                   ymax: float | None = None) -> None:
@@ -48,7 +59,8 @@ def _write_series(base: str, category: str, stem: str, times, values, sim_start,
             writer.writerow([t.strftime('%d-%m-%Y %H:%M') if sim_start else round(t, 4),
                              round(v, 4) if isinstance(v, float) else v])
 
-    fig, ax = plt.subplots(figsize=(11, 4))
+    fig = _series_figure()
+    ax = fig.add_subplot(111)
     xs = _dates(times, sim_start)
     ax.step(xs, values, where='post', color=color, linewidth=1.1)
     ax.fill_between(xs, values, step='post', color=color, alpha=0.15)
@@ -63,7 +75,6 @@ def _write_series(base: str, category: str, stem: str, times, values, sim_start,
     fig.autofmt_xdate()
     fig.tight_layout()
     fig.savefig(_out_path(base, 'png', category, stem, 'png'), dpi=130)
-    plt.close(fig)
 
 
 def _sum_of_steps(series: list[tuple[list, list]]) -> tuple[list, list]:

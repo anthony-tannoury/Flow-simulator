@@ -14,7 +14,7 @@ from .protocols import *
 from .ables import Dispatchable, Donnable
 
 from abc import ABC, abstractmethod
-from typing import override
+from .compat import override
 from dataclasses import dataclass
 from enum import Enum, auto
 
@@ -67,7 +67,7 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
         return duration
 
     def handle_batch_operators(self, operators: Alternative, earliest_deadline: float, ideal_duration: float, fail_before: float, handle_restock: bool, work_mode: str) -> None:
-        recuperated = operators.request(demander=self, fail_at=earliest_deadline - fail_before, cap_now=True)
+        recuperated = operators.request(demander=self, request_priority=self.task.request_priority, fail_at=earliest_deadline - fail_before, cap_now=True)
         self.freeze_abort_if(self.failed())
         assert recuperated is not None
 
@@ -204,7 +204,7 @@ class TaskStarter(Component, Donnable):
             self.hold(till=next_shutdown.end)
 
         deadline = self.task.get_earliest_deadline()
-        recuperated = self.task.config.startup_operators.request(demander=self, fail_at=deadline - duration)
+        recuperated = self.task.config.startup_operators.request(demander=self, request_priority=self.task.request_priority, fail_at=deadline - duration)
         if self.failed():
             self.task.is_frozen.set(True)
             self.done.set(True)
@@ -344,7 +344,7 @@ class Task(Component, HasShifts, ABC):
 
 
         deadline = min(self.non_flexible_shutdowns.get_deadline(), self.flexible_shutdowns.get_deadline())
-        self.task_operators = self.config.operators.request(demander=self, fail_at=deadline) or []
+        self.task_operators = self.config.operators.request(demander=self, request_priority=self.request_priority, fail_at=deadline) or []
         self.set_mode("")
         if self.failed():
             self.is_frozen.set(True)

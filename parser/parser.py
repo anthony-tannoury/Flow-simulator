@@ -1,12 +1,10 @@
 import json
-import os
-import shutil
 import salabim as sim
 
 from time import perf_counter
-from simulation import env, kpis, graphs, reseed
+from simulation import reseed
 
-from datetime import date, time, datetime, timedelta
+from datetime import date, datetime, timedelta
 from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
 from simulation.resource_task import ResourceTask, ResourceTaskConfig, ResourceCollectorType
 from simulation.piece import Model, GoalPieceGenerator, RatePieceGenerator
@@ -50,14 +48,19 @@ def canon_name(value: str) -> str:
     return ''.join(ch for ch in str(value) if ch.isalnum()).lower()
 
 
+_CANON_TABLES: dict = {}
+
+
 def lookup(table: dict, value: str, what: str):
     if value in table:
         return table[value]
-    key = canon_name(value)
-    for k, v in table.items():
-        if canon_name(k) == key:
-            return v
-    raise NotImplementedError(f"unknown {what}: {value!r}")
+    canon = _CANON_TABLES.get(id(table))
+    if canon is None:
+        canon = _CANON_TABLES[id(table)] = {canon_name(k): v for k, v in table.items()}
+    try:
+        return canon[canon_name(value)]
+    except KeyError:
+        raise ValueError(f"unknown {what}: {value!r}") from None
 
 
 def same_name(value: str, canonical: str) -> bool:
@@ -75,7 +78,7 @@ def make_callable(c: dict) -> float | Callable[[float], float]:
         case 'step':
             return Step.generate(c['x1'], c['y1'], c['x2'], c['y2'], c['step_size'])
         case _:
-            raise NotImplementedError()
+            raise ValueError(f"unknown time-function kind: {c['kind']!r}")
 
 
 def make_distribution(distribution: dict) -> Distribution:
@@ -90,7 +93,7 @@ def make_salabim_distribution(distribution: dict) -> sim.Distribution:
     params = [make_callable(p) for p in distribution['params'].values()]
 
     if not all(isinstance(p, (int, float)) for p in params):
-        raise NotImplementedError('output-resource distributions must have constant parameters')
+        raise ValueError('output-resource distributions must have constant parameters')
 
     return lookup(DISTR_TYPE_TO_CLASS, distribution['dist_type'], 'distribution type')(*params)
 
@@ -106,7 +109,7 @@ def make_mtbf(mtbf: dict) -> Sampler:
                 max_iters=mtbf['max_iters']
             )
         case _:
-            raise NotImplementedError()
+            raise ValueError(f"unknown mtbf mode: {mtbf['mode']!r}")
 
 
 def make_protocol(policy: dict):
@@ -138,7 +141,7 @@ def make_protocol(policy: dict):
         case 'smallestgaptomincarriercapacity':
             return SmallestGapToMinCarrierCapacity()
         case _:
-            raise NotImplementedError()
+            raise ValueError(f"unknown protocol type: {policy['type']!r}")
 
 
 def make_protocols(policies: dict) -> Protocols:
@@ -217,7 +220,6 @@ class Parser:
         self.sim_start = to_datetime(self.data['start_date'])
         self.drop_disabled_nodes()
         self.discriminate()
-        self.by_id = {n['id']: n for n in self.data['nodes']}
 
     def drop_disabled_nodes(self) -> None:
         nodes = self.data.get('nodes', [])
@@ -238,139 +240,12 @@ class Parser:
                 node['buffer_probs'] = [e for e in node.get('buffer_probs', [])
                                         if e.get('buffer') not in dead]
 
-    @staticmethod
-    def _describe_fn(fn) -> str:
-        if not isinstance(fn, dict):
-            return str(fn)
-        if canon_name(fn.get('kind', 'constant')) == 'constant':
-            return f"{fn.get('value', 0):g}"
-        params = ', '.join(f"{k}={v:g}" for k, v in fn.items() if k != 'kind')
-        return f"{fn['kind']}({params})"
-
-    def describe_criterion(self) -> str:
-        parts = []
-        for key, value in self.data['stopping_criterion'].items():
-            if key == 'type':
-                continue
-            if key == 'models_goals':
-                parts.append('models_goals: ' + ', '.join(
-                    f"{self.models[mg['model']].name} = {mg['goal']}" for mg in value))
-            elif key == 'models_probs':
-                parts.append('models_probs: ' + ', '.join(
-                    f"{self.models[mp['model']].name} = "
-                    + ('reste' if mp['probability'] is None else self._describe_fn(mp['probability']))
-                    for mp in value))
-            elif key == 'gap':
-                parts.append(f"gap = {self._describe_fn(value)}")
-            elif key in ('timeout', 'grace_period') and isinstance(value, (int, float)) and value != float('inf'):
-                parts.append(f"{key} = {kpis.fmt_duree(value)}")
-            else:
-                parts.append(f"{key} = {value}")
-        return '; '.join(parts)
-
     def report(self, directory: str | None = None) -> str:
-        if directory is None:
-            stem = os.path.splitext(os.path.basename(self.filename))[0]
-            directory = os.path.join('runs', f"{datetime.now():%Y-%m-%d_%H%M%S}_{stem}")
-        buffers = [o for o in self.outlets.values() if isinstance(o, Buffer)]
-
-        criterion = self.data['stopping_criterion']
-        run_info = {
-            'fichier': self.filename,
-            'debut': self.data['start_date'],
-            'fin': (self.sim_start + timedelta(minutes=env.now())).strftime('%d-%m-%Y %H:%M'),
-            'temps_calcul': kpis.fmt_duree((perf_counter() - self.loaded_at) / 60),
-            'critere_arret': criterion['type'],
-            'critere_details': self.describe_criterion(),
-        }
-        kpis.write_report(
-            directory,
-            tasks=list(self.tasks.values()),
-            buffers=buffers,
-            piece_generator=self.piece_generator,
-            run_info=run_info,
-            sim_start=self.sim_start,
-            operator_groups=list(self.operator_groups.values()),
-            resources=list(self.resources.values())
-        )
-        graphs.write_graphs(
-            os.path.join(directory, 'graphes'),
-            tasks=list(self.tasks.values()),
-            buffers=buffers,
-            resources=list(self.resources.values()),
-            operator_groups=list(self.operator_groups.values()),
-            piece_generator=self.piece_generator,
-            sim_start=self.sim_start
-        )
-        self.write_machine_report(directory, run_info)
-        return directory
-
-    def write_machine_report(self, directory: str, run_info: dict) -> None:
-        from simulation.outlet import BufferType
-        import simulation as simulation_pkg
-
-        criterion = self.data['stopping_criterion']
-        exit_pieces = sum(len(b) for b in self.outlets.values()
-                          if isinstance(b, Buffer) and b.buffer_type is BufferType.EXIT)
-        goal_total = None
-        goal_reached = None
-        if same_name(criterion['type'], 'ByPiecesProduced'):
-            goal_total = sum(mg['goal'] for mg in criterion['models_goals'])
-            goal_reached = exit_pieces >= goal_total
-
-        def png(category: str, stem: str) -> str | None:
-            rel = os.path.join('graphes', 'png', category, f"{stem}.png")
-            return rel if os.path.isfile(os.path.join(directory, rel)) else None
-
-        safe = graphs._safe
-        flux, flux_modeles = kpis.flow_kpis(
-            [b for b in self.outlets.values() if isinstance(b, Buffer)], self.piece_generator)
-        task_kpi_rows = {id_: kpis.task_kpis(t) for id_, t in self.tasks.items()}
-        data = {
-            'format': 'flow-simulator-report',
-            'version': 1,
-            'run': {
-                **run_info,
-                'source_file': os.path.abspath(self.filename),
-                'flow_snapshot': 'flow.json',
-                'sim_end_minutes': round(env.now(), 3),
-                'graine': simulation_pkg.SEED,
-                'genere_le': datetime.now().isoformat(timespec='seconds'),
-                'criterion': criterion,
-                'pieces_sorties': exit_pieces,
-                'objectif_total': goal_total,
-                'objectif_atteint': goal_reached,
-            },
-            'tasks': task_kpi_rows,
-            'admin_summary': kpis.admin_summary(list(task_kpi_rows.values())),
-            'tasks_models': {id_: rows for id_, t in self.tasks.items()
-                             if (rows := kpis.task_model_rows(t))},
-            'buffers': {id_: kpis.buffer_kpis(b) for id_, b in self.outlets.items()
-                        if isinstance(b, Buffer)},
-            'operators': {id_: kpis.operator_kpis(g) for id_, g in self.operator_groups.items()},
-            'resources': {id_: kpis.resource_kpis(r) for id_, r in self.resources.items()},
-            'flux': flux,
-            'flux_modeles': flux_modeles,
-            'graphs': {
-                'tasks': {id_: p for id_, t in self.tasks.items()
-                          if (p := png('postes', f"occupation_{safe(t.name())}"))},
-                'buffers': {id_: p for id_, b in self.outlets.items()
-                            if isinstance(b, Buffer)
-                            and (p := png('buffers', f"longueur_{safe(b.name())}"))},
-                'operators': {id_: p for id_, g in self.operator_groups.items()
-                              if (p := png('operateurs', f"disponibles_{safe(g.name())}"))},
-                'resources': {id_: p for id_, r in self.resources.items()
-                              if (p := png('ressources', f"stock_{safe(r.name())}"))},
-                'models': {m.name: p for m in self.piece_generator.models
-                           if (p := png('modeles', f"trajectoires_{safe(m.name)}"))},
-                'production': png('modeles', 'production'),
-                'encours': png('ligne', 'encours'),
-                'attente': png('ligne', 'pieces_en_attente'),
-            },
-        }
-        with open(os.path.join(directory, 'report.json'), 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=1, ensure_ascii=False)
-        shutil.copyfile(self.filename, os.path.join(directory, 'flow.json'))
+        try:
+            from .report import write_report
+        except ImportError:
+            from report import write_report
+        return write_report(self, directory)
 
     def load_all(self) -> None:
         self.load_models()
@@ -424,18 +299,18 @@ class Parser:
         for entry in router['buffer_probs']:
             target = self.by_id[entry['buffer']]
             if target['kind'] == 'Router':
-                raise NotImplementedError('router-to-router chains are not supported')
+                raise ValueError('router-to-router chains are not supported')
             if same_name(target['buffer_type'], 'SCRAP'):
                 return True
         return False
 
     def discriminate(self) -> None:
         self.per_kind: dict[str, list[dict]] = {}
+        self.by_id: dict[str, dict] = {}
 
         for node in self.data['nodes']:
-            if node['kind'] not in self.per_kind:
-                self.per_kind[node['kind']] = []
-            self.per_kind[node['kind']].append(node)
+            self.per_kind.setdefault(node['kind'], []).append(node)
+            self.by_id[node['id']] = node
 
     def load_models(self) -> None:
         self.models: dict[str, Model] = {}
@@ -484,7 +359,7 @@ class Parser:
                 return ShiftManager.generate_custom_shifts(
                     sim_start=self.sim_start, shifts=intervals, days_off=days_off)
             case _:
-                raise NotImplementedError()
+                raise ValueError(f"unknown shift mode: {shift['mode']!r}")
 
     def load_shifts(self) -> None:
         self.shifts: dict[str, list[Interval]] = {}
@@ -616,7 +491,7 @@ class Parser:
                     name=node['name'], models=models, shifts=shifts, outlets=outlets,
                     gap=make_callable(criterion['gap']), model_probs=model_probs)
             case _:
-                raise NotImplementedError()
+                raise ValueError(f"unknown stopping criterion type: {criterion['type']!r}")
 
     def load_scrap_buffers(self) -> None:
         for id_ in self.scrap_buffers_ids:
@@ -716,7 +591,7 @@ class Parser:
                             end=to_datetime(generator['end'])
                         )
                     case _:
-                        raise NotImplementedError()
+                        raise ValueError(f"unknown shutdowns mode: {shutdowns_node.get('mode')!r}")
 
                 match canon_name(shutdowns_node['shutdown_type']):
                     case 'flexible':
@@ -724,7 +599,7 @@ class Parser:
                     case 'nonflexible':
                         NonFlexibleShutdowns(task=task, intervals=intervals)
                     case _:
-                        raise NotImplementedError()
+                        raise ValueError(f"unknown shutdown type: {shutdowns_node['shutdown_type']!r}")
 
     def load_breakdowns(self) -> None:
         for breakdown in self.per_kind.get('Breakdown', []):
@@ -755,6 +630,6 @@ class Parser:
                     timeout=float(criterion['timeout'])
                 )
             case _:
-                raise NotImplementedError()
+                raise ValueError(f"unknown stopping criterion type: {criterion['type']!r}")
 
         SimulationStopper(criterion=self.stopping_criterion)

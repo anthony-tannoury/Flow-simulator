@@ -3,7 +3,7 @@ from __future__ import annotations
 import salabim as sim
 
 from enum import Enum, auto
-from typing import override
+from .compat import override
 from dataclasses import dataclass
 
 from simulation import env
