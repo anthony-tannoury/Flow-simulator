@@ -30,12 +30,16 @@ position instead of a memoryless re-race). This is the single most valuable
 behavioral improvement available.
 
 ### 1.2 No finite buffer capacity — no backpressure
-Buffers are unbounded (`attente_place` is 0 in every report ever produced).
+Buffers are unbounded, and placement is unconditional: `helpers.place()` calls
+`piece.enter(...)` synchronously, so a piece can never wait to enter a buffer.
 Overloaded flows therefore express themselves as unbounded WIP + labor
 starvation (see 1.1) instead of graceful upstream blocking. Adding an optional
-`capacity` to `Buffer` (designer field + both engines + `attente_place`
-accounting, which the KPI layer already supports) would let users model real
-line coupling.
+`capacity` to `Buffer` (designer field + both engines) would let users model
+real line coupling. Note on naming: the existing `attente_place` KPI is
+*not* about buffers — it is the collectors' `wait_slot` time against the
+task's own `max_capacity` slot pool (nonzero where carriers contend, e.g.
+Rework 2/3). A placement-block wait would be a new measurement and should get
+a distinct name (e.g. `attente_place_aval`) to avoid overloading this one.
 
 ### 1.3 Three hand-maintained copies of every enum/policy table
 `flow_designer/ui_helpers.py` (`COLLECTOR_TYPES`, `POLICY_OPTIONS`, …),
