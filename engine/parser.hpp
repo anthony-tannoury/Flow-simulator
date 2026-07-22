@@ -316,6 +316,7 @@ class Parser {
     explicit Parser(const std::string& flow_json_text) {
         data = json::parse(flow_json_text);  // nlohmann decodes UTF-8 (no mojibake, §15b)
         sim_start = parse_datetime(data.at("start_date").get<std::string>());
+        drop_disabled_nodes();
         discriminate();
         for (const auto& n : data.at("nodes")) by_id[n.at("id").get<std::string>()] = &n;
     }
@@ -408,6 +409,51 @@ class Parser {
             if (same_name(target.at("buffer_type").get<std::string>(), "SCRAP")) return true;
         }
         return false;
+    }
+
+    // Mirror of parser.py drop_disabled_nodes: a card saved with "enabled": false
+    // does not exist for this run — the node, the connections touching it, and
+    // every reference to its id are removed before anything is built. Cards
+    // without the field count as enabled (older files).
+    void drop_disabled_nodes() {
+        if (!data.contains("nodes")) return;
+        std::set<std::string> dead;
+        for (const auto& n : data.at("nodes"))
+            if (n.contains("enabled") && n.at("enabled").is_boolean() && !n.at("enabled").get<bool>())
+                dead.insert(n.at("id").get<std::string>());
+        if (dead.empty()) return;
+        // a breakdown whose task is disabled has nothing to break: drop it too
+        for (const auto& n : data.at("nodes"))
+            if (n.at("kind") == "Breakdown" && n.contains("task") && n.at("task").is_string()
+                && dead.count(n.at("task").get<std::string>()))
+                dead.insert(n.at("id").get<std::string>());
+        json kept = json::array();
+        for (auto& n : data.at("nodes")) {
+            if (dead.count(n.at("id").get<std::string>())) continue;
+            for (const char* key : {"bufs_in", "bufs_out", "outlets", "shutdowns",
+                                    "breakdowns", "inputs_from"}) {
+                if (!n.contains(key)) continue;
+                json filtered = json::array();
+                for (const auto& id : n.at(key))
+                    if (!(id.is_string() && dead.count(id.get<std::string>()))) filtered.push_back(id);
+                n[key] = std::move(filtered);
+            }
+            if (n.at("kind") == "Router" && n.contains("buffer_probs")) {
+                json filtered = json::array();
+                for (const auto& e : n.at("buffer_probs"))
+                    if (!dead.count(e.at("buffer").get<std::string>())) filtered.push_back(e);
+                n["buffer_probs"] = std::move(filtered);
+            }
+            kept.push_back(std::move(n));
+        }
+        data["nodes"] = std::move(kept);
+        if (data.contains("connections")) {
+            json conns = json::array();
+            for (const auto& c : data.at("connections"))
+                if (!dead.count(c.value("from_node", "")) && !dead.count(c.value("to_node", "")))
+                    conns.push_back(c);
+            data["connections"] = std::move(conns);
+        }
     }
 
     void discriminate() {
@@ -572,7 +618,11 @@ class Parser {
     }
 
     void load_piece_generator() {
-        const json& node = *nodes_of("PieceGenerator").at(0);
+        const auto& generators = nodes_of("PieceGenerator");
+        if (generators.size() != 1)
+            throw std::invalid_argument("the flow needs exactly one enabled piece generator, found " +
+                                        std::to_string(generators.size()));
+        const json& node = *generators.at(0);
         const json& criterion = data.at("stopping_criterion");
         for (const auto& id : node.at("outlets"))
             if (!outlets.count(id.get<std::string>()))
@@ -750,8 +800,11 @@ class Parser {
         } else if (type == "bypiecesproduced") {
             int total = 0;
             for (const auto& mg : criterion.at("models_goals")) total += mg.at("goal").get<int>();
+            Buffer* exit_b = exit_buffer();
+            if (exit_b == nullptr)
+                throw std::invalid_argument("no enabled EXIT buffer to count produced pieces on");
             stopping_criterion =
-                sim::make<ByPiecesProduced>({}, total, exit_buffer(), parse_float(criterion.at("timeout")));
+                sim::make<ByPiecesProduced>({}, total, exit_b, parse_float(criterion.at("timeout")));
         } else {
             throw std::invalid_argument("unknown stopping criterion type: " +
                                         criterion.at("type").get<std::string>());

@@ -18,11 +18,6 @@ try:
 except ImportError:
     import results_mode
 
-try:
-    from NodeGraphQt import BackdropNode
-except Exception:
-    BackdropNode = None
-
 
 # --- simulation engine selection (Python vs bundled C++) --------------------
 def app_settings() -> QtCore.QSettings:
@@ -3123,6 +3118,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self.properties_dock = QtWidgets.QDockWidget("Properties", self)
         self.properties_dock.setWidget(self.properties_bin)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.properties_dock)
+        # start with the panel closed; Tools menu carries its toggle to reopen it
+        self.properties_dock.hide()
 
         self._build_menus()
         self._install_context_menus()
@@ -3143,7 +3140,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         act_new.setShortcut(QtGui.QKeySequence.New)
         act_open = editing(file_menu.addAction("Open..."))
         act_open.setShortcut(QtGui.QKeySequence.Open)
-        act_import = editing(file_menu.addAction("Import clean JSON (add)..."))
         file_menu.addSeparator()
         act_save = editing(file_menu.addAction("Save"))
         act_save.setShortcut(QtGui.QKeySequence.Save)
@@ -3151,7 +3147,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         act_save_as.setShortcut(QtGui.QKeySequence.SaveAs)
         act_new.triggered.connect(lambda checked=False: self.new_graph())
         act_open.triggered.connect(lambda checked=False: self.open_file_dialog())
-        act_import.triggered.connect(self.import_clean_json_dialog)
         act_save.triggered.connect(lambda checked=False: self.save_file())
         act_save_as.triggered.connect(lambda checked=False: self.save_file_as())
 
@@ -3207,6 +3202,10 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         dup_action.setShortcut("Ctrl+D")  # Qt maps Ctrl to Cmd on macOS
         dup_action.triggered.connect(lambda: self.duplicate_selected_cards())
         edit_menu.addSeparator()
+        disable_action = editing(edit_menu.addAction("Disable / enable cards"))
+        disable_action.setShortcut("Ctrl+E")
+        disable_action.triggered.connect(lambda: self.toggle_disable_selected_cards())
+        edit_menu.addSeparator()
         delete_action = editing(edit_menu.addAction("Delete selected"))
         delete_action.setShortcut("Delete")
         delete_action.triggered.connect(self.delete_selected_nodes)
@@ -3214,10 +3213,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         tools_menu = self.menuBar().addMenu("Tools")
         tools_menu.addAction("Validate graph").triggered.connect(self.validate_graph_dialog)
         tools_menu.addAction("Frame all").triggered.connect(self.frame_all)
-
-        templates_menu = self.menuBar().addMenu("Templates")
-        editing(templates_menu.addAction("Add backdrop around selection")).triggered.connect(
-            self.add_backdrop_around_selection)
+        tools_menu.addSeparator()
+        tools_menu.addAction(self.properties_dock.toggleViewAction())
 
         create_menu = self.menuBar().addMenu("Create")
         for label, cls_name in [
@@ -3241,6 +3238,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             graph_menu.add_command("Cut cards", lambda graph: self.cut_selected_cards())
             graph_menu.add_command("Paste cards", lambda graph: self.paste_cards())
             graph_menu.add_command("Duplicate cards", lambda graph: self.duplicate_selected_cards())
+            graph_menu.add_command("Disable / enable cards",
+                                   lambda graph: self.toggle_disable_selected_cards())
             nodes_menu = self.graph.get_context_menu("nodes")
             for cls in (ShutdownsNode, BufferNode, RouterNode, PieceGeneratorNode,
                         TaskNode, ResourceTaskNode, BreakdownNode):
@@ -3256,6 +3255,10 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 nodes_menu.add_command(
                     "Duplicate cards",
                     func=lambda graph, node: self.duplicate_selected_cards(context_node=node),
+                    node_type=node_type)
+                nodes_menu.add_command(
+                    "Disable / enable cards",
+                    func=lambda graph, node: self.toggle_disable_selected_cards(context_node=node),
                     node_type=node_type)
         except Exception as error:
             print(f"[WARNING] Could not install context menus: {error}")
@@ -3395,7 +3398,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self._suspend_dirty = True
         try:
             self.reset_session()
-            self.import_clean_json(data, remap_ids=False)
+            self.load_clean_json(data)
         finally:
             self._suspend_dirty = False
         self.current_path = path
@@ -3451,7 +3454,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             self._suspend_dirty = True
             try:
                 self.reset_session()
-                self.import_clean_json(data, remap_ids=False)
+                self.load_clean_json(data)
             finally:
                 self._suspend_dirty = False
             self.current_path = None
@@ -3465,6 +3468,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self._results_dock = results_mode.ResultsDock(self, results)
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self._results_dock)
         self._apply_results_tooltips(True)
+        self._props_dock_was_visible = self.properties_dock.isVisible()
         self.properties_dock.setVisible(False)  # its editors would bypass the lock
         self._update_title()
         self.statusBar().showMessage(
@@ -3484,7 +3488,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             self.removeDockWidget(self._results_dock)
             self._results_dock.deleteLater()
             self._results_dock = None
-        self.properties_dock.setVisible(True)
+        self.properties_dock.setVisible(getattr(self, "_props_dock_was_visible", False))
         self.results = None
         self._update_title()
         self.statusBar().showMessage("Left results mode.")
@@ -3540,8 +3544,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 return
             colors = results_mode.heat_values(metric_index, self.results)
             for node in self.all_nodes():
-                if node_kind(node) in ("Backdrop", "BackdropNode"):
-                    continue
                 uid = node_uid(node)
                 # heat color inside the metric's family, neutral grey everywhere
                 # else so the colored cards stand out
@@ -3890,34 +3892,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
 
     def export_clean_json(self) -> dict:
         nodes = []
-        backdrops = []
         for node in self.all_nodes():
-            kind = node_kind(node)
-            is_backdrop = (node.__class__.__name__ == "BackdropNode" or kind in {"Backdrop", "BackdropNode"})
-            if is_backdrop:
-                wrapped_node_ids = get_property_json(node, "wrapped_node_ids", [])
-                if not wrapped_node_ids:
-                    continue
-                title = node.get_property("backdrop_title") if node.has_property("backdrop_title") else node.name()
-                width, height = None, None
-                try:
-                    width, height = node.size()
-                except Exception:
-                    if node.has_property("width"):
-                        width = node.get_property("width")
-                    if node.has_property("height"):
-                        height = node.get_property("height")
-                backdrops.append({
-                    "id": node_uid(node),
-                    "title": title,
-                    "nodes": wrapped_node_ids,
-                    "position": [node.x_pos(), node.y_pos()],
-                    "width": width,
-                    "height": height,
-                })
-                continue
             if hasattr(node, "to_clean_json"):
-                node_data = node.to_clean_json()
+                node_data = self._card_json(node)
                 if node_data and node_data.get("kind"):
                     nodes.append(node_data)
 
@@ -3955,7 +3932,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             "seed": self.seed,
             "nodes": nodes,
             "connections": self.connections_clean(),
-            "backdrops": backdrops,
         }
 
     def validate_graph_dialog(self):
@@ -3975,6 +3951,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         if kind == "Router":
             sets = []
             for b in connected_nodes_from_port(node, "to_buffers", "output"):
+                if not self._node_enabled(b):
+                    continue
                 if node_kind(b) != "Buffer":
                     return None
                 vm = get_property_json(b, "valid_models", [])
@@ -3988,7 +3966,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         """Mirror check_outlet_validity: a generator/piece-task's outlets must be pairwise
         disjoint and together cover every model the giver emits. Skips silently when the
         wiring is incomplete (other checks flag empties)."""
-        outlets = connected_nodes_from_port(node, out_port, "output")
+        outlets = [o for o in connected_nodes_from_port(node, out_port, "output")
+                   if self._node_enabled(o)]
         if not outlets or not giver_models:
             return
         resolved = []
@@ -4011,11 +3990,18 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def validate_graph(self) -> List[str]:
         problems = []
         start_dt = parse_date_time(self.start_date)
+        # disabled cards are dropped by the parsers, so validation ignores them
+        # too — together with every wire that touches them
+        disabled = {node_uid(n) for n in self.all_nodes() if not self._node_enabled(n)}
         for c in self.connections_clean():
+            if c["from_node"] in disabled or c["to_node"] in disabled:
+                continue
             if not is_valid_connection(c["from_kind"], c["from_port"], c["to_kind"], c["to_port"]):
                 problems.append(f"Invalid connection: {c['from_kind']}.{c['from_port']} -> {c['to_kind']}.{c['to_port']}")
 
         for node in self.all_nodes():
+            if node_uid(node) in disabled:
+                continue
             kind = node_kind(node)
             name = node.name()
             if kind in ("Task", "ResourceTask"):
@@ -4054,7 +4040,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 buffer_type = node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
                 if buffer_type == "PASSAGE":
                     consumers = [t for t in connected_nodes_from_port(node, "to_task", "output")
-                                 if node_kind(t) == "Task"]
+                                 if node_kind(t) == "Task" and self._node_enabled(t)]
                     if not consumers:
                         problems.append(f"Buffer '{name}': no task consumes from this buffer (dead end).")
                     else:
@@ -4083,16 +4069,19 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             if kind == "Router":
                 # the simulation samples branch probabilities at run time; catch what is
                 # statically checkable (all-constant branches) at design time
-                if not connected_nodes_from_port(node, "to_buffers", "output"):
+                if not [b for b in connected_nodes_from_port(node, "to_buffers", "output")
+                        if self._node_enabled(b)]:
                     problems.append(f"Router '{name}' has no outlets.")
-                branch_map = get_property_json(node, "buffer_probs", {})
+                branch_map = {bid: p for bid, p in get_property_json(node, "buffer_probs", {}).items()
+                              if bid not in disabled}
                 branches = list(branch_map.values())
                 freeloaders = [p for p in branches if p is None]
                 if len(freeloaders) > 1:
                     problems.append(f"Router '{name}': at most one freeloader branch is allowed.")
                 # a constant-0 branch can never carry a piece: the wire exists but is dead
                 targets = {node_uid(b): b.name()
-                           for b in connected_nodes_from_port(node, "to_buffers", "output")}
+                           for b in connected_nodes_from_port(node, "to_buffers", "output")
+                           if self._node_enabled(b)}
                 for bid, p in branch_map.items():
                     if isinstance(p, dict) and p.get("kind") == "constant" and as_float(p.get("value", 0.0)) == 0.0:
                         problems.append(f"Router '{name}': branch '{targets.get(bid, bid)}' has "
@@ -4111,9 +4100,9 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                         problems.append(f"Router '{name}': branch probabilities sum to {s:g} "
                                         f"(must be <= 1 so the freeloader can take the rest).")
             if kind == "Task":
-                if not connected_refs_from_port(node, "bufs_in", "input"):
+                if not [r for r in connected_refs_from_port(node, "bufs_in", "input") if r not in disabled]:
                     problems.append(f"Piece task '{name}' has no input buffers.")
-                if not get_output_refs(node, "bufs_out"):
+                if not [r for r in get_output_refs(node, "bufs_out") if r not in disabled]:
                     problems.append(f"Piece task '{name}' has no output buffers.")
                 mc = get_property_json(node, "models_configs", [])
                 if not mc:
@@ -4192,14 +4181,15 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                                     f"(currently {sum(props):g}).")
 
             elif kind == "Breakdown":
-                tasks = connected_nodes_from_port(node, "breakdown", "output")
+                tasks = [t for t in connected_nodes_from_port(node, "breakdown", "output")
+                         if self._node_enabled(t)]
                 if not tasks:
                     problems.append(f"Breakdown '{name}' is not attached to a task.")
                 if not (get_property_json(node, "mtbf", {}) or {}):
                     problems.append(f"Breakdown '{name}' has no mtbf set.")
                 if not get_property_json(node, "mttr", None):
                     problems.append(f"Breakdown '{name}' has no mttr distribution.")
-                has_outlets = bool(get_output_refs(node, "bufs_out"))
+                has_outlets = bool([r for r in get_output_refs(node, "bufs_out") if r not in disabled])
                 for t in tasks:
                     if node_kind(t) == "Task" and not has_outlets:
                         problems.append(f"Breakdown '{name}' on piece task '{t.name()}' must have "
@@ -4211,7 +4201,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 # What it emits (models + goals/rates) lives in the stopping criterion
                 # (Simulation Settings); the node carries its shifts and its wiring.
                 # The criterion block below checks the models against these outlets.
-                if not get_output_refs(node, "bufs_out"):
+                if not [r for r in get_output_refs(node, "bufs_out") if r not in disabled]:
                     problems.append(f"Piece generator '{name}' has no outlets.")
                 if not get_property_json(node, "shifts", []):
                     problems.append(f"Piece generator '{name}' has no shifts (double-click it to choose when it emits).")
@@ -4219,7 +4209,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 # even through routers: freshly generated pieces would be scrapped on
                 # arrival, and the parser cannot build the object cycle
                 # generator -> router -> scrap -> generator anyway.
-                frontier = list(connected_nodes_from_port(node, "bufs_out", "output"))
+                frontier = [o for o in connected_nodes_from_port(node, "bufs_out", "output")
+                            if self._node_enabled(o)]
                 seen = set()
                 while frontier:
                     outlet = frontier.pop()
@@ -4240,7 +4231,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     problems.append(f"Buffer '{name}' has no valid models.")
 
             elif kind == "Router":
-                out_bufs = connected_nodes_from_port(node, "to_buffers", "output")
+                out_bufs = [b for b in connected_nodes_from_port(node, "to_buffers", "output")
+                            if self._node_enabled(b)]
                 if not out_bufs:
                     problems.append(f"Router '{name}' has no output buffers.")
                 else:
@@ -4300,7 +4292,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             problems.append(f"Closing day '{d}' appears more than once in the registry.")
 
         buffer_types = [node.get_property("buffer_type") if node.has_property("buffer_type") else "PASSAGE"
-                        for node in self.all_nodes() if node_kind(node) == "Buffer"]
+                        for node in self.all_nodes()
+                        if node_kind(node) == "Buffer" and node_uid(node) not in disabled]
         exit_count = buffer_types.count("EXIT")
         if exit_count == 0:
             problems.append("No EXIT buffer: the parser expects exactly one to define the simulation's exit.")
@@ -4308,7 +4301,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             problems.append(f"{exit_count} EXIT buffers: the simulation allows at most one.")
 
         # Mirror the simulation's guard: exactly one piece generator.
-        gen_count = sum(1 for n in self.all_nodes() if node_kind(n) == "PieceGenerator")
+        gen_count = sum(1 for n in self.all_nodes()
+                        if node_kind(n) == "PieceGenerator" and node_uid(n) not in disabled)
         if gen_count == 0:
             problems.append("No piece generator: the simulation requires exactly one.")
         elif gen_count > 1:
@@ -4323,7 +4317,8 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         # on the generator node); validate the generation params here and flush its
         # models through the generator's outlets.
         crit = self.stopping_criterion or {}
-        gen_node = next((n for n in self.all_nodes() if node_kind(n) == "PieceGenerator"), None)
+        gen_node = next((n for n in self.all_nodes()
+                         if node_kind(n) == "PieceGenerator" and node_uid(n) not in disabled), None)
         if not crit:
             problems.append("No stopping criterion set (Simulation > Settings...); "
                             "the simulation may never terminate.")
@@ -4424,6 +4419,43 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             self.graph.delete_node(node)
 
     # ------------------------------------------------------------------
+    # Disable / enable cards. A disabled card stays on the canvas (grayed,
+    # crossed out) and keeps its wires, but exports with "enabled": false and
+    # both engines' parsers drop it — so parts of the flow can be tested
+    # independently without deleting anything.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _node_enabled(node) -> bool:
+        try:
+            return not bool(node.disabled())
+        except Exception:
+            return True
+
+    def _card_json(self, node) -> dict | None:
+        """A card's clean-JSON dict with its enabled state stamped on."""
+        data = node.to_clean_json()
+        if data:
+            data["enabled"] = self._node_enabled(node)
+        return data
+
+    def toggle_disable_selected_cards(self, context_node=None):
+        nodes = self._selected_cards(context_node)
+        if not nodes:
+            self.statusBar().showMessage("Nothing selected to disable/enable.")
+            return
+        # mixed selection: disable everything first, then a second hit re-enables
+        disable = any(self._node_enabled(n) for n in nodes)
+        for node in nodes:
+            try:
+                node.set_disabled(disable)
+            except Exception:
+                pass
+        self.mark_dirty()
+        verb = "Disabled" if disable else "Enabled"
+        self.statusBar().showMessage(f"{verb} {len(nodes)} card(s).")
+
+    # ------------------------------------------------------------------
     # Copy / paste of cards. The clipboard carries the same clean-JSON shape
     # as the export (cards + the connections between them) as plain text, so
     # a paste is a mini-import: ids re-minted, positions offset, new nodes
@@ -4452,7 +4484,7 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
     def _cards_payload(self, nodes):
         """Clean-JSON clipboard payload for these cards: the cards plus the wires
         between them (wires leaving the set are dropped). None if nothing usable."""
-        cards = [c for c in (n.to_clean_json() for n in nodes) if c and c.get("kind")]
+        cards = [c for c in (self._card_json(n) for n in nodes) if c and c.get("kind")]
         if not cards:
             return None
         uids = {c["id"] for c in cards if c.get("id")}
@@ -4580,77 +4612,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         else:
             node.create_property(prop_name, value)
 
-    def add_backdrop_for_nodes(self, nodes, title: str, width=None, height=None):
-        if not nodes:
-            return None
-        clean_nodes, seen = [], set()
-        for node in nodes:
-            if node is None:
-                continue
-            if node.__class__.__name__ == "BackdropNode" or node_kind(node) in {"Backdrop", "BackdropNode"}:
-                continue
-            uid = node_uid(node)
-            if uid in seen:
-                continue
-            seen.add(uid)
-            clean_nodes.append(node)
-        if not clean_nodes:
-            return None
-
-        backdrop = None
-        try:
-            backdrop = self.graph.create_node("nodeGraphQt.nodes.BackdropNode")
-        except Exception:
-            try:
-                if BackdropNode is not None:
-                    self.graph.register_node(BackdropNode, alias="Backdrop")
-                    backdrop = self.graph.create_node("Backdrop")
-            except Exception:
-                backdrop = None
-        if backdrop is None:
-            qmessage(self, "Backdrop error", "Could not create a BackdropNode in this NodeGraphQt version.",
-                     QtWidgets.QMessageBox.Warning)
-            return None
-
-        try:
-            backdrop.set_text(title)
-        except Exception:
-            try:
-                backdrop.set_name(title)
-            except Exception:
-                pass
-
-        if width is not None and height is not None:
-            try:
-                backdrop.set_size(float(width), float(height))
-            except Exception:
-                try:
-                    self.set_property_safe(backdrop, "width", float(width))
-                    self.set_property_safe(backdrop, "height", float(height))
-                except Exception:
-                    pass
-        else:
-            try:
-                backdrop.wrap_nodes(clean_nodes)
-            except Exception:
-                pass
-
-        self.set_property_safe(backdrop, "backdrop_title", title)
-        self.set_json_property_safe(backdrop, "wrapped_node_ids", [node_uid(n) for n in clean_nodes])
-        return backdrop
-
-    def add_backdrop_around_selection(self):
-        try:
-            selected = self.graph.selected_nodes()
-        except Exception:
-            selected = []
-        if not selected:
-            qmessage(self, "No selection",
-                     "Select nodes, then use Templates > Add backdrop around selection.",
-                     QtWidgets.QMessageBox.Information)
-            return
-        self.add_backdrop_for_nodes(selected, "Group")
-
     def node_type_from_kind(self, kind: str) -> str:
         mapping = {
             "Shutdowns": "simulation.flow.ShutdownsNode",
@@ -4698,6 +4659,10 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         position = node_data.get("position", [0, 0])
         if isinstance(position, list) and len(position) >= 2:
             self.set_node_position_safe(node, position[0], position[1])
+        try:
+            node.set_disabled(not bool(node_data.get("enabled", True)))
+        except Exception:
+            pass
 
         for key in self._IMPORT_JSON_PROPS.get(kind, []):
             if key in node_data:
@@ -4719,15 +4684,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                     prob_map[bid] = item.get("probability", {"kind": "constant", "value": 0.0})
             self.set_json_property_safe(node, "buffer_probs", prob_map)
 
-    def import_clean_json_dialog(self):
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Import clean JSON", "", "JSON (*.json)")
-        if not path:
-            return
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.import_clean_json(data)
-        self.statusBar().showMessage(f"Imported clean JSON: {path}")
-
     def _remap_ids(self, data: dict) -> dict:
         data = json.loads(json.dumps(data))
         mapping = {}
@@ -4744,28 +4700,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 return mapping[obj]
             return obj
         return walk(data)
-
-    def _offset_imported_positions(self, data: dict, padding: float = 200.0) -> dict:
-        existing = self.content_bounds()
-        if existing is None:
-            return data
-        ex_left, ex_top, ex_right, ex_bottom = existing
-        xs, ys = [], []
-        for group in (data.get("nodes", []), data.get("backdrops", [])):
-            for item in group:
-                pos = item.get("position") if isinstance(item, dict) else None
-                if isinstance(pos, list) and len(pos) >= 2:
-                    xs.append(pos[0]); ys.append(pos[1])
-        if not xs:
-            return data
-        dx = (ex_right + padding) - min(xs)
-        dy = ex_top - min(ys)
-        for group in (data.get("nodes", []), data.get("backdrops", [])):
-            for item in group:
-                pos = item.get("position") if isinstance(item, dict) else None
-                if isinstance(pos, list) and len(pos) >= 2:
-                    item["position"] = [pos[0] + dx, pos[1] + dy]
-        return data
 
     def _resolve_ref_ids_to_names(self, data: dict) -> dict:
         """Inverse of the export's name->id mapping: rewrite id references in the
@@ -4784,40 +4718,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                        lambda kind, v: id_to_name[kind].get(v, v), shifts=regs["shift"],
                        criterion=data.get("stopping_criterion"))
         return data
-
-    def _merge_models(self, imported_models: list) -> None:
-        if not hasattr(self, "model_registry") or self.model_registry is None:
-            self.model_registry = []
-        existing = {m.get("name"): m for m in self.model_registry if m.get("name")}
-        conflicts = []
-        for model in imported_models or []:
-            name = model.get("name")
-            if not name:
-                continue
-            if name in existing:
-                if (existing[name].get("parent") or None) != (model.get("parent") or None):
-                    conflicts.append(name)
-                continue
-            entry = {"name": name, "parent": model.get("parent") or None, "id": model.get("id")}
-            self.model_registry.append(entry)
-            existing[name] = entry
-        if conflicts:
-            qmessage(self, "Model conflict",
-                     "These imported models already exist with a different parent and were kept as-is:\n- "
-                     + "\n- ".join(conflicts), QtWidgets.QMessageBox.Warning)
-
-    def _merge_named_registry(self, attr: str, imported: list, key: str = "name") -> None:
-        """Merge imported registry entries (resources/operators/shifts by name, closing
-        days by date); existing entries win on a clash (models are handled separately,
-        with conflict warnings)."""
-        reg = getattr(self, attr, None) or []
-        existing = {e.get(key) for e in reg if e.get(key)}
-        for entry in imported or []:
-            value = entry.get(key)
-            if value and value not in existing:
-                reg.append(dict(entry))
-                existing.add(value)
-        setattr(self, attr, reg)
 
     def _adopt_orphan_days_off(self) -> None:
         """Every day off referenced by a shift must exist in the closing-days registry.
@@ -4865,45 +4765,29 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                       f"{connection.get('to_node')}.{connection.get('to_port')}: {error}")
         return id_to_node
 
-    def import_clean_json(self, data: dict, remap_ids: bool = True):
+    def load_clean_json(self, data: dict):
+        """Fill the (already reset) session from a file's clean-JSON content. Only
+        called by open_file — files always replace the session, never add to it."""
         data = self._resolve_ref_ids_to_names(data)
-        if remap_ids:  # False when a file replaces the session (open): ids kept stable
-            data = self._remap_ids(data)
-        data = self._offset_imported_positions(data)
-        self._merge_models(data.get("models", []))
-        self._merge_named_registry("resource_registry", data.get("resources", []))
-        self._merge_named_registry("operator_registry", data.get("operators", []))
-        self._merge_named_registry("closing_day_registry", data.get("closing_days", []), key="date")
-        self._merge_named_registry("shift_registry", data.get("shifts", []))
+        self.model_registry = [{"name": m["name"], "parent": m.get("parent") or None, "id": m.get("id")}
+                               for m in data.get("models", []) if m.get("name")]
+        self.resource_registry = [dict(e) for e in data.get("resources", []) if e.get("name")]
+        self.operator_registry = [dict(e) for e in data.get("operators", []) if e.get("name")]
+        self.closing_day_registry = [dict(e) for e in data.get("closing_days", []) if e.get("date")]
+        self.shift_registry = [dict(e) for e in data.get("shifts", []) if e.get("name")]
         self._adopt_orphan_days_off()
         ensure_ids(self.model_registry, "model")
         ensure_ids(self.resource_registry, "resource")
         ensure_ids(self.operator_registry, "operator")
         ensure_ids(self.shift_registry, "shift")
         ensure_ids(self.closing_day_registry, "closingday", key="date")
-        if not self.stopping_criterion and data.get("stopping_criterion"):
+        if data.get("stopping_criterion"):
             self.stopping_criterion = data["stopping_criterion"]
         if data.get("start_date"):
-            # the imported file's dates were authored against its own anchor: adopt it
             self.start_date = data["start_date"]
         if data.get("seed") is not None:
             self.seed = int(data["seed"])
-
-        id_to_node = self._instantiate_cards(data)
-
-        # Only recreate backdrops that were actually saved in the file; never wrap
-        # the import in a backdrop of our own.
-        for group in data.get("backdrops", []):
-            group_node_ids = group.get("nodes", group.get("wrapped_node_ids", []))
-            group_nodes = [id_to_node[nid] for nid in group_node_ids if nid in id_to_node]
-            if not group_nodes:
-                continue
-            backdrop = self.add_backdrop_for_nodes(group_nodes, group.get("title", "Imported group"),
-                                                   width=group.get("width"), height=group.get("height"))
-            position = group.get("position")
-            if backdrop is not None and isinstance(position, list) and len(position) >= 2:
-                self.set_node_position_safe(backdrop, position[0], position[1])
-
+        self._instantiate_cards(data)
         self.frame_all()
 
 

@@ -223,8 +223,32 @@ class Parser:
         self.seed = int(self.data.get('seed', 0))
         reseed(self.seed)
         self.sim_start = to_datetime(self.data['start_date'])
+        self.drop_disabled_nodes()
         self.discriminate()
         self.by_id = {n['id']: n for n in self.data['nodes']}
+
+    def drop_disabled_nodes(self) -> None:
+        """A card saved with "enabled": false does not exist for this run: the node
+        itself, every connection touching it, and every reference to its id are
+        removed before anything is built. Cards without the field count as enabled
+        (older files)."""
+        nodes = self.data.get('nodes', [])
+        dead = {n['id'] for n in nodes if not n.get('enabled', True)}
+        if not dead:
+            return
+        # a breakdown whose task is disabled has nothing to break: drop it too
+        dead |= {n['id'] for n in nodes
+                 if n['kind'] == 'Breakdown' and n.get('task') in dead}
+        self.data['nodes'] = [n for n in nodes if n['id'] not in dead]
+        self.data['connections'] = [c for c in self.data.get('connections', [])
+                                    if c.get('from_node') not in dead and c.get('to_node') not in dead]
+        for node in self.data['nodes']:
+            for key in ('bufs_in', 'bufs_out', 'outlets', 'shutdowns', 'breakdowns', 'inputs_from'):
+                if key in node:
+                    node[key] = [id_ for id_ in node[key] if id_ not in dead]
+            if node['kind'] == 'Router':
+                node['buffer_probs'] = [e for e in node.get('buffer_probs', [])
+                                        if e.get('buffer') not in dead]
 
     @staticmethod
     def _describe_fn(fn) -> str:
@@ -588,8 +612,10 @@ class Parser:
                 for e in router['buffer_probs']})
 
     def load_piece_generator(self) -> None:
-        assert len(self.per_kind['PieceGenerator']) == 1
-        node = self.per_kind['PieceGenerator'][0]
+        generators = self.per_kind.get('PieceGenerator', [])
+        if len(generators) != 1:
+            raise ValueError(f"the flow needs exactly one enabled piece generator, found {len(generators)}")
+        node = generators[0]
         criterion = self.data['stopping_criterion']
 
         for id_ in node['outlets']:
@@ -751,8 +777,10 @@ class Parser:
                 self.stopping_criterion = ByTime(time=minutes)
             case 'bypiecesproduced':
                 total = sum(mg['goal'] for mg in criterion['models_goals'])
-                exit_buffer = next(self.outlets[b['id']] for b in self.per_kind['Buffer']
-                                   if same_name(b['buffer_type'], 'EXIT'))
+                exit_buffer = next((self.outlets[b['id']] for b in self.per_kind.get('Buffer', [])
+                                    if same_name(b['buffer_type'], 'EXIT')), None)
+                if exit_buffer is None:
+                    raise ValueError('no enabled EXIT buffer to count produced pieces on')
                 self.stopping_criterion = ByPiecesProduced(
                     total=total,
                     exit_buffer=exit_buffer,
