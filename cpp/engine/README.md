@@ -27,7 +27,7 @@ streams differ across languages).
 ## Building
 
 Depends only on header-only libraries (`salabim++`, `simulation++`,
-`engine/third_party/json.hpp`), so the binaries are portable and dependency-free.
+`cpp/third_party/json.hpp`), so the binaries are portable and dependency-free.
 
 ```
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

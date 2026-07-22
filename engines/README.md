@@ -41,20 +41,20 @@ the repo root:
 ```sh
 # Linux (Clang; GCC ≤13 ICEs on the coroutines)
 clang++ -std=c++20 -O2 -static-libgcc -static-libstdc++ \
-  -Isalabim++ -Isimulation++ -Iengine -Iengine/third_party \
-  engine/main.cpp -o engines/flow_sim-linux-x86_64
+  -Icpp/salabim++ -Icpp/simulation++ -Icpp/engine -Icpp/third_party \
+  cpp/engine/main.cpp -o engines/flow_sim-linux-x86_64
 
 # macOS (Apple Clang; universal arm64 + x86-64)
 clang++ -std=c++20 -O2 -arch arm64 -arch x86_64 \
-  -Isalabim++ -Isimulation++ -Iengine -Iengine/third_party \
-  engine/main.cpp -o engines/flow_sim-macos-universal
+  -Icpp/salabim++ -Icpp/simulation++ -Icpp/engine -Icpp/third_party \
+  cpp/engine/main.cpp -o engines/flow_sim-macos-universal
 ```
 
 ```bat
 :: Windows (MSVC x64 Native Tools prompt; GCC won't work, use cl)
 cl /std:c++20 /O2 /EHsc /MT /nologo ^
-  /I salabim++ /I simulation++ /I engine /I engine\third_party ^
-  engine\main.cpp /Fe:engines\flow_sim-windows-x86_64.exe
+  /I cpp\salabim++ /I cpp\simulation++ /I cpp\engine /I cpp\third_party ^
+  cpp\engine\main.cpp /Fe:engines\flow_sim-windows-x86_64.exe
 ```
 
 Smoke-test it the way CI does — this must print a line starting with `@@DONE`:
