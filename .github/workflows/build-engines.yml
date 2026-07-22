@@ -110,8 +110,11 @@ jobs:
 
       - name: Commit and push (skip ci to avoid a rebuild loop)
         run: |
-          git config user.name  'flow-simulator-ci'
-          git config user.email 'ci@users.noreply.github.com'
+          # The github-actions bot identity: 'ci@users.noreply.github.com' is the
+          # no-reply address of the real GitHub user 'ci', so commits made with it
+          # were being attributed to that unrelated account in the contributor list.
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f engines/
           if git diff --cached --quiet; then
             echo "engines/ unchanged — nothing to commit"
