@@ -1,8 +1,3 @@
-# Benchmark (Python side) — scenario1 scaled to 20,000 pieces, trace off.
-# Companion of bench.cpp: same scenario, same seed; time both to compare.
-# Generator (2 models, shifts) -> B0 -> PieceTask T1 (discriminating greedy,
-# operators w/ productivity, uniform durations) -> Router(90% B1 / 10% scrap)
-# -> PieceTask T2 (non-discriminating greedy, no operators) -> exit.
 import sys
 
 import salabim as sim

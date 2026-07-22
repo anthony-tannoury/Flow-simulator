@@ -126,7 +126,6 @@ class AltruisticResourceCollector(ResourceCollector):
         self.passivate()
 
 
-
 @dataclass
 class ResourceTaskConfig(TaskConfig):
     non_transformed_resources: list[tuple[Resource, float]]
@@ -154,7 +153,7 @@ class ResourceCarrier(Carrier):
         for resource, _ in self.task.config.non_transformed_resources:
             if isinstance(resource, RestockableResource):
                 resource.restock(demander=self)
-        
+
         for resource, _, _ in self.task.config.transformed_resources_salvageable:
             if isinstance(resource, RestockableResource):
                 resource.restock(demander=self)
@@ -176,9 +175,8 @@ class ResourceCarrier(Carrier):
 
         self.task.pending_carriers.remove(self)
         self.task.active_carriers.remove(self)
-        # the task is frozen (or aborting) at this point: a held PER_TASK crew
-        # must not stay reserved through the frozen wait, but only once no other
-        # carrier is still mid-run with it
+
+
         if not self.task.active_carriers:
             self.task.release_task_operators()
         self.cancel()
@@ -203,12 +201,12 @@ class ResourceCarrier(Carrier):
     @override
     def get_ideal_loading_duration(self) -> float:
         return self.task.config.loading_duration.sample_now()
-    
+
     @override
     def get_ideal_duration(self) -> float:
         assert isinstance(self.task.config, ResourceTaskConfig)
         return self.task.config.duration.sample_now()
-    
+
     @override
     def request_resources(self, fail_at: float) -> None:
         assert isinstance(self.task.config, ResourceTaskConfig)

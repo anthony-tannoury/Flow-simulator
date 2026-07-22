@@ -39,9 +39,6 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
         pass
 
     def check_shift_fit(self, operators: list[tuple[OperatorGroup, int]], duration: float) -> None:
-        """Shift-fit decision for a work hold of `duration` starting now. Also
-        re-run after the materials step: a restock order or a stock-out wait can
-        outdate the first approval, and what fit then may not fit anymore."""
         task_shift_constraint_decision = self.task.config.protocols.task_shift_constraint.decide(self.task.current_or_last_shift(), duration)
         if not operators:
             self.freeze_abort_if(task_shift_constraint_decision is Action.ABORT)
@@ -78,9 +75,8 @@ class Carrier(Component, Dispatchable, Donnable, ABC):
 
         if handle_restock:
             self.handle_restock()
-            # a materials wait that cannot end before the crew's fit deadline can
-            # never pass the re-check below: give up (and free the crew) as soon
-            # as success becomes impossible, not when the materials show up
+
+
             self.request_resources(fail_at=min(earliest_deadline - duration - (fail_before - ideal_duration),
                                                self.operator_fit_deadline(recuperated) - duration))
             self.check_shift_fit(recuperated, duration)
@@ -180,13 +176,13 @@ class CarrierTracker:
 
     def __iter__(self):
         return iter(self.carriers)
-    
+
     def __len__(self):
         return len(self.carriers)
-    
+
     def __bool__(self):
         return bool(self.carriers)
-    
+
     def __getitem__(self, key):
         return self.carriers[key]
 
@@ -201,21 +197,21 @@ class TaskStarter(Component, Donnable):
     def setup(self, task: Task):
         Donnable.__init__(self)
         self.task = task
-    
+
     def process(self):
         duration = self.task.config.startup_duration.sample_now()
         while (next_shutdown := self.task.get_earliest_shutdown()) is not None and env.now() + duration > next_shutdown.start:
             self.hold(till=next_shutdown.end)
-        
+
         deadline = self.task.get_earliest_deadline()
         recuperated = self.task.config.startup_operators.request(demander=self, fail_at=deadline - duration)
         if self.failed():
             self.task.is_frozen.set(True)
             self.done.set(True)
             return
-        
+
         self.hold(duration)
-        self.task.startup_times.tally(duration)  # the setup work itself, not the wait for the crew
+        self.task.startup_times.tally(duration)
         self.task.labor_minutes += sum(count for _, count in (recuperated or [])) * duration
         self.done.set(True)
 
@@ -230,7 +226,7 @@ class TaskShiftManager(ShiftManager):
     @override
     def on_leave(self, *args):
         assert isinstance(self.entity, Task)
-        self.entity.started_up = False  # the machine warms up again at the next shift
+        self.entity.started_up = False
         super().on_leave(*args)
 
 
@@ -261,7 +257,7 @@ class TaskConfig:
     independent_carriers: bool
     timeout: float
     priority: int
-    admin: bool          # administrative task: a reporting classification only, no behaviour
+    admin: bool
 
     protocols: Protocols
 
@@ -270,13 +266,13 @@ class Task(Component, HasShifts, ABC):
     def setup(self, config: TaskConfig, carrier_type: type[Carrier]) -> None:
         if config.operator_scope is Scope.PER_UNIT:
             raise ValueError("Operator scope cannot be PER_UNIT")
-        
+
         if config.resource_scope is Scope.PER_TASK:
             raise ValueError("Resource scope cannot be PER_TASK")
 
         if not 0 <= config.priority <= 10:
             raise ValueError("Task priority must be in [0,10]")
-        
+
         if isinstance(config.protocols.task_shift_constraint, ConstrainedByShift) and isinstance(config.protocols.pending_carrier_pre_task_shift_end, WaitForCarriers):
             raise ValueError("Task cannot be constrained by shift and wait for carrier completion pre task shift end at the same time")
 
@@ -295,27 +291,25 @@ class Task(Component, HasShifts, ABC):
 
         self.task_operators: list[tuple[OperatorGroup, int]] = []
         self.carrier_type = carrier_type
-        # so each operator group can unfreeze this task when it comes back on shift
-        # (dict.fromkeys, not a set: iteration must not depend on object addresses,
-        # or the shift-boundary wake-up order — and with it the whole run — would
-        # change from process to process)
+
+
         for alternative in (config.operators, config.loading_operators, config.startup_operators):
             for group in dict.fromkeys(g for alt in alternative.alternatives for g, _ in alt):
                 group.dependent_tasks.append(self)
         self.vacant_slots = sim.Resource(capacity=config.max_capacity)
         self.started_up = False
-        self.requested_per_task_operators = False  # whether the PER_TASK crew is currently held
-        self.labor_minutes = 0.0        # operator-minutes booked on this task, all crews
-        self._task_crew_since = None    # claim start of the held PER_TASK crew
+        self.requested_per_task_operators = False
+        self.labor_minutes = 0.0
+        self._task_crew_since = None
         self.pending_carriers = CarrierTracker()
         self.active_carriers = CarrierTracker()
 
-        # KPI instrumentation: finished carriers stay readable, tallies fill on deposit
+
         self.all_carriers: list[Carrier] = []
         self.batch_sizes = sim.Monitor("batch_sizes")
         self.cycle_times = sim.Monitor("cycle_times")
         self.startup_times = sim.Monitor("startup_times")
-        self.pieces_in = 0  # pieces physically taken from the inlets (retries included)
+        self.pieces_in = 0
 
         self.skip_frozen_check = False
         self.skip_downtime_check = False
@@ -333,7 +327,7 @@ class Task(Component, HasShifts, ABC):
         elif nfs is None:
             return fs
         return nfs
-    
+
     def get_earliest_deadline(self) -> float:
         earliest_shutdown = self.get_earliest_shutdown()
         return earliest_shutdown.start if earliest_shutdown is not None else float('inf')
@@ -347,10 +341,8 @@ class Task(Component, HasShifts, ABC):
         self.started_up = True
 
     def request_task_operators(self) -> None:
-        # PER_TASK: one crew supervises every carrier. It is requested once and
-        # reused across carriers, and only re-requested after being released (when
-        # it goes off shift). Tracked by requested_per_task_operators so it is never
-        # claimed twice without a release in between (which used to hoard the pools).
+
+
         deadline = min(self.non_flexible_shutdowns.get_deadline(), self.flexible_shutdowns.get_deadline())
         self.task_operators = self.config.operators.request(demander=self, fail_at=deadline) or []
         self.set_mode("")
@@ -371,14 +363,6 @@ class Task(Component, HasShifts, ABC):
         self.requested_per_task_operators = False
 
     def hand_off_crew_at_shift_end(self) -> None:
-        """A group this task may hold as its PER_TASK crew has just gone off shift.
-        Release the crew when it is held, idle (no carrier mid-run) and shift-
-        constrained past this boundary, so an idle crew is not reserved — and
-        booked as off-shift labour — while the task sits parked between carriers
-        (waiting for one to load, or blocked at the top of its loop). A crew that
-        may work past the boundary (NotConstrainedByShift, or PartiallyConstrained
-        within tolerance) is kept: it starts/finishes the carrier and is released
-        afterwards instead. Called from the operator shift manager's on_leave."""
         if (self.config.operator_scope is not Scope.PER_TASK
                 or not self.requested_per_task_operators or not self.task_operators
                 or self.active_carriers):
@@ -388,8 +372,6 @@ class Task(Component, HasShifts, ABC):
             self.release_task_operators()
 
     def labor_minutes_total(self) -> float:
-        """Booked operator-minutes on this task (loading, processing and startup
-        crews), a still-held PER_TASK crew's open claim included."""
         total = self.labor_minutes
         if self._task_crew_since is not None:
             total += (sum(count for _, count in self.task_operators)
@@ -405,9 +387,7 @@ class Task(Component, HasShifts, ABC):
                 states.append(self.is_in_downtime)
             self.wait(*[(state, False) for state in states], all=True)
 
-            # PER_TASK crew hands off at operator-shift boundaries: once no carrier is
-            # mid-run, drop a crew that has gone off shift so the next round re-picks
-            # whichever group is on shift now (instead of holding it for the whole run).
+
             if (self.config.operator_scope is Scope.PER_TASK and self.requested_per_task_operators
                     and not self.active_carriers
                     and any(group.is_in_downtime() for group, _ in self.task_operators)):
@@ -426,15 +406,12 @@ class Task(Component, HasShifts, ABC):
             new_carrier = self.carrier_type(task=self)
             self.pending_carriers.add(new_carrier)
             self.all_carriers.append(new_carrier)
-            # A held PER_TASK crew that goes off shift while we wait for the carrier
-            # to load is released at the boundary by the operator shift manager's
-            # hand-off (see OperatorShiftManager.on_leave); here we just wait until
-            # the carrier actually loads.
+
+
             while not new_carrier.loaded():
                 self.wait(new_carrier.loaded)
 
-            # a crew handed off during the wait is re-acquired before dispatching
-            # (whichever group is on shift now); a failed request freezes as usual
+
             if (self.config.operator_scope is Scope.PER_TASK and self.started_up
                     and not self.is_frozen() and not self.requested_per_task_operators):
                 self.request_task_operators()

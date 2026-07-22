@@ -19,7 +19,6 @@ def app_settings() -> QtCore.QSettings:
 
 
 def cpp_engine_filename() -> str:
-    """The bundled flow_sim binary name for this platform (see engines/)."""
     system = platform.system()
     if system == "Windows":
         return "flow_sim-windows-x86_64.exe"
@@ -29,7 +28,6 @@ def cpp_engine_filename() -> str:
 
 
 def bundled_cpp_engine() -> str | None:
-    """Path to the bundled binary for this platform under engines/, if present."""
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     path = os.path.join(repo_root, "engines", cpp_engine_filename())
     return path if os.path.isfile(path) else None
@@ -44,11 +42,10 @@ DISTRIBUTION_SPECS = {
     "Normal": [("mean", float, 0.0), ("std", float, 1.0)],
     "Exponential": [("mean", float, 1.0)],
     "Triangular": [("low", float, 0.0), ("mode", float, 0.5), ("high", float, 1.0)],
-    "LogNormal": [("mean", float, 1.0), ("sigma", float, 1.0)],   # mean & std of the values (mean > 0)
+    "LogNormal": [("mean", float, 1.0), ("sigma", float, 1.0)],
 }
 
-# A distribution parameter (or productivity / router probability) is either constant or a
-# function of time. Each form's dynamic float fields:
+
 FUNCTION_SPECS = {
     "constant":    [("value", 0.0)],
     "linear":      [("x1", 0.0), ("y1", 0.0), ("x2", 1.0), ("y2", 1.0)],
@@ -56,22 +53,22 @@ FUNCTION_SPECS = {
     "step":        [("x1", 0.0), ("y1", 0.0), ("x2", 1.0), ("y2", 1.0), ("step_size", 1.0)],
 }
 
-# CollectorType (piece tasks): discriminating x greedy/altruistic.
+
 COLLECTOR_TYPES = [
     "NON_DISCRIMINATING_GREEDY",
     "DISCRIMINATING_GREEDY",
     "NON_DISCRIMINATING_ALTRUISTIC",
     "DISCRIMINATING_ALTRUISTIC",
 ]
-# ResourceCollectorType (resource tasks).
+
 RESOURCE_COLLECTOR_TYPES = ["GREEDY", "ALTRUISTIC"]
 
 SHUTDOWN_TYPES = ["NON_FLEXIBLE", "FLEXIBLE"]
 
-# BufferType (outlet.py): where a piece lands.
+
 BUFFER_TYPES = ["PASSAGE", "SCRAP", "EXIT"]
 
-# Simulation stopping criteria (judgement_day.py), canonical class names.
+
 STOPPING_CRITERION_TYPES = ["ByTime", "ByPiecesProduced"]
 
 PORT_COLORS = {
@@ -101,9 +98,6 @@ def as_int(value: Any, default: int = 0) -> int:
 
 
 def sentence_case(name: str) -> str:
-    """Display form of an identifier: words split on underscores and CamelCase
-    humps, all lowercase except a single leading capital. ByTime -> 'By time',
-    PER_BATCH -> 'Per batch', AbortPendingCarriers -> 'Abort pending carriers'."""
     text = str(name or "").replace("_", " ")
     text = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
     text = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", text)
@@ -115,8 +109,6 @@ def sentence_case(name: str) -> str:
 
 
 def to_canonical(value: str, canonical_items: list) -> str:
-    """Inverse of sentence_case over a known vocabulary: accept either the
-    canonical identifier or its display form; anything else passes through."""
     for canonical in canonical_items:
         if value == canonical or value == sentence_case(canonical):
             return canonical
@@ -124,8 +116,6 @@ def to_canonical(value: str, canonical_items: list) -> str:
 
 
 def fill_combo(combo, canonical_items: list, current: str | None = None) -> None:
-    """Populate a combo with sentence-case labels carrying the canonical values
-    as item data (read back with currentData()), selecting `current` if given."""
     for canonical in canonical_items:
         combo.addItem(sentence_case(canonical), canonical)
     if current is not None:
@@ -253,27 +243,24 @@ def port_signature(port) -> Tuple[str, str, str]:
 
 
 def is_valid_connection(out_kind: str, out_port: str, in_kind: str, in_port: str) -> bool:
-    """Strict connection rules -- the single place controlling what can feed what.
-    The only wires are piece flow (buffers/router/tasks), shutdowns and breakdowns;
-    everything else is configured inside the card menus."""
 
-    # Shutdowns feed tasks (piece or resource).
+
     if out_kind == "Shutdowns" and out_port == "shutdowns":
         return in_kind in {"Task", "ResourceTask"} and in_port == "shutdowns"
 
-    # Breakdowns attach directly to a task (piece or resource), like shutdowns.
+
     if out_kind == "Breakdown" and out_port == "breakdown":
         return in_kind in {"Task", "ResourceTask"} and in_port == "breakdowns"
 
-    # Buffer feeds task inputs.
+
     if out_kind == "Buffer" and out_port == "to_task":
         return in_kind == "Task" and in_port == "bufs_in"
 
-    # Tasks / piece generators / breakdowns feed buffers (breakdown outlets are lifeboats).
+
     if out_kind in {"Task", "PieceGenerator", "Breakdown"} and out_port == "bufs_out":
         return in_kind in {"Buffer", "Router"} and in_port == "from_task"
 
-    # Router (router) routes to hard or soft buffers with probabilities.
+
     if out_kind == "Router" and out_port == "to_buffers":
         return in_kind in {"Buffer", "Router"} and in_port == "from_task"
 
@@ -299,7 +286,6 @@ PY_DATE_FORMAT = "%d-%m-%Y"
 
 
 def parse_date_time(text):
-    """dd-mm-yyyy hh:mm -> datetime, or None if malformed."""
     try:
         return datetime.strptime(str(text).strip(), PY_DATE_TIME_FORMAT)
     except Exception:
@@ -307,7 +293,6 @@ def parse_date_time(text):
 
 
 def parse_date(text):
-    """dd-mm-yyyy -> datetime (midnight), or None if malformed."""
     try:
         return datetime.strptime(str(text).strip(), PY_DATE_FORMAT)
     except Exception:
@@ -315,7 +300,6 @@ def parse_date(text):
 
 
 def closing_day_label(entry: dict) -> str:
-    """Display text for a closing-day registry entry: the date, plus the optional label."""
     date = entry.get("date", "?")
     name = (entry.get("name") or "").strip()
     return f"{date} - {name}" if name else date
@@ -327,11 +311,10 @@ def _hhmm_to_min(text):
 
 
 def _min_to_hhmm(m):
-    return f"{m // 60:02d}:{m % 60:02d}"  # 1440 -> "24:00", the end-of-day convention
+    return f"{m // 60:02d}:{m % 60:02d}"
 
 
 def _merge_day_intervals(intervals):
-    """Merge overlapping or touching (start, end) minute intervals; sorted result."""
     out = []
     for s, e in sorted(intervals):
         if out and s <= out[-1][1]:
@@ -342,21 +325,14 @@ def _merge_day_intervals(intervals):
 
 
 def translate_shift_entry(entry, minutes, name=None):
-    """A deep copy of a shift definition with every interval shifted by `minutes`
-    (positive later, negative earlier). Weekly intervals move in a periodic week
-    (mod 7 days): an interval that ends up crossing a day boundary is split, and the
-    week end wraps back to its start — so e.g. a Mon-Fri 06:00-14:00 shift + 16 h
-    becomes the matching night coverage (22:00-24:00 that day, 00:00-06:00 the next),
-    exactly as such shifts are authored by hand. Custom intervals shift their
-    absolute datetimes. The horizon and the days off are left unchanged."""
     WEEK = 7 * 1440
     e = copy.deepcopy(entry)
     if name is not None:
         e["name"] = name
 
-    # Weekly: rebuild the seven weekday rows from the shifted, day-split pieces.
+
     days = e.get("days", [])
-    per_day = [[] for _ in range(7)]  # (start_min, end_min) pieces landing on each weekday
+    per_day = [[] for _ in range(7)]
     for i, d in enumerate(days[:7]):
         if not d.get("working"):
             continue
@@ -382,7 +358,7 @@ def translate_shift_entry(entry, minutes, name=None):
             for merged in (_merge_day_intervals(p) for p in per_day)
         ]
 
-    # Custom: shift each absolute interval by the same duration.
+
     delta = timedelta(minutes=minutes)
     if e.get("custom_intervals"):
         shifted = []
@@ -392,7 +368,7 @@ def translate_shift_entry(entry, minutes, name=None):
                 shifted.append({"start": (s + delta).strftime(PY_DATE_TIME_FORMAT),
                                 "end": (en + delta).strftime(PY_DATE_TIME_FORMAT)})
             else:
-                shifted.append(dict(iv))  # leave a malformed interval untouched
+                shifted.append(dict(iv))
         e["custom_intervals"] = shifted
 
     return e
@@ -406,14 +382,14 @@ POLICY_OPTIONS = {
     "operators_self_conscious": (["Conscious", "Unconscious"], "Conscious"),
 }
 
-# Piece tasks add two collection policies on top of the shared five.
+
 PIECE_POLICY_OPTIONS = {
     **POLICY_OPTIONS,
     "piece_exit_order": (["FirstInFirstOut", "FirstCreatedFirstOut"], "FirstInFirstOut"),
     "batch_model_choice": (["MostPresent", "FastestTaskDuration", "SmallestGapToMinCarrierCapacity"], "MostPresent"),
 }
 
-# Protocol types that carry a numeric parameter: type -> (json key, field label, default).
+
 POLICY_TYPE_PARAMS = {
     "AbortOrWaitForCarriers": ("tolerance_fraction", "tolerance fraction", 0.5),
     "PartiallyConstrainedByShift": ("tolerance", "tolerance (time)", 0.0),
@@ -438,8 +414,6 @@ def _model_parents(model_registry):
 
 
 def _taker_can_take(valid_models: set, model: str, parents: dict) -> bool:
-    """Mirror PickyPieceTaker.can_take: a taker accepts a model if the model or any
-    of its ancestors is in the taker's valid-model set."""
     seen = set()
     while model is not None and model not in seen:
         if model in valid_models:
@@ -450,17 +424,11 @@ def _taker_can_take(valid_models: set, model: str, parents: dict) -> bool:
 
 
 def _takers_disjoint(a: set, b: set, parents: dict) -> bool:
-    """Mirror PickyPieceTaker.disjoint (hierarchy-aware)."""
     return not (any(_taker_can_take(a, m, parents) for m in b)
                 or any(_taker_can_take(b, m, parents) for m in a))
 
 
 def ensure_ids(entries: list, prefix: str, old_by_name: dict | None = None, key: str = "name") -> list:
-    """Give every registry entry a unique id. An entry without one reuses its prior
-    id (matched by `key` against old_by_name) so ids survive edits, unless that id is
-    already taken by a sibling — then it mints a fresh one. The id, never the key, is
-    the identity, so two entries that happen to share a key still get distinct ids.
-    `key` is "name" for models/resources/operators/shifts, "date" for closing days."""
     old_by_name = old_by_name or {}
     used = {e["id"] for e in entries if e.get("id")}
     for e in entries:
@@ -473,9 +441,6 @@ def ensure_ids(entries: list, prefix: str, old_by_name: dict | None = None, key:
 
 
 def _shift_export_shape(s: dict) -> dict:
-    """Only the fields a shift's mode actually uses: weekly keeps days/horizon,
-    custom keeps custom_intervals; both keep days_off and the optional repeat.
-    mode is always present."""
     mode = s.get("mode", "weekly")
     out = {"id": s.get("id"), "name": s.get("name"), "mode": mode,
            "days_off": s.get("days_off", [])}
@@ -490,11 +455,6 @@ def _shift_export_shape(s: dict) -> dict:
 
 
 def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None, criterion=None) -> None:
-    """Translate every registry reference (model/resource/operator/shift/closing day)
-    in place, via resolve(kind, value) -> value. Node-to-node wires (node uids) are
-    untouched. Shifts reference closing days: internally by date, exported by id.
-    The generator node carries its shifts; the stopping criterion carries the
-    per-model goals/probs."""
     for m in models:
         if m.get("parent"):
             m["parent"] = resolve("model", m["parent"])
@@ -540,9 +500,6 @@ def _apply_ref_map(nodes, models, resources, operators, resolve, shifts=None, cr
 
 
 def _check_date_intervals(label, intervals, start_dt, problems):
-    """Shared checks for a list of absolute {start, end} date intervals (shutdowns,
-    custom shifts): dates parse, each ends after it starts, pairwise disjoint, and
-    none begins before the simulation start date."""
     parsed = []
     for iv in intervals:
         d0 = parse_date_time(iv.get("start"))
@@ -565,9 +522,6 @@ def _check_date_intervals(label, intervals, start_dt, problems):
 
 
 def _cap_dialog_height(dialog, max_frac=0.9):
-    """Keep a dialog reachable on small screens: if it is taller than the screen,
-    move its content into a scroll area (with any trailing OK/Cancel box kept fixed
-    below) and cap the height, so the buttons never fall off the bottom. Runs once."""
     if getattr(dialog, "_height_capped", False):
         return
     screen = QtWidgets.QApplication.primaryScreen()
@@ -578,14 +532,14 @@ def _cap_dialog_height(dialog, max_frac=0.9):
     if dialog.sizeHint().height() <= max_h:
         return
     dialog._height_capped = True
-    bb = None  # detach a trailing button box so it stays visible below the scroll area
+    bb = None
     if lay.count():
         last = lay.itemAt(lay.count() - 1).widget()
         if isinstance(last, QtWidgets.QDialogButtonBox):
             bb = last
             lay.removeWidget(bb)
     content = QtWidgets.QWidget()
-    content.setLayout(lay)  # reparents the whole layout into content; dialog loses its layout
+    content.setLayout(lay)
     scroll = QtWidgets.QScrollArea()
     scroll.setWidgetResizable(True)
     scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
@@ -601,8 +555,6 @@ def _cap_dialog_height(dialog, max_frac=0.9):
 
 
 class _DialogHeightCapper(QtCore.QObject):
-    """Application-wide: caps every custom config dialog to the screen height the
-    first time it is shown (native message/file dialogs are left alone)."""
     _NATIVE = (QtWidgets.QMessageBox, QtWidgets.QFileDialog, QtWidgets.QInputDialog,
                QtWidgets.QColorDialog, QtWidgets.QFontDialog, QtWidgets.QProgressDialog)
 

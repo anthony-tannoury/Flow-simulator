@@ -1,26 +1,3 @@
-//  salabim.hpp — a C++20 port of salabim, the Python discrete event simulation library
-//  =====================================================================================
-//
-//  This single-header library mimics salabim (https://www.salabim.org, version 26.0.8)
-//  as closely as C++ allows:
-//
-//    * same process-interaction world view: Components with a process() describing
-//      their behaviour over simulated time (C++20 coroutines instead of Python
-//      generators: `co_await hold(10)` instead of `yield self.hold(10)`)
-//    * same event-chain mechanics: (time, priority, sequence) ordered event list,
-//      urgent scheduling, standby components
-//    * same building blocks: Environment, Component, Queue, Resource (incl. anonymous),
-//      State, Store, Monitor (level and non-level), ComponentGenerator
-//    * same statistics, same print_statistics()/print_histogram() output format
-//    * same tracing format
-//    * same random distributions (seeded, reproducible streams via sim::Random)
-//
-//  Animation and the Python-specific facilities (string-eval wait conditions,
-//  monitor slicing/merging, video export, ...) are intentionally not ported.
-//
-//  License: MIT. Not affiliated with the salabim project; salabim itself is
-//  (c) Ruud van der Ham and contributors, MIT licensed.
-//
 #ifndef SALABIM_HPP
 #define SALABIM_HPP
 
@@ -68,9 +45,7 @@ inline constexpr double nan_ = std::numeric_limits<double>::quiet_NaN();
 
 inline const char* version() { return "salabim++ 1.0.0 (API of salabim 26.0.8)"; }
 
-// ---------------------------------------------------------------------------
-// component statuses (mirroring salabim's module-level string constants)
-// ---------------------------------------------------------------------------
+
 enum Status : int {
     data = 0,
     current = 1,
@@ -88,9 +63,7 @@ inline const char* status_to_str(Status s) {
     return names[static_cast<int>(s)];
 }
 
-// ---------------------------------------------------------------------------
-// forward declarations
-// ---------------------------------------------------------------------------
+
 class Environment;
 class Component;
 class Queue;
@@ -116,9 +89,7 @@ class SimulationStopped : public SalabimError {
     SimulationStopped() : SalabimError("simulation stopped") {}
 };
 
-// ---------------------------------------------------------------------------
-// small string / formatting helpers (mirroring salabim's pad/rpad/fn)
-// ---------------------------------------------------------------------------
+
 namespace detail {
 
 inline std::string pad(std::string_view txt, long n) {
@@ -149,7 +120,7 @@ inline std::string sprintf_str(const char* fmt, Args... args) {
     return buf;
 }
 
-// salabim's fn(x, length, d): fixed-width number formatting used in all statistics output
+
 inline std::string fn(double x, int length, int d) {
     if (std::isnan(x)) return std::string(static_cast<size_t>(length), ' ');
     if (x >= std::pow(10.0, length - d - 1)) {
@@ -164,7 +135,7 @@ inline std::string fn(double x, int length, int d) {
     return sprintf_str(f.c_str(), x);
 }
 
-// merges all non-blank elements, separated by one blank (salabim's merge_blanks)
+
 template <class... S>
 inline std::string merge_blanks(S&&... parts) {
     std::string out;
@@ -182,10 +153,7 @@ inline std::string lowercase(std::string s) {
     return s;
 }
 
-// Thrown by Component::cancel when a component cancels ITSELF: Python's cancel
-// switches to the scheduler greenlet and never returns, so all code between the
-// cancel call and the end of the process is skipped. Unwinds through the
-// coroutine chain; the scheduler destroys the frame silently (no 'ended' trace).
+
 struct AbandonedByCancel {};
 
 inline std::string demangle(const char* name) {
@@ -195,7 +163,7 @@ inline std::string demangle(const char* name) {
     if (status == 0 && dem) {
         std::string out(dem);
         std::free(dem);
-        // strip namespaces / template arguments for the short class name
+
         if (auto pos = out.find('<'); pos != std::string::npos) out = out.substr(0, pos);
         if (auto pos = out.rfind("::"); pos != std::string::npos) out = out.substr(pos + 2);
         return out;
@@ -206,19 +174,19 @@ inline std::string demangle(const char* name) {
     return out;
 }
 
-// python-style repr / str for trace messages
+
 inline std::string py_repr(bool v) { return v ? "True" : "False"; }
 inline std::string py_repr(const std::string& v) { return "'" + v + "'"; }
 inline std::string py_repr(const char* v) { return std::string("'") + v + "'"; }
-// python repr() of a float: shortest round-trip digits, fixed notation
-// for exponents in [-4, 16), otherwise scientific
+
+
 inline std::string py_repr(double v) {
     if (std::isnan(v)) return "nan";
     if (std::isinf(v)) return v > 0 ? "inf" : "-inf";
     if (v == 0.0) return std::signbit(v) ? "-0.0" : "0.0";
     char buf[64];
     auto res = std::to_chars(buf, buf + sizeof buf, v, std::chars_format::scientific);
-    std::string s(buf, res.ptr); // shortest, e.g. "1.3832e+01"
+    std::string s(buf, res.ptr);
     bool neg = false;
     if (s[0] == '-') {
         neg = true;
@@ -254,13 +222,9 @@ template <class T>
     requires std::is_integral_v<T> && (!std::is_same_v<T, bool>)
 inline std::string py_str(T v) { return std::to_string(v); }
 
-} // namespace detail
+}
 
-// ---------------------------------------------------------------------------
-// Random — a seeded random stream (std::mt19937_64) plus the sampling
-// helpers the distributions below build on. Runs with the same seed are
-// reproducible.
-// ---------------------------------------------------------------------------
+
 class Random {
   public:
     explicit Random(std::uint64_t seed_value = 5489u) { seed(seed_value); }
@@ -270,28 +234,28 @@ class Random {
         gauss_next_.reset();
     }
 
-    // random() -> float in [0, 1), 53-bit resolution
+
     double random() {
         return static_cast<double>(eng_() >> 11) * (1.0 / 9007199254740992.0);
     }
 
-    // getrandbits(k) for 1 <= k <= 64
+
     std::uint64_t getrandbits(int k) {
         if (k <= 0) throw SalabimError("getrandbits: k must be > 0");
         if (k > 64) throw SalabimError("getrandbits: k must be <= 64");
         return eng_() >> (64 - k);
     }
 
-    // uniform integer in [0, n): rejection sampling on bit_length-sized draws
+
     std::uint64_t randbelow(std::uint64_t n) {
         if (n == 0) return 0;
-        int k = 64 - std::countl_zero(n); // bit_length
+        int k = 64 - std::countl_zero(n);
         std::uint64_t r = getrandbits(k);
         while (r >= n) r = getrandbits(k);
         return r;
     }
 
-    long long randint(long long a, long long b) { // randrange(a, b+1)
+    long long randint(long long a, long long b) {
         if (b < a) throw SalabimError("randint: empty range");
         return a + static_cast<long long>(randbelow(static_cast<std::uint64_t>(b - a + 1)));
     }
@@ -396,7 +360,7 @@ class Random {
         return alpha * std::pow(-std::log(u), 1.0 / beta);
     }
 
-    // pick a uniform index in [0, n)
+
     std::size_t sample_index(std::size_t n) { return static_cast<std::size_t>(randbelow(n)); }
 
     template <class T>
@@ -414,12 +378,10 @@ class Random {
     std::optional<double> gauss_next_;
 };
 
-// ---------------------------------------------------------------------------
-// global state (mirroring salabim's class g)
-// ---------------------------------------------------------------------------
+
 struct g {
     inline static Environment* default_env = nullptr;
-    inline static Random random{};   // the shared default stream
+    inline static Random random{};
     inline static bool default_cap_now = false;
 };
 
@@ -432,9 +394,7 @@ inline bool default_cap_now(std::optional<bool> value = std::nullopt) {
     return g::default_cap_now;
 }
 
-// ---------------------------------------------------------------------------
-// time unit support (mirrors salabim's _time_unit_lookup / _time_unit_factor)
-// ---------------------------------------------------------------------------
+
 namespace detail {
 
 inline double time_unit_lookup(std::string_view d) {
@@ -450,13 +410,11 @@ inline double time_unit_lookup(std::string_view d) {
     throw SalabimError("time unit '" + std::string(d) + "' not supported");
 }
 
-double time_unit_factor(std::string_view time_unit, const Environment* env); // defined after Environment
+double time_unit_factor(std::string_view time_unit, const Environment* env);
 
-} // namespace detail
+}
 
-// ---------------------------------------------------------------------------
-// distributions — every sample() draws from the shared (or given) Random stream.
-// ---------------------------------------------------------------------------
+
 class Distribution_ {
   public:
     virtual ~Distribution_() = default;
@@ -464,7 +422,7 @@ class Distribution_ {
     virtual double mean() const = 0;
     double operator()() { return sample(); }
 
-    // rejection-sample within bounds; salabim's bounded_sample
+
     double bounded_sample(std::optional<double> lowerbound = std::nullopt,
                           std::optional<double> upperbound = std::nullopt,
                           std::optional<double> fail_value = std::nullopt,
@@ -489,10 +447,10 @@ class Distribution_ {
     const Environment* tu_env_ = nullptr;
 
     void set_stream(Random* rs) { stream_ = rs ? rs : &g::random; }
-    double tuf() const; // time unit factor, lazily resolved (defined after Environment)
+    double tuf() const;
 };
 
-using Dist = Distribution_; // short alias
+using Dist = Distribution_;
 
 class Constant : public Distribution_ {
   public:
@@ -540,7 +498,7 @@ class IntUniform : public Distribution_ {
     long long lb_, ub_;
 };
 
-struct ExpRate { double rate; };  // tag to construct Exponential from a rate
+struct ExpRate { double rate; };
 
 class Exponential : public Distribution_ {
   public:
@@ -723,8 +681,7 @@ class Beta : public Distribution_ {
     double alpha_, beta_;
 };
 
-// Pdf: discrete distribution given by value/probability pairs.
-// Pdf({x1, p1, x2, p2, ...}) or Pdf(values, probabilities)
+
 class Pdf : public Distribution_ {
   public:
     Pdf(std::initializer_list<double> pairs, Random* randomstream = nullptr) {
@@ -741,14 +698,14 @@ class Pdf : public Distribution_ {
         init(xs, ps);
         set_stream(randomstream);
     }
-    // equal probabilities for all values
+
     explicit Pdf(std::vector<double> xs, Random* randomstream = nullptr) {
         init(xs, std::vector<double>(xs.size(), 1.0));
         set_stream(randomstream);
     }
     double sample() override {
         if (supports_n_) {
-            // salabim uses random.sample(x, 1)[0] here: exactly one randbelow(n) draw
+
             return x_[stream_->sample_index(x_.size())];
         }
         double r = stream_->random();
@@ -783,9 +740,9 @@ class Pdf : public Distribution_ {
     }
 };
 
-using Pmf = Pdf; // salabim 23+ alias
+using Pmf = Pdf;
 
-// Cdf: cumulative (piecewise linear) distribution: Cdf({x1, c1, x2, c2, ...})
+
 class Cdf : public Distribution_ {
   public:
     Cdf(std::initializer_list<double> pairs, Random* randomstream = nullptr) {
@@ -830,7 +787,7 @@ class Cdf : public Distribution_ {
     double mean_ = 0;
 };
 
-// duration/time specifications may be a number, a distribution (sampled) or a callable
+
 class DurationSpec {
   public:
     DurationSpec() : kind_(Kind::none) {}
@@ -840,7 +797,7 @@ class DurationSpec {
     DurationSpec(long long v) : kind_(Kind::value), value_(static_cast<double>(v)) {}
     DurationSpec(unsigned v) : kind_(Kind::value), value_(v) {}
     DurationSpec(Distribution_& d) : kind_(Kind::dist), dist_(&d) {}
-    // rvalue distributions are copied and owned, so `.iat = sim::Exponential(10)` is safe
+
     template <class D>
         requires std::is_base_of_v<Distribution_, std::remove_cvref_t<D>> &&
                  (!std::is_lvalue_reference_v<D>)
@@ -871,12 +828,7 @@ class DurationSpec {
     std::function<double()> func_{};
 };
 
-// ---------------------------------------------------------------------------
-// Monitor — collects statistics, either
-//   * non-level (tally):    values (with optional weights), e.g. length of stay
-//   * level (time-weighted): a value that persists over time, e.g. queue length
-// Matches salabim's Monitor number-crunching and print formats exactly.
-// ---------------------------------------------------------------------------
+
 struct MonitorOpts {
     bool level = false;
     double initial_tally = 0.0;
@@ -910,9 +862,9 @@ class Monitor {
     bool is_level() const { return level_; }
     Environment* env() const { return env_; }
 
-    // record a value; for level monitors this is "the value from now on"
+
     void tally(double value, double weight = 1.0);
-    double get() const { return tally_; }        // current value (level monitors)
+    double get() const { return tally_; }
     double operator()() const { return tally_; }
     double t() const { return ttally_; }
 
@@ -921,7 +873,7 @@ class Monitor {
     void reset(std::optional<bool> monitor_on = std::nullopt);
     double start_time() const { return start_; }
 
-    // statistics (ex0: exclude zero values)
+
     double mean(bool ex0 = false) const;
     double std(bool ex0 = false) const;
     double minimum(bool ex0 = false) const;
@@ -930,40 +882,40 @@ class Monitor {
     double percentile(double q, bool ex0 = false) const;
     long long number_of_entries(bool ex0 = false) const;
     long long number_of_entries_zero() const;
-    double weight(bool ex0 = false) const;       // total weight (non-level)
-    double duration(bool ex0 = false) const;     // total duration (level)
+    double weight(bool ex0 = false) const;
+    double duration(bool ex0 = false) const;
     double weight_zero() const;
     double duration_zero() const;
 
-    // per-value / per-bin queries
+
     double value_number_of_entries(double v) const;
     double value_weight(double v) const;
     double value_duration(double v) const { return value_weight(v); }
     long long bin_number_of_entries(double lowerbound, double upperbound, bool ex0 = false) const;
     double bin_weight(double lowerbound, double upperbound) const;
     double bin_duration(double lowerbound, double upperbound) const { return bin_weight(lowerbound, upperbound); }
-    std::vector<double> values(bool ex0 = false) const; // sorted unique values
+    std::vector<double> values(bool ex0 = false) const;
 
-    // x / t access (mirrors salabim's xt() / tx() spirit)
+
     const std::vector<double>& x_raw() const { return x_; }
     const std::vector<double>& t_raw() const { return t_; }
     std::pair<std::vector<double>, std::vector<double>> xweight(bool ex0 = false) const;
     std::vector<double> xduration_weights(bool ex0 = false) const { return xweight(ex0).second; }
 
-    // output
+
     std::string print_statistics(bool show_header = true, bool show_legend = true,
                                  bool do_indent = false, bool as_str = false) const;
     std::string print_histogram(HistogramOpts opts = {}) const;
     std::tuple<double, double, int> histogram_autoscale(bool ex0 = false) const;
 
-    // labels: used by status/mode/string-state monitors to display coded values
+
     void set_label_provider(std::function<std::string(double)> f) { label_of_ = std::move(f); }
     std::string label_for(double v) const {
         return label_of_ ? label_of_(v) : detail::py_str(v);
     }
     const std::string& weight_legend() const { return weight_legend_; }
 
-    // internal (used by the library itself)
+
     void tally_internal_(double value, double weight = 1.0) { tally(value, weight); }
     double tally_raw_() const { return tally_; }
     void set_tally_raw_(double v) { tally_ = v; }
@@ -978,47 +930,40 @@ class Monitor {
     Environment* env_ = nullptr;
     bool level_ = false;
     bool monitor_ = true;
-    double tally_ = 0.0;      // current value (level)
-    double ttally_ = 0.0;     // time of last tally
-    double start_ = 0.0;      // reset time
-    std::vector<double> x_;   // recorded values
-    std::vector<double> t_;   // recording times
-    std::vector<double> weight_; // non-level: lazily created weights (all-1 until a weight != 1 arrives)
+    double tally_ = 0.0;
+    double ttally_ = 0.0;
+    double start_ = 0.0;
+    std::vector<double> x_;
+    std::vector<double> t_;
+    std::vector<double> weight_;
     bool has_weights_ = false;
     std::string weight_legend_;
     std::function<std::string(double)> label_of_{};
 
-    static constexpr double off_ = -inf;  // marker for "monitoring disabled" periods
-    double now_() const;                  // environment time (defined after Environment)
+    static constexpr double off_ = -inf;
+    double now_() const;
 };
 
-// ---------------------------------------------------------------------------
-// Process — the coroutine type returned by Component::process().
-// `co_await hold(...)` in C++ corresponds to `yield self.hold(...)` in salabim.
-// ---------------------------------------------------------------------------
+
 class Process {
   public:
     struct promise_type;
     using Handle = std::coroutine_handle<promise_type>;
 
-    // Sub-process support (salabim's yieldless world in coroutine form): a process
-    // may `co_await call(helper())` where helper() is itself a Process coroutine.
-    // The helper runs immediately (like a plain call); whenever it suspends on a
-    // process interaction the whole logical stack suspends; the scheduler resumes
-    // the innermost frame; on completion control returns to the awaiting frame.
+
     struct FinalAwaiter {
         bool await_ready() const noexcept { return false; }
-        std::coroutine_handle<> await_suspend(Handle h) noexcept; // defined after Component
+        std::coroutine_handle<> await_suspend(Handle h) noexcept;
         void await_resume() const noexcept {}
     };
 
     struct promise_type {
         Component* component = nullptr;
-        Handle continuation{};       // parent frame when running as a sub-process
+        Handle continuation{};
         std::exception_ptr exception{};
         ~promise_type() {
-            // an abandoned sub-frame (cancel/terminate mid-call) drags its
-            // suspended parents down with it, so nothing leaks
+
+
             if (continuation) continuation.destroy();
         }
         Process get_return_object() {
@@ -1035,28 +980,22 @@ class Process {
     Handle handle{};
 };
 
-// awaitable returned by all process interaction methods: hands control back to
-// the scheduler (the scheduling itself already happened inside the method call,
-// exactly like salabim's generator mode)
+
 struct Yield {
     constexpr bool await_ready() const noexcept { return false; }
     constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
     constexpr void await_resume() const noexcept {}
 };
 
-// awaitable returned by from_store(): resumes with the retrieved item
+
 struct YieldItem {
     Component* self_;
     constexpr bool await_ready() const noexcept { return false; }
     constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
-    Component* await_resume() const noexcept; // returns the item (defined later)
+    Component* await_resume() const noexcept;
 };
 
-// ---------------------------------------------------------------------------
-// option structs for the process interaction methods (salabim keyword args).
-// The source_location members default to the call site, giving salabim-style
-// line numbers in the trace.
-// ---------------------------------------------------------------------------
+
 struct HoldOpts {
     DurationSpec till{};
     double priority = 0;
@@ -1078,7 +1017,7 @@ struct ActivateOpts {
     std::source_location loc = std::source_location::current();
 };
 
-struct ModeOpts { // passivate / cancel / standby / interrupt
+struct ModeOpts {
     std::optional<std::string> mode{};
     std::source_location loc = std::source_location::current();
 };
@@ -1096,8 +1035,8 @@ struct RequestOpts {
     DurationSpec fail_delay{};
     std::optional<std::string> mode{};
     bool urgent = false;
-    double request_priority = 0; // priority in the requesters queue
-    double priority = 0;         // schedule priority of the fail event
+    double request_priority = 0;
+    double priority = 0;
     bool oneof = false;
     std::optional<bool> cap_now{};
     std::source_location loc = std::source_location::current();
@@ -1115,19 +1054,19 @@ struct WaitOpts {
     std::source_location loc = std::source_location::current();
 };
 
-struct StoreOpts { // from_store / to_store
+struct StoreOpts {
     DurationSpec fail_at{};
     DurationSpec fail_delay{};
     std::optional<std::string> mode{};
-    bool urgent = true; // salabim: from_store/to_store default urgent=True
+    bool urgent = true;
     double request_priority = 0;
-    double priority = 0;    // to_store: priority of item in store; also fail event priority
+    double priority = 0;
     std::optional<bool> cap_now{};
-    std::function<bool(Component*)> filter{}; // from_store only
+    std::function<bool(Component*)> filter{};
     std::source_location loc = std::source_location::current();
 };
 
-// request specifier: a resource, optionally with quantity and requesters-queue priority
+
 struct ReqSpec {
     Resource* r;
     double q = 1;
@@ -1137,7 +1076,7 @@ struct ReqSpec {
     ReqSpec(Resource& res, double quantity, double prio) : r(&res), q(quantity), priority(prio) {}
 };
 
-// wait specifier: a state with a value to compare or a predicate to satisfy
+
 class WaitSpec {
   public:
     StateBase* state;
@@ -1145,18 +1084,16 @@ class WaitSpec {
     std::optional<double> priority{};
 
     template <class T>
-    WaitSpec(State<T>& s); // "truthy" test (salabim: wait for value True)
+    WaitSpec(State<T>& s);
 
     template <class T, class V>
-    WaitSpec(State<T>& s, V&& v); // equality (or predicate if callable)
+    WaitSpec(State<T>& s, V&& v);
 
     template <class T, class V>
     WaitSpec(State<T>& s, V&& v, double prio);
 };
 
-// ---------------------------------------------------------------------------
-// Queue — priority-ordered doubly linked list with full statistics
-// ---------------------------------------------------------------------------
+
 class Qmember {
   public:
     Qmember* predecessor = nullptr;
@@ -1193,11 +1130,11 @@ class Queue {
 
     Component* head() const { return head_.successor->component; }
     Component* tail() const { return tail_.predecessor->component; }
-    Component* pop();                    // remove and return head (nullptr if empty)
-    Component* operator[](long long index) const; // python-style: negative = from tail
-    long long index(const Component* c) const;    // -1 if not in queue
+    Component* pop();
+    Component* operator[](long long index) const;
+    long long index(const Component* c) const;
 
-    // add components (equivalent to Component::enter*)
+
     Queue& add(Component& c);
     Queue& append(Component& c) { return add(c); }
     Queue& add_sorted(Component& c, double priority);
@@ -1212,7 +1149,7 @@ class Queue {
 
     void set_capacity(double cap);
 
-    // iteration over components (safe against removing the current element)
+
     class iterator {
       public:
         iterator(const Qmember* m, const Qmember* tail) : tail_(tail) { set(m); }
@@ -1231,13 +1168,13 @@ class Queue {
     };
     iterator begin() const { return iterator(head_.successor, &tail_); }
     iterator end() const { return iterator(&tail_, &tail_); }
-    std::vector<Component*> components() const; // snapshot
+    std::vector<Component*> components() const;
 
-    // statistics
-    Monitor length;              // level
-    Monitor length_of_stay;      // non-level
-    Monitor capacity;            // level
-    Monitor available_quantity;  // level
+
+    Monitor length;
+    Monitor length_of_stay;
+    Monitor capacity;
+    Monitor available_quantity;
     long long number_of_arrivals = 0;
     long long number_of_departures = 0;
     double arrival_rate(bool reset = false);
@@ -1256,7 +1193,7 @@ class Queue {
 
     Queue(std::string name, Opts opts, int registry, const char* fallback);
 
-    // insert c in a new Qmember in front of member m2 (salabim Qmember.insert_in_front_of)
+
     Qmember* insert_in_front_of_(Qmember* m2, Component* c, double priority);
     void register_leave_(Qmember* mx);
 
@@ -1271,25 +1208,15 @@ class Queue {
     long long rate_arrivals_base_ = 0, rate_departures_base_ = 0;
 };
 
-// ---------------------------------------------------------------------------
-// Component — the active object of the simulation.
-// Subclass it and give it a process():
-//
-//     struct Car : sim::Component {
-//         sim::Process process() override {
-//             while (true) co_await hold(1.0);
-//         }
-//     };
-//     sim::make<Car>();
-// ---------------------------------------------------------------------------
+
 struct ComponentOptions {
     std::string name{};
     DurationSpec at{};
     DurationSpec delay{};
     std::optional<double> priority{};
     std::optional<bool> urgent{};
-    bool data_component = false; // like salabim's process="": never activate process()
-    std::string process_name{}; // shown in the activate trace (default "process")
+    bool data_component = false;
+    std::string process_name{};
     std::string mode{};
     bool suppress_trace = false;
     bool skip_standby = false;
@@ -1309,7 +1236,7 @@ struct PendingComponent {
     bool skip_standby = false;
 };
 inline thread_local PendingComponent pending_component{};
-} // namespace detail
+}
 
 class Component {
   public:
@@ -1318,18 +1245,18 @@ class Component {
     Component(const Component&) = delete;
     Component& operator=(const Component&) = delete;
 
-    // ---- to be overridden --------------------------------------------------
-    virtual Process process() { return Process{}; } // no process -> data component
-    virtual void setup() {}                          // called right after creation
 
-    // ---- identity -----------------------------------------------------------
+    virtual Process process() { return Process{}; }
+    virtual void setup() {}
+
+
     const std::string& name() const { return name_; }
     const std::string& base_name() const { return base_name_; }
     long long sequence_number() const { return sequence_number_; }
 
     Environment* env = nullptr;
 
-    // ---- status -------------------------------------------------------------
+
     Status status() const { return status_; }
     Monitor& status_monitor() { return *status_mon_; }
     bool isdata() const { return status_ == Status::data; }
@@ -1346,10 +1273,7 @@ class Component {
     void set_mode(const std::optional<std::string>& m);
     double mode_time() const { return mode_time_; }
 
-    // Mode-over-time record (salabim's Component.mode is a MonitorTimestamp).
-    // Each set_mode with a value appends {now, mode}; the KPI layer reconstructs
-    // the intervals like Python's mode.xt() (each entry runs until the next, the
-    // last to env.now()) to get value_duration / union-of-modes.
+
     const std::vector<std::pair<double, std::string>>& mode_log() const { return mode_log_; }
 
     double creation_time() const { return creation_time_; }
@@ -1369,11 +1293,7 @@ class Component {
         return skip_standby_;
     }
 
-    // ---- sub-processes -------------------------------------------------------
-    // co_await call(some_helper()) runs a Process coroutine as a nested part of
-    // this component's process (salabim's yieldless helper-method pattern). The
-    // helper may hold/request/wait/... on this component; results travel through
-    // out-parameters or member state.
+
     struct CallAwaiter {
         Component* self;
         Process sub;
@@ -1382,22 +1302,22 @@ class Component {
             auto ph = Process::Handle::from_address(parent.address());
             sub.handle.promise().continuation = ph;
             sub.handle.promise().component = self;
-            self->process_ = sub.handle; // the scheduler resumes the innermost frame
-            return sub.handle;           // run the helper right now, like a plain call
+            self->process_ = sub.handle;
+            return sub.handle;
         }
         void await_resume() {
             if (!sub.handle) return;
             std::exception_ptr ex = sub.handle.promise().exception;
-            sub.handle.promise().continuation = {}; // break the cascade link before destroy
+            sub.handle.promise().continuation = {};
             sub.handle.destroy();
             if (ex) std::rethrow_exception(ex);
         }
     };
     CallAwaiter call(Process sub) { return CallAwaiter{this, sub}; }
 
-    // ---- process interaction (use with co_await on the current component) ---
+
     Yield hold(DurationSpec duration, HoldOpts opts = {});
-    Yield hold(HoldOpts opts); // till-form or "hold()": scheduled now
+    Yield hold(HoldOpts opts);
     Yield passivate(ModeOpts opts = {});
     Yield activate(ActivateOpts opts = {});
     Yield cancel(ModeOpts opts = {});
@@ -1405,18 +1325,18 @@ class Component {
 
     Yield request(std::initializer_list<ReqSpec> specs, RequestOpts opts = {});
     Yield request(std::vector<ReqSpec> specs, RequestOpts opts = {}) {
-        return request_impl_(std::move(specs), opts);  // dynamic spec lists
+        return request_impl_(std::move(specs), opts);
     }
     Yield request(Resource& r, RequestOpts opts = {});
     Yield request(Resource& r, double q, RequestOpts opts = {});
-    void release(); // release all claims
+    void release();
     void release(std::initializer_list<ReqSpec> specs);
     void release(Resource& r);
     void release(Resource& r, double q);
 
     Yield wait(std::initializer_list<WaitSpec> specs, WaitOpts opts = {});
     Yield wait(std::vector<WaitSpec> specs, WaitOpts opts = {}) {
-        return wait_impl_(std::move(specs), opts);  // dynamic spec lists
+        return wait_impl_(std::move(specs), opts);
     }
     template <class T>
     Yield wait(State<T>& s, WaitOpts opts = {}) { return wait({WaitSpec(s)}, std::move(opts)); }
@@ -1427,7 +1347,7 @@ class Component {
     YieldItem from_store(Store& store, StoreOpts opts = {});
     YieldItem from_store(std::initializer_list<Store*> stores, StoreOpts opts = {});
     YieldItem from_store(std::vector<Store*> stores, StoreOpts opts = {}) {
-        return from_store_impl_(std::move(stores), opts);  // dynamic store lists
+        return from_store_impl_(std::move(stores), opts);
     }
     Yield to_store(Store& store, Component& item, StoreOpts opts = {});
     Yield to_store(std::initializer_list<Store*> stores, Component& item, StoreOpts opts = {});
@@ -1435,24 +1355,24 @@ class Component {
     Store* from_store_store() const { return from_store_store_; }
     Store* to_store_store() const { return to_store_store_; }
 
-    // ---- queue operations ----------------------------------------------------
+
     Component& enter(Queue& q);
     Component& enter_sorted(Queue& q, double priority);
     Component& enter_at_head(Queue& q);
     Component& enter_in_front_of(Queue& q, Component& poscomponent);
     Component& enter_behind(Queue& q, Component& poscomponent);
-    Component& leave();          // leave all (non-internal) queues
-    virtual Component& leave(Queue& q);  // virtual so Piece can stamp its journal on buffer exit
-    long long count(const Queue* q = nullptr) const; // membership count
+    Component& leave();
+    virtual Component& leave(Queue& q);
+    long long count(const Queue* q = nullptr) const;
     long long index(const Queue& q) const;
     double enter_time(const Queue& q) const;
     double priority(const Queue& q) const;
-    void set_priority(Queue& q, double priority); // may reposition component
+    void set_priority(Queue& q, double priority);
     std::vector<Queue*> queues() const;
     Component* successor(const Queue& q) const;
     Component* predecessor(const Queue& q) const;
 
-    // ---- resource queries ------------------------------------------------------
+
     double claimed_quantity(const Resource* r = nullptr) const;
     double requested_quantity(const Resource* r = nullptr) const;
     std::vector<Resource*> claimed_resources() const;
@@ -1471,20 +1391,20 @@ class Component {
     template <class T> friend class State;
 
   public:
-    // internal machinery (names follow the salabim source; not part of the public API)
+
     void finish_make_(const ComponentOptions& opts);
     std::string modetxt_() const;
 
   protected:
-    // internal machinery (names follow the salabim source)
+
     void push_(double t, double priority, bool urgent);
     void remove_();
     void check_fail_();
     void reschedule_(double scheduled_time, double priority, bool urgent, const std::string& caller,
                      std::optional<bool> cap_now, const std::string& extra = "",
                      std::optional<std::string> s0 = std::nullopt);
-    bool tryrequest_();  // Component._tryrequest
-    bool trywait_();     // Component._trywait
+    bool tryrequest_();
+    bool trywait_();
     void release_(Resource* r, std::optional<double> q = std::nullopt,
                   std::optional<std::string> s0 = std::nullopt, Component* bumped_by = nullptr);
     std::vector<Resource*> honor_all_();
@@ -1512,12 +1432,11 @@ class Component {
     Process::Handle process_{};
     bool process_abandoned_ = false;
 
-    std::vector<std::pair<Queue*, Qmember*>> qmembers_; // insertion ordered
-    std::vector<std::pair<Resource*, double>> requests_; // insertion ordered
-    std::vector<std::pair<Resource*, double>> claims_;   // insertion ordered
-    // anonymous-resource re-scan deferred until this component resumes: Python's
-    // _push switches greenlets when self is current, so the re-scan at the end
-    // of Component._tryrequest runs at resumption, not at request-call time
+    std::vector<std::pair<Queue*, Qmember*>> qmembers_;
+    std::vector<std::pair<Resource*, double>> requests_;
+    std::vector<std::pair<Resource*, double>> claims_;
+
+
     std::vector<Resource*> deferred_anon_rescan_;
     std::vector<WaitSpec> waits_;
     bool wait_all_ = false;
@@ -1543,18 +1462,16 @@ class Component {
     double creation_time_ = 0;
     std::string mode_;
     double mode_time_ = 0;
-    std::vector<std::pair<double, std::string>> mode_log_;  // (time, mode) timeline
+    std::vector<std::pair<double, std::string>> mode_log_;
     bool suppress_trace_ = false;
     bool skip_standby_ = false;
-    std::uint_least32_t last_line_ = 0;   // last co_await site, for trace line numbers
+    std::uint_least32_t last_line_ = 0;
     const char* last_file_ = nullptr;
     std::uint_least32_t creation_line_ = 0;
     const char* creation_file_ = nullptr;
 };
 
-// ---------------------------------------------------------------------------
-// StateBase / State<T> — components can wait() for state values / conditions
-// ---------------------------------------------------------------------------
+
 struct StateOpts {
     bool monitor = true;
     Environment* env = nullptr;
@@ -1583,7 +1500,7 @@ class StateBase {
 
     StateBase() = default;
     void init_base_(std::string name, Environment* env);
-    void trywait_(double max_honor = inf); // State._trywait: check all waiters
+    void trywait_(double max_honor = inf);
     virtual std::string value_str_() const = 0;
 
     std::string name_, base_name_;
@@ -1593,9 +1510,7 @@ class StateBase {
     std::unique_ptr<Monitor> value_mon_;
 };
 
-// ---------------------------------------------------------------------------
-// Resource — request/release with capacities; supports anonymous resources
-// ---------------------------------------------------------------------------
+
 struct ResourceOpts {
     double initial_claimed_quantity = 0;
     bool anonymous = false;
@@ -1628,7 +1543,7 @@ class Resource {
     void set_capacity(double cap);
     void release(std::optional<double> quantity = std::nullopt);
 
-    // level monitors; calling e.g. claimed_quantity() gives the current value
+
     Monitor capacity;
     Monitor claimed_quantity;
     Monitor available_quantity;
@@ -1643,7 +1558,7 @@ class Resource {
     friend class Component;
     friend class Environment;
 
-    void tryrequest_(); // Resource._tryrequest
+    void tryrequest_();
     void update_monitors_();
 
     std::string name_, base_name_;
@@ -1661,9 +1576,7 @@ class Resource {
     bool trying_ = false;
 };
 
-// ---------------------------------------------------------------------------
-// Store — a Queue of items that components can put to / get from
-// ---------------------------------------------------------------------------
+
 class Store : public Queue {
   public:
     explicit Store(std::string name = "", QueueOpts opts = {});
@@ -1671,28 +1584,26 @@ class Store : public Queue {
 
     Queue& from_store_requesters() { return *from_requesters_; }
     Queue& to_store_requesters() { return *to_requesters_; }
-    void set_capacity_store(double cap); // like salabim Store.set_capacity
+    void set_capacity_store(double cap);
     void rescan();
 
   protected:
     friend class Component;
     friend class Queue;
-    void item_entered_(Component* item); // honor pending from_store requests
-    void item_left_();                   // honor pending to_store requests
+    void item_entered_(Component* item);
+    void item_left_();
     std::unique_ptr<Queue> from_requesters_;
     std::unique_ptr<Queue> to_requesters_;
-    int honor_depth_ = 0; // guards against salabim's store honor recursion
+    int honor_depth_ = 0;
 };
 
-// ---------------------------------------------------------------------------
-// Environment — the simulation environment and scheduler
-// ---------------------------------------------------------------------------
+
 inline constexpr std::int64_t seed_no_reseed = std::numeric_limits<std::int64_t>::min();
 inline constexpr std::int64_t seed_random = std::numeric_limits<std::int64_t>::min() + 1;
 
 struct EnvOptions {
     bool trace = false;
-    std::int64_t random_seed = 1234567; // sim::seed_no_reseed / sim::seed_random sentinels
+    std::int64_t random_seed = 1234567;
     std::string time_unit = "n/a";
     std::string name{};
     bool print_trace_header = true;
@@ -1717,7 +1628,7 @@ class Environment {
 
     const std::string& name() const { return name_; }
 
-    // --- time ---------------------------------------------------------------
+
     double now() const { return now_ - offset_; }
     double t() const { return now_; }
     double peek();
@@ -1726,13 +1637,13 @@ class Environment {
     Component* main() { return main_; }
     Component* current_component() { return current_; }
 
-    // --- running ------------------------------------------------------------
+
     void run() { run_impl_(DurationSpec{}, RunOpts{}); }
     void run(DurationSpec duration, RunOpts opts = {}) { run_impl_(std::move(duration), std::move(opts)); }
     void run(RunOpts opts) { run_impl_(DurationSpec{}, std::move(opts)); }
     void step();
 
-    // --- tracing ------------------------------------------------------------
+
     bool trace() const { return trace_; }
     void trace(bool value) {
         if (value && !trace_ && !header_printed_ && print_trace_header_) {
@@ -1769,7 +1680,7 @@ class Environment {
                      bool optional_line = false);
     void print_trace_header();
 
-    // --- randomness ---------------------------------------------------------
+
     void random_seed(std::int64_t seed = 1234567) {
         if (seed == seed_no_reseed) return;
         if (seed == seed_random) {
@@ -1780,9 +1691,9 @@ class Environment {
         }
     }
 
-    // --- time units -----------------------------------------------------------
+
     const std::string& time_unit_name() const { return time_unit_name_; }
-    double time_unit_factor_env() const { return time_unit_; } // lookup value of env unit
+    double time_unit_factor_env() const { return time_unit_; }
     double years(double t) const { return t * unit_factor("years"); }
     double weeks(double t) const { return t * unit_factor("weeks"); }
     double days(double t) const { return t * unit_factor("days"); }
@@ -1806,9 +1717,7 @@ class Environment {
 
     std::string print_info(bool as_str = false) const;
 
-    // ------------------------------------------------------------------------
-    // internals (public-ish for the library machinery; underscore suffix)
-    // ------------------------------------------------------------------------
+
     enum class Registry { component, queue, resource, state, monitor, store };
     std::string set_name_(Registry reg, std::string name, const std::string& fallback_classname,
                           std::string* base_name, long long* sequence_number);
@@ -1861,7 +1770,7 @@ class Environment {
     void print_legend_(int ref);
 
     std::string name_;
-    double time_unit_ = 0.0; // lookup value; 0 = "n/a"
+    double time_unit_ = 0.0;
     std::string time_unit_name_ = "n/a";
     bool trace_ = false;
     bool header_printed_ = false;
@@ -1884,7 +1793,7 @@ class Environment {
     std::map<std::string, long long> registries_[6];
     inline static std::map<std::string, long long> env_registry_{};
     std::vector<std::unique_ptr<Component>> components_;
-    std::vector<std::pair<std::string, int>> source_files_; // (filename, ref)
+    std::vector<std::pair<std::string, int>> source_files_;
 };
 
 inline Environment* default_env() { return g::default_env; }
@@ -1897,11 +1806,9 @@ inline Environment* need_env(Environment* env) {
             "no default environment. Create an Environment first (sim::Environment env;)");
     return e;
 }
-} // namespace detail
+}
 
-// ---------------------------------------------------------------------------
-// State<T> — a state with a value; components can wait for values/conditions
-// ---------------------------------------------------------------------------
+
 template <class T>
 class State : public StateBase {
   public:
@@ -1948,7 +1855,7 @@ class State : public StateBase {
 
   private:
     T value_;
-    std::vector<std::string> labels_; // for non-arithmetic values: code registry
+    std::vector<std::string> labels_;
 
     void set_impl_(const T& value, const char* action) {
         env_->print_trace("", "", name_ + " " + action, "value = " + detail::py_repr(value));
@@ -1976,11 +1883,11 @@ class State : public StateBase {
     }
 };
 
-// WaitSpec constructors (declared with class Component)
+
 template <class T>
 WaitSpec::WaitSpec(State<T>& s) : state(&s) {
     if constexpr (std::is_arithmetic_v<T>)
-        test = [st = &s] { return st->get() == static_cast<T>(1); }; // python: True == value
+        test = [st = &s] { return st->get() == static_cast<T>(1); };
     else
         test = [] { return false; };
 }
@@ -2000,15 +1907,7 @@ WaitSpec::WaitSpec(State<T>& s, V&& v, double prio) : WaitSpec(s, std::forward<V
     priority = prio;
 }
 
-// ---------------------------------------------------------------------------
-// make<T> — creates (and usually activates) a component, salabim-style:
-//
-//     sim::make<Customer>();                          // like Customer() in salabim
-//     sim::make<Customer>({.at = 10, .name = "cust.ute"});
-//     sim::make<Car>({}, ctor_args...);               // args go to Car's constructor
-//
-// The environment owns the component; the raw pointer stays valid.
-// ---------------------------------------------------------------------------
+
 template <class T, class... Args>
 T* make(ComponentOptions opts, Args&&... args) {
     static_assert(std::is_base_of_v<Component, T>, "make<T>: T must derive from sim::Component");
@@ -2041,10 +1940,7 @@ T* make(std::source_location loc = std::source_location::current()) {
     return make<T>(std::move(opts));
 }
 
-// ---------------------------------------------------------------------------
-// Event — a component that executes a callable once at its scheduled time
-// (salabim's Event class, useful for reneging etc.)
-// ---------------------------------------------------------------------------
+
 class Event : public Component {
   public:
     explicit Event(std::function<void()> action, std::string action_string = "action")
@@ -2063,13 +1959,7 @@ class Event : public Component {
     std::string action_string_;
 };
 
-// ---------------------------------------------------------------------------
-// ComponentGenerator<T> — generates components with a given inter-arrival
-// time (or spread over an interval), like salabim's ComponentGenerator.
-//
-//     sim::Exponential iat(10);
-//     sim::ComponentGenerator<Customer>({.iat = iat, .till = 1000});
-// ---------------------------------------------------------------------------
+
 struct GeneratorOpts {
     std::string generator_name{};
     DurationSpec at{};
@@ -2083,7 +1973,7 @@ struct GeneratorOpts {
     bool equidistant = false;
     bool suppress_trace = false;
     std::function<void()> at_end{};
-    std::function<Component*()> factory{}; // if not given: sim::make<T>()
+    std::function<Component*()> factory{};
     Environment* env = nullptr;
     std::source_location loc = std::source_location::current();
 };
@@ -2125,7 +2015,7 @@ class ComponentGeneratorImpl : public Component {
         }
     }
 
-    // configuration computed before activation (see sim::ComponentGenerator<T>())
+
     GeneratorOpts o_;
     double till_ = inf;
     bool mode_spread_ = false;
@@ -2140,14 +2030,14 @@ class ComponentGeneratorImpl : public Component {
     }
 };
 
-} // namespace detail
+}
 
 template <class T>
 Component* ComponentGenerator(GeneratorOpts opts = {}) {
     Environment* env = detail::need_env(opts.env);
     std::string gname = opts.generator_name;
     if (gname.empty())
-        gname = detail::demangle(typeid(T).name()) + ".generator."; // salabim keeps the class case here
+        gname = detail::demangle(typeid(T).name()) + ".generator.";
 
     double at;
     double delay = opts.delay.has_value() ? opts.delay.resolve() : 0.0;
@@ -2191,7 +2081,7 @@ Component* ComponentGenerator(GeneratorOpts opts = {}) {
         till = inf;
         o.number = number;
     } else if (!opts.iat.has_value()) {
-        // spread mode: number components uniformly over [at, till]
+
         if (till == inf || number == std::numeric_limits<long long>::max())
             throw SalabimError("iat not specified --> till and number need to be specified");
         std::vector<double> moments;
@@ -2227,9 +2117,6 @@ Component* ComponentGenerator(GeneratorOpts opts = {}) {
     return gen;
 }
 
-// ===========================================================================
-//                            IMPLEMENTATION
-// ===========================================================================
 
 namespace detail {
 inline double time_unit_factor(std::string_view time_unit, const Environment* env) {
@@ -2240,12 +2127,12 @@ inline std::string basename(std::string_view path) {
     auto pos = path.find_last_of("/\\");
     return std::string(pos == std::string_view::npos ? path : path.substr(pos + 1));
 }
-inline std::string fmt_num(double v) { // python str() of an int-or-float quantity
+inline std::string fmt_num(double v) {
     if (v == std::floor(v) && std::abs(v) < 9.2e18 && !std::isinf(v))
         return std::to_string(static_cast<long long>(v));
     return py_repr(v);
 }
-} // namespace detail
+}
 
 inline double Distribution_::tuf() const {
     if (time_unit_.empty()) return 1.0;
@@ -2253,7 +2140,6 @@ inline double Distribution_::tuf() const {
     return *tuf_cache_;
 }
 
-// --------------------------------- Monitor ---------------------------------
 
 inline double Monitor::now_() const { return env_->now_raw_(); }
 
@@ -2311,7 +2197,7 @@ inline void Monitor::tally(double value, double weight) {
             x_.push_back(value);
             t_.push_back(now);
         } else if (monitor_ && weight == 0.0) {
-            // salabim ignores zero-weight tallies for stats_only; full monitors record them
+
             x_.push_back(value);
             t_.push_back(now);
             if (has_weights_) weight_.push_back(0.0);
@@ -2414,7 +2300,7 @@ inline double Monitor::percentile(double q, bool ex0) const {
     }
     size_t n = xs.size();
 
-    if (level_ || has_weights_) { // weighted percentile (salabim: self._weight truthy)
+    if (level_ || has_weights_) {
         std::vector<double> cum;
         double c = 0;
         for (size_t k = 0; k < n; ++k) {
@@ -2426,7 +2312,7 @@ inline double Monitor::percentile(double q, bool ex0) const {
             if (cum[k] >= q) break;
         if (k >= n) k = n - 1;
         if (cum[k] != q) return xs[k];
-        // exactly on a boundary: 'linear' -> midpoint of the two adjacent values
+
         if (k + 1 < n) return (xs[k] + xs[k + 1]) / 2.0;
         return xs[k];
     } else {
@@ -2435,7 +2321,7 @@ inline double Monitor::percentile(double q, bool ex0) const {
         size_t k = 0;
         for (; k + 1 < n; ++k)
             if (cum[k + 1] > q) break;
-        // linear interpolation between xs[k] and xs[k+1]
+
         double c0 = cum[k], c1 = cum[k + 1];
         return xs[k] + (xs[k + 1] - xs[k]) * ((q - c0) / (c1 - c0));
     }
@@ -2625,7 +2511,7 @@ inline std::string Monitor::print_histogram(HistOpts opts) const {
                     int ncum = static_cast<int>(cumperc * graph_scale) + 1;
                     s = std::string(static_cast<size_t>(n), '*') +
                         std::string(static_cast<size_t>(gs - n), ' ');
-                    // python: s = s[:ncum-1] + "|" + s[ncum+1:]  (forgiving slices)
+
                     int cut1 = std::clamp(ncum - 1, 0, gs);
                     int cut2 = std::min(ncum + 1, gs);
                     s = s.substr(0, static_cast<size_t>(cut1)) + "|" +
@@ -2636,10 +2522,10 @@ inline std::string Monitor::print_histogram(HistOpts opts) const {
             }
         }
     }
-    result.push_back(""); // salabim ends every histogram with a blank line
+    result.push_back("");
     std::string out;
     for (auto& l : result) {
-        // avoid double newline when embedding print_statistics output
+
         out += l;
         if (l.empty() || l.back() != '\n') out += "\n";
     }
@@ -2647,7 +2533,6 @@ inline std::string Monitor::print_histogram(HistOpts opts) const {
     return opts.as_str ? out : "";
 }
 
-// --------------------------------- Queue -----------------------------------
 
 inline Queue::Queue(std::string name, Opts opts) : Queue(std::move(name), std::move(opts), 1, "queue.") {}
 
@@ -2676,7 +2561,7 @@ inline Queue::Queue(std::string name, Opts opts, int registry, const char* fallb
 
 inline Queue::~Queue() {
     if (env_ && env_->is_shutting_down_()) return;
-    // silently detach any remaining members
+
     Qmember* m = head_.successor;
     while (m && m != &tail_) {
         Qmember* nxt = m->successor;
@@ -2899,7 +2784,6 @@ inline std::string Queue::print_info(bool as_str) const {
     return as_str ? out : "";
 }
 
-// ------------------------------- Component ---------------------------------
 
 inline Component::Component() {
     auto& pend = detail::pending_component;
@@ -2927,7 +2811,7 @@ inline Component::~Component() {
         process_ = {};
     }
     if (env && !env->is_shutting_down_()) {
-        // silently leave any queues we are still in
+
         auto qs = qmembers_;
         for (auto& [q, m] : qs) {
             Qmember* m1 = m->predecessor;
@@ -2949,7 +2833,7 @@ inline void Component::set_mode(const std::optional<std::string>& m) {
     if (m) {
         mode_time_ = env->now_raw_();
         mode_ = *m;
-        mode_log_.emplace_back(env->now(), *m);  // timeline for the KPI layer
+        mode_log_.emplace_back(env->now(), *m);
     }
 }
 
@@ -3142,7 +3026,7 @@ inline Yield Component::activate(ActivateOpts opts) {
     bool restart = false;
     std::string extra;
     if (status_ == Status::data) {
-        // restart the process (like salabim using the "process" method by default)
+
         Process pr = process();
         if (!pr.handle) throw SalabimError("no process for data component " + name_);
         pr.handle.promise().component = this;
@@ -3186,7 +3070,7 @@ inline Yield Component::cancel(ModeOpts opts) {
         check_fail_();
     }
     for (auto& [r, q] : std::vector<std::pair<Resource*, double>>(claims_)) release_(r);
-    deferred_anon_rescan_.clear(); // Python: killing the greenlet drops the pending re-scan
+    deferred_anon_rescan_.clear();
     if (this != env->current_ && process_) {
         process_.destroy();
         process_ = {};
@@ -3198,8 +3082,8 @@ inline Yield Component::cancel(ModeOpts opts) {
                          env->frame_to_lineno_(opts.loc));
     set_status_(Status::data);
     if (this == env->current_) {
-        // Python: cancel on the current component switches to the scheduler and
-        // never returns — skip the rest of the process by unwinding the frames.
+
+
         process_abandoned_ = true;
         throw detail::AbandonedByCancel{};
     }
@@ -3446,8 +3330,8 @@ inline bool Component::tryrequest_() {
     set_status_(Status::scheduled);
     reschedule_(env->now_raw_(), 0, false, "request honor " + honoredstr, false, "", env->last_s0_);
     if (env->current_component() == this) {
-        // Python (yieldless): _reschedule on the current component switches to
-        // the scheduler right away, so this re-scan runs when we resume.
+
+
         deferred_anon_rescan_ = std::move(anonymous_resources);
     } else {
         for (Resource* r : anonymous_resources) r->tryrequest_();
@@ -3466,7 +3350,7 @@ inline void Component::release_(Resource* r, std::optional<double> q_opt,
     it->second -= q;
     if (it->second < 1e-8) {
         leave(*r->claimers_);
-        if (r->claimers_->length_ == 0) r->claimed_quantity_ = 0; // avoid rounding problems
+        if (r->claimers_->length_ == 0) r->claimed_quantity_ = 0;
         claims_.erase(std::find_if(claims_.begin(), claims_.end(), [r](auto& p) { return p.first == r; }));
     }
     r->update_monitors_();
@@ -3580,7 +3464,6 @@ inline bool Component::trywait_() {
     return honored;
 }
 
-// ---- stores ----------------------------------------------------------------
 
 inline Component* YieldItem::await_resume() const noexcept { return self_->from_store_item(); }
 
@@ -3692,7 +3575,6 @@ inline Yield Component::to_store_impl_(std::vector<Store*> stores, Component& it
     return {};
 }
 
-// ---- queue membership -------------------------------------------------------
 
 inline Qmember* Component::member_(const Queue& q) const {
     for (auto& [qq, m] : qmembers_)
@@ -3794,7 +3676,7 @@ inline double Component::priority(const Queue& q) const {
 inline void Component::set_priority(Queue& q, double priority) {
     Qmember* mx = checkinqueue_(q);
     if (mx->priority == priority) return;
-    // remove and re-insert sorted (salabim keeps stats untouched)
+
     Qmember* m1 = mx->predecessor;
     Qmember* m2 = mx->successor;
     m1->successor = m2;
@@ -3830,7 +3712,6 @@ inline Component* Component::predecessor(const Queue& q) const {
     return checkinqueue_(q)->predecessor->component;
 }
 
-// ---- resource queries -------------------------------------------------------
 
 inline double Component::claimed_quantity(const Resource* r) const {
     if (!r) {
@@ -3915,7 +3796,6 @@ inline std::string Component::print_info(bool as_str) const {
     return as_str ? out : "";
 }
 
-// --------------------------------- Resource --------------------------------
 
 inline Resource::Resource(std::string name, double cap, Opts opts)
     : capacity("", MonitorOpts{.level = true, .initial_tally = cap, .monitor = opts.monitor, .env = opts.env}),
@@ -3923,7 +3803,7 @@ inline Resource::Resource(std::string name, double cap, Opts opts)
                                          .monitor = opts.monitor, .env = opts.env}),
       available_quantity("", MonitorOpts{.level = true, .initial_tally = cap - opts.initial_claimed_quantity,
                                            .monitor = opts.monitor, .env = opts.env}),
-      occupancy("", MonitorOpts{.level = true, .initial_tally = 0, // salabim starts occupancy at 0
+      occupancy("", MonitorOpts{.level = true, .initial_tally = 0,
                                 .monitor = opts.monitor, .env = opts.env}) {
     env_ = detail::need_env(opts.env);
     if (opts.initial_claimed_quantity != 0 && !opts.anonymous)
@@ -3976,7 +3856,7 @@ inline void Resource::tryrequest_() {
             Component* c = mx->component;
             mx = mx->successor;
             c->tryrequest_();
-            if (!requesters_->contains(c)) mx = requesters_->head_.successor; // start again
+            if (!requesters_->contains(c)) mx = requesters_->head_.successor;
         }
         trying_ = false;
     } else {
@@ -3986,7 +3866,7 @@ inline void Resource::tryrequest_() {
         while (mx != &requesters_->tail_) {
             if (honor_only_first_ && mx != mx_first) break;
             if (honor_only_highest_priority_ && mx->priority != mx_first_priority) break;
-            if (minq_ > capacity_ - claimed_quantity_ + 1e-8) break; // no more honors possible
+            if (minq_ > capacity_ - claimed_quantity_ + 1e-8) break;
             Component* c = mx->component;
             mx = mx->successor;
             c->tryrequest_();
@@ -4096,7 +3976,6 @@ inline std::string Resource::print_info(bool as_str) const {
     return as_str ? out : "";
 }
 
-// --------------------------------- Store -----------------------------------
 
 inline Store::Store(std::string name, Opts opts) : Queue(std::move(name), opts, 5, "store.") {
     auto sup = env_->suppress_trace();
@@ -4112,9 +3991,8 @@ inline Store::~Store() = default;
 
 inline void Store::item_entered_(Component* item) {
     if (!from_requesters_ || from_requesters_->empty()) return;
-    // Python salabim dies with a RecursionError on the same pattern (an item
-    // bouncing between a blocked to_store putter and a filtered from_store
-    // getter); fail with a diagnosable error instead of a stack overflow.
+
+
     if (honor_depth_ > 200)
         throw SalabimError(name_ + ": store honor recursion (a blocked to_store together with a "
                                    "filtered from_store waiter bounces one item forever; salabim "
@@ -4203,7 +4081,6 @@ inline void Store::rescan() {
     }
 }
 
-// --------------------------------- StateBase -------------------------------
 
 inline void StateBase::init_base_(std::string name, Environment* env) {
     env_ = env;
@@ -4276,7 +4153,6 @@ inline std::string StateBase::print_info(bool as_str) const {
     return as_str ? out : "";
 }
 
-// --------------------------------- Environment -----------------------------
 
 inline Environment::Environment(EnvOptions opts) {
     if (opts.name.empty()) {
@@ -4335,7 +4211,7 @@ inline std::string Environment::set_name_(Registry reg, std::string name,
                                           const std::string& fallback_classname,
                                           std::string* base_name, long long* sequence_number) {
     auto& registry = registries_[static_cast<int>(reg)];
-    if (name.empty()) name = fallback_classname; // classname (lowercased) + "."
+    if (name.empty()) name = fallback_classname;
     if (name == "." || name == ",") name = fallback_classname.substr(0, fallback_classname.size() - 1) + name;
     if (name.ends_with(".") || name.ends_with(",")) {
         long long seq;
@@ -4399,7 +4275,7 @@ inline void Environment::print_trace_header() {
 inline std::string Environment::filename_lineno_to_str_(const char* filename, unsigned line) {
     if (!filename) return "";
     std::string_view f(filename);
-    if (f.ends_with("salabim.hpp")) return ""; // internal (salabim: "n/a")
+    if (f.ends_with("salabim.hpp")) return "";
     int ref = -1;
     for (auto& [fn, r] : source_files_)
         if (fn == f) {
@@ -4461,9 +4337,7 @@ inline void Environment::terminate_(Component* c) {
     }
 }
 
-// A finished sub-process hands its component's "current frame" back to the parent
-// and symmetric-transfers into it; a finished root process suspends back to the
-// scheduler (which detects done() and terminates the component).
+
 inline std::coroutine_handle<> Process::FinalAwaiter::await_suspend(Process::Handle h) noexcept {
     auto& p = h.promise();
     if (p.continuation) {
@@ -4479,7 +4353,7 @@ inline void Environment::resume_process_(Component* c) {
         return;
     }
     if (!c->deferred_anon_rescan_.empty()) {
-        // re-scan deferred by tryrequest_ (Python runs it on greenlet resumption)
+
         auto rs = std::move(c->deferred_anon_rescan_);
         c->deferred_anon_rescan_.clear();
         for (Resource* r : rs) r->tryrequest_();
@@ -4487,8 +4361,8 @@ inline void Environment::resume_process_(Component* c) {
     auto h = c->process_;
     h.resume();
     if (c->process_ && c->process_.done()) {
-        // note: read the exception off c->process_, not h — with sub-processes the
-        // frame the scheduler resumed may be an inner (already destroyed) frame
+
+
         std::exception_ptr ex = c->process_.promise().exception;
         if (ex) {
             c->process_.destroy();
@@ -4496,7 +4370,7 @@ inline void Environment::resume_process_(Component* c) {
             try {
                 std::rethrow_exception(ex);
             } catch (const detail::AbandonedByCancel&) {
-                // self-cancel: Python's abandoned greenlet — no 'ended', no terminate
+
                 c->process_abandoned_ = false;
                 return;
             } catch (...) {
@@ -4516,12 +4390,12 @@ inline void Environment::resume_process_(Component* c) {
 }
 
 inline void Environment::step() {
-    // standby components get a turn after every event
+
     if (!current_ || !current_->skip_standby_) {
         if (!pendingstandbylist_.empty()) {
             Component* c = pendingstandbylist_.front();
             pendingstandbylist_.erase(pendingstandbylist_.begin());
-            if (c->status_ == Status::standby) { // skip cancelled components
+            if (c->status_ == Status::standby) {
                 c->set_status_(Status::current);
                 c->scheduled_time_ = inf;
                 current_ = c;
@@ -4603,6 +4477,6 @@ inline std::string Environment::print_info(bool as_str) const {
     return as_str ? out : "";
 }
 
-} // namespace sim
+}
 
-#endif // SALABIM_HPP
+#endif

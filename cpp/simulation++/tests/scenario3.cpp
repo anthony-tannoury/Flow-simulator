@@ -1,5 +1,3 @@
-// Scenario 3 (C++ side) — midnight-crossing weekly shifts + touching-
-// interval merging. Companion of scenario3.py: same scenario, same seed.
 #include "simulation.hpp"
 
 #include <chrono>
@@ -17,12 +15,12 @@ int main() {
     auto day = [](int y, unsigned m, unsigned d) {
         return days_t(std::chrono::year(y) / m / d);
     };
-    ShiftManager::DateTime sim_start{day(2026, 1, 5), 0, 0};  // a Monday, 00:00
+    ShiftManager::DateTime sim_start{day(2026, 1, 5), 0, 0};
 
     std::vector<std::pair<double, double>> night{{0.0, 360.0}, {1320.0, 1440.0}};
     std::vector<std::vector<std::pair<double, double>>> shifts_per_day{
         night, night, night, night, night, {}, {}};
-    std::set<long long> days_off{day(2026, 1, 7).time_since_epoch().count()};  // Wednesday off
+    std::set<long long> days_off{day(2026, 1, 7).time_since_epoch().count()};
     Intervals gen_shifts = ShiftManager::generate_weekly_shifts(
         sim_start, shifts_per_day, {true, true, true, true, true, false, false},
         days_off, day(2026, 1, 5), day(2026, 1, 11));

@@ -20,8 +20,6 @@ except ImportError:
 
 
 class TimeFunctionWidget(QtWidgets.QWidget):
-    """One numeric quantity that is either constant or a function of time.
-    Value: {"kind": "constant"|"linear"|"exponential"|"step", ...float params...}."""
 
     def __init__(self, value=None, parent=None):
         super().__init__(parent)
@@ -71,8 +69,6 @@ class TimeFunctionWidget(QtWidgets.QWidget):
 
 
 class SamplerWidget(QtWidgets.QWidget):
-    """A distribution whose every parameter is a TimeFunctionWidget.
-    Value: {"dist_type": <name>, "params": {<pname>: <time-function>}}."""
 
     def __init__(self, value=None, parent=None):
         super().__init__(parent)
@@ -123,7 +119,6 @@ class SamplerWidget(QtWidgets.QWidget):
 
 
 class InfFloatWidget(QtWidgets.QWidget):
-    """A float that can also be infinite (checkbox). Value: number or the string "inf"."""
 
     def __init__(self, value="inf", parent=None):
         super().__init__(parent)
@@ -149,8 +144,6 @@ class InfFloatWidget(QtWidgets.QWidget):
 
 
 class HourMinuteWidget(QtWidgets.QWidget):
-    """A time of day entered as hours + minutes; the stored/returned value is an
-    "hh:mm" string (e.g. "08:30")."""
 
     def __init__(self, value="00:00", parent=None):
         super().__init__(parent)
@@ -172,9 +165,6 @@ class HourMinuteWidget(QtWidgets.QWidget):
 
 
 class DateTimeWidget(QtWidgets.QDateTimeEdit):
-    """Calendar-popup picker for an absolute 'dd-mm-yyyy hh:mm'. The value travels
-    as that string; converting it to raw simulation minutes (relative to the
-    simulation start date) is the loader's job."""
 
     def __init__(self, value="", parent=None):
         super().__init__(parent)
@@ -193,7 +183,6 @@ class DateTimeWidget(QtWidgets.QDateTimeEdit):
 
 
 class DateWidget(QtWidgets.QDateEdit):
-    """Calendar-popup picker for a date-only 'dd-mm-yyyy' (days off, horizons)."""
 
     def __init__(self, value="", parent=None):
         super().__init__(parent)
@@ -212,7 +201,6 @@ class DateWidget(QtWidgets.QDateEdit):
 
 
 class ClosingDayPickerWidget(QtWidgets.QListWidget):
-    """Multi-select over the closing-days registry; the value is the chosen dates."""
 
     def __init__(self, closing_days, chosen=None, parent=None):
         super().__init__(parent)
@@ -225,8 +213,8 @@ class ClosingDayPickerWidget(QtWidgets.QListWidget):
             it.setCheckState(QtCore.Qt.Checked if entry.get("date") in chosen else QtCore.Qt.Unchecked)
             self.addItem(it)
             known.add(entry.get("date"))
-        # a day the shift still references but the registry no longer holds: keep it
-        # visible (checked) so unchecking it is a deliberate act, not a silent loss
+
+
         for date in sorted(chosen - known):
             it = QtWidgets.QListWidgetItem(f"{date} (not in registry)")
             it.setData(QtCore.Qt.UserRole, date)
@@ -258,7 +246,6 @@ class _IntervalRow(QtWidgets.QWidget):
 
 
 class _DayRow(QtWidgets.QWidget):
-    """One weekday: a working toggle + a list of shift intervals (edited as h/m of day)."""
 
     def __init__(self, label, working=False, intervals=None, parent=None):
         super().__init__(parent)
@@ -284,7 +271,7 @@ class _DayRow(QtWidgets.QWidget):
     def _add(self, start="08:00", end="17:00"):
         row = _IntervalRow(start, end, on_remove=self._remove)
         self._rows.append(row)
-        self._vl.insertWidget(self._vl.count() - 1, row)  # keep the add button last
+        self._vl.insertWidget(self._vl.count() - 1, row)
 
     def _remove(self, row):
         if row in self._rows:
@@ -298,7 +285,6 @@ class _DayRow(QtWidgets.QWidget):
 
 
 class _CustomIntervalRow(QtWidgets.QWidget):
-    """One absolute interval: start date+time -> end date+time (dd-mm-yyyy hh:mm)."""
 
     def __init__(self, start="01-01-2026 08:00", end="01-01-2026 17:00", on_remove=None, parent=None):
         super().__init__(parent)
@@ -318,7 +304,6 @@ class _CustomIntervalRow(QtWidgets.QWidget):
 
 
 class CustomIntervalListWidget(QtWidgets.QWidget):
-    """A list of absolute {start, end} date intervals with '+ interval'."""
 
     def __init__(self, intervals=None, parent=None):
         super().__init__(parent)
@@ -344,9 +329,6 @@ class CustomIntervalListWidget(QtWidgets.QWidget):
 
 
 class ModelTreeWidget(QtWidgets.QTreeWidget):
-    """Checkable model hierarchy with cascade: checking a model checks all its
-    descendants; unchecking a model unchecks its ancestors. If leaves_only, only
-    childless models are selectable (used by the piece generator)."""
 
     def __init__(self, model_registry, checked=None, leaves_only=False, parent=None):
         super().__init__(parent)
@@ -385,7 +367,7 @@ class ModelTreeWidget(QtWidgets.QTreeWidget):
         if state == QtCore.Qt.Checked:
             self._set_descendants(item, QtCore.Qt.Checked)
         else:
-            # unchecking a node unchecks its ancestors (child deselect -> parent deselect)
+
             p = item.parent()
             while p is not None:
                 if p.flags() & QtCore.Qt.ItemIsUserCheckable:
@@ -406,7 +388,6 @@ class ModelTreeWidget(QtWidgets.QTreeWidget):
 
 
 class ShiftPickerWidget(QtWidgets.QListWidget):
-    """Multi-select of shift-definition names (their concatenation is the schedule)."""
 
     def __init__(self, shift_names, chosen=None, parent=None):
         super().__init__(parent)
@@ -423,8 +404,6 @@ class ShiftPickerWidget(QtWidgets.QListWidget):
 
 
 class ResourcePickerWidget(QtWidgets.QWidget):
-    """Rows of (resource-name, float). Used for per-model resources (quantity) and
-    resource-task non-transformed inputs (quantity). Value: [{"resource","value"}]."""
 
     def __init__(self, resource_names, value_label="quantity", entries=None,
                  add_label="resource", integer=False, parent=None):
@@ -451,7 +430,7 @@ class ResourcePickerWidget(QtWidgets.QWidget):
         combo = QtWidgets.QComboBox(); combo.addItems(self._names)
         if resource in self._names:
             combo.setCurrentText(resource)
-        text = str(as_int(value)) if self._int else str(value)  # counts show as 1, not 1.0
+        text = str(as_int(value)) if self._int else str(value)
         edit = QtWidgets.QLineEdit(text); edit.setMaximumWidth(70)
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
         h.addWidget(combo); h.addWidget(QtWidgets.QLabel(sentence_case(self._label) + ":")); h.addWidget(edit); h.addWidget(rm); h.addStretch(1)
@@ -475,8 +454,6 @@ class ResourcePickerWidget(QtWidgets.QWidget):
 
 
 class AlternativesWidget(QtWidgets.QWidget):
-    """An operator Alternative = OR of ANDs. Each alternative is a set of
-    (operator-group, count). Value: [[{"operator","count"}, ...], ...]."""
 
     def __init__(self, operator_names, value=None, parent=None):
         super().__init__(parent)
@@ -522,11 +499,6 @@ class AlternativesWidget(QtWidgets.QWidget):
 
 
 class PoliciesWidget(QtWidgets.QWidget):
-    """The task protocols with their defaults (POLICY_OPTIONS for resource tasks,
-    PIECE_POLICY_OPTIONS for piece tasks). Types listed in POLICY_TYPE_PARAMS
-    expose their numeric parameter (AbortOrWaitForCarriers' tolerance_fraction,
-    PartiallyConstrainedByShift's tolerance in time units past the shift end).
-    Value: {protocol_name: {"type", ...param}}."""
 
     def __init__(self, value=None, parent=None, policy_options=None):
         super().__init__(parent)
@@ -574,9 +546,6 @@ class PoliciesWidget(QtWidgets.QWidget):
 
 
 class FixedGoalsWidget(QtWidgets.QWidget):
-    """One fixed goal box per leaf model: no add/remove, no model dropdown, so every
-    leaf model is forced to carry an explicit production goal. A model absent from
-    the prior entries starts at 0. Value: [{"model", "goal"}] over all leaf models."""
 
     def __init__(self, leaf_model_names, entries=None, parent=None):
         super().__init__(parent)
@@ -597,18 +566,11 @@ class FixedGoalsWidget(QtWidgets.QWidget):
 
 
 class FixedModelProbsWidget(QtWidgets.QWidget):
-    """One fixed probability row per leaf model, used by the rate generator: no
-    add/remove, no model dropdown, so every leaf model is forced to carry an
-    explicit emission probability (a constant or a function of time). At most one
-    model may be marked the freeloader: its probability is 1 - sum(others), so
-    its function slot is disabled and it is exported as None. A model absent from
-    the prior entries starts at 0. Value: [{"model", "probability": <time-function>
-    | None}] over all leaf models."""
 
     def __init__(self, leaf_model_names, entries=None, parent=None):
         super().__init__(parent)
         prior = {e.get("model"): e.get("probability") for e in (entries or [])}
-        self._rows = []  # (name, tf, free_chk)
+        self._rows = []
         form = QtWidgets.QFormLayout(self)
         form.setContentsMargins(0, 0, 0, 0)
         if not leaf_model_names:
@@ -628,7 +590,7 @@ class FixedModelProbsWidget(QtWidgets.QWidget):
             form.addRow(name, row)
 
     def _on_free_toggled(self, entry, checked):
-        if checked:  # freeloader is exclusive: clear any other, re-enable its slot
+        if checked:
             for e in self._rows:
                 if e is not entry and e[2].isChecked():
                     blocked = e[2].blockSignals(True); e[2].setChecked(False); e[2].blockSignals(blocked)
@@ -641,7 +603,6 @@ class FixedModelProbsWidget(QtWidgets.QWidget):
 
 
 class ModelConfigsWidget(QtWidgets.QWidget):
-    """Per-model configs for a piece task: list of {model, duration, resources, min/max carrier capacity}."""
 
     def __init__(self, model_names, resource_names, entries=None, parent=None):
         super().__init__(parent)

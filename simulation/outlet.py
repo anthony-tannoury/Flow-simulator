@@ -39,7 +39,7 @@ class Buffer(sim.Store, Outlet, Triggerable):
             if Buffer.EXIT_BUFFERS == 1:
                 raise ValueError("Simulation cannot have more than 1 exit buffer")
             Buffer.EXIT_BUFFERS += 1
-        
+
         Outlet.__init__(self, valid_models)
         Triggerable.__init__(self)
         self.buffer_type = buffer_type
@@ -55,7 +55,7 @@ class Router(Outlet):
         outlets_probs_values = list(outlets_probs.values())
         if outlets_probs_values.count(None) > 1:
             raise ValueError("At most one freeloader are allowed in router")
-        
+
         valid_models_sets = [set(outlet.valid_models) for outlet in outlets_probs.keys()]
         intersection = set.intersection(*valid_models_sets)
 
@@ -72,6 +72,6 @@ class Router(Outlet):
         probs = [p if isinstance(p, (int, float)) else p(env.now()) if p is not None else 0 for p in self.probs]
         if self.freeloader_index != -1:
             probs[self.freeloader_index] = 1 - sum(probs)
-        
+
         check_probabilities(probs=probs)
         return self.outlets[np.random.choice(len(self.outlets), p=probs)].get()

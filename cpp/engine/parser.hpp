@@ -1,13 +1,3 @@
-// parser++ — flow JSON -> simulation objects (mirror of parser/parser.py).
-//
-// This header is being built up in layers. This first layer is the leaf
-// builders every load_* method reuses: name normalization + tolerant lookup,
-// the string->enum tables, and the distribution / time-function / MTBF /
-// protocol builders. The Parser class (load_models, load_shifts, ... load_all)
-// is added on top of these.
-//
-// Read UTF-8 only: nlohmann::json::parse already decodes UTF-8, so the mojibake
-// bug that bit the Python side (locale code page) cannot recur here (§15b).
 #pragma once
 
 #include "simulation.hpp"
@@ -32,10 +22,7 @@ namespace parser {
 using json = nlohmann::json;
 using namespace simulation;
 
-// --- name normalization (§15) ----------------------------------------------
-// The designer exports canonical identifiers (ByTime, PER_BATCH,
-// AbortPendingCarriers), but a hand-edited file may use the sentence-case
-// display forms (By time, Per batch). canon_name folds both to one key.
+
 inline std::string canon_name(const std::string& value) {
     std::string out;
     for (char ch : value)
@@ -48,7 +35,7 @@ inline bool same_name(const std::string& a, const std::string& b) {
     return canon_name(a) == canon_name(b);
 }
 
-// table lookup accepting any spelling canon_name folds together.
+
 template <class V>
 const V& lookup(const std::vector<std::pair<std::string, V>>& table, const std::string& value,
                 const char* what) {
@@ -60,7 +47,7 @@ const V& lookup(const std::vector<std::pair<std::string, V>>& table, const std::
     throw std::invalid_argument(std::string("unknown ") + what + ": " + value);
 }
 
-// --- string -> enum tables (mirror parser.py) ------------------------------
+
 inline const std::vector<std::pair<std::string, DistType>>& distr_types() {
     static const std::vector<std::pair<std::string, DistType>> t = {
         {"Constant", DistType::Constant}, {"Uniform", DistType::Uniform},
@@ -96,8 +83,7 @@ inline const std::vector<std::pair<std::string, Scope>>& scopes() {
     return t;
 }
 
-// --- time function (§10 make_callable) -------------------------------------
-// Returns a Param: a bare double for constants, else a function of time.
+
 inline Param make_callable(const json& c) {
     std::string kind = canon_name(c.at("kind").get<std::string>());
     if (kind == "constant") return Param(c.at("value").get<double>());
@@ -114,7 +100,7 @@ inline Param make_callable(const json& c) {
 
 inline bool is_constant(const Param& p) { return std::holds_alternative<double>(p); }
 
-// --- distributions (§18: full designer set incl. LogNormal) ----------------
+
 inline SamplerPtr make_distribution(const json& d) {
     std::vector<Param> params;
     for (const auto& [name, param] : d.at("params").items()) params.push_back(make_callable(param));
@@ -122,8 +108,7 @@ inline SamplerPtr make_distribution(const json& d) {
                         std::move(params));
 }
 
-// Output-resource distributions must have constant parameters (they feed a
-// Bounded sampler); anything time-varying is rejected, as in Python.
+
 inline SamplerPtr make_salabim_distribution(const json& d) {
     std::vector<Param> params;
     for (const auto& [name, param] : d.at("params").items()) {
@@ -146,8 +131,7 @@ inline SamplerPtr make_mtbf(const json& m) {
     throw std::invalid_argument("unknown mtbf mode: " + m.at("mode").get<std::string>());
 }
 
-// --- protocols (§1/§2 + the shared five) -----------------------------------
-// Python's single make_protocol returns Any; C++ needs typed dispatch per slot.
+
 inline std::shared_ptr<PendingCarriers> make_pending_carriers(const json& p) {
     std::string t = canon_name(p.at("type").get<std::string>());
     if (t == "abortpendingcarriers") return std::make_shared<AbortPendingCarriers>();
@@ -189,8 +173,7 @@ inline std::shared_ptr<ModelChoiceCriteria> make_model_choice(const json& p) {
     throw std::invalid_argument("unknown batch-model-choice policy: " + p.at("type").get<std::string>());
 }
 
-// policies.get(field, {"type": default}) — the designer omits a slot to accept
-// its default (ConstrainedByShift for the shift slots, etc.).
+
 inline json policy_or(const json& policies, const char* field, const char* default_type) {
     if (policies.contains(field)) return policies.at(field);
     return json{{"type", default_type}};
@@ -211,8 +194,7 @@ inline Protocols make_protocols(const json& policies) {
     };
 }
 
-// piece tasks carry the shared five plus the two piece-only protocols; the C++
-// config stores the latter two directly (see PieceTaskConfig).
+
 struct PieceProtocolBundle {
     Protocols shared;
     std::shared_ptr<PieceExitOrder> piece_exit_order;
@@ -225,15 +207,15 @@ inline PieceProtocolBundle make_piece_protocols(const json& policies) {
             make_model_choice(policy_or(policies, "batch_model_choice", "MostPresent"))};
 }
 
-// --- date / number parsing --------------------------------------------------
-inline ShiftManager::days_t parse_date(const std::string& s) {  // "dd-mm-yyyy"
+
+inline ShiftManager::days_t parse_date(const std::string& s) {
     int d = 0, m = 0, y = 0;
     std::sscanf(s.c_str(), "%d-%d-%d", &d, &m, &y);
     return std::chrono::sys_days{std::chrono::year{y} / std::chrono::month{unsigned(m)} /
                                  std::chrono::day{unsigned(d)}};
 }
 
-inline ShiftManager::DateTime parse_datetime(const std::string& s) {  // "dd-mm-yyyy hh:mm"
+inline ShiftManager::DateTime parse_datetime(const std::string& s) {
     int d = 0, m = 0, y = 0, hh = 0, mm = 0;
     std::sscanf(s.c_str(), "%d-%d-%d %d:%d", &d, &m, &y, &hh, &mm);
     return {std::chrono::sys_days{std::chrono::year{y} / std::chrono::month{unsigned(m)} /
@@ -241,10 +223,7 @@ inline ShiftManager::DateTime parse_datetime(const std::string& s) {  // "dd-mm-
             hh, mm};
 }
 
-// A sys_days moved forward by k repeat-translations: k*years and k*months as
-// calendar arithmetic (the day is clamped to the target month, so 29 Feb in a
-// non-leap year lands on 28 Feb), then k*(weeks*7 + days) fixed days. Mirrors
-// parser.py's Parser._shift_date so a yearly repeat keeps the calendar date.
+
 inline std::chrono::sys_days shift_sysdays(std::chrono::sys_days d, long long k, const json& rep) {
     using namespace std::chrono;
     year_month_day ymd{d};
@@ -263,13 +242,13 @@ inline ShiftManager::DateTime shift_datetime(const ShiftManager::DateTime& dt, l
     return {shift_sysdays(dt.date, k, rep), dt.hour, dt.minute};
 }
 
-inline double to_minutes(const std::string& s) {  // "hh:mm"
+inline double to_minutes(const std::string& s) {
     int hh = 0, mm = 0;
     std::sscanf(s.c_str(), "%d:%d", &hh, &mm);
     return 60.0 * hh + mm;
 }
 
-// float(x) where x may be the JSON string "inf" / "-inf" (Python's float()).
+
 inline double parse_float(const json& v) {
     if (v.is_string()) {
         std::string s = v.get<std::string>();
@@ -288,17 +267,13 @@ inline Intervals join_shifts(const std::vector<Intervals>& parts) {
     return joined;
 }
 
-// ============================================================================
-// Parser — flow JSON -> a live simulation (mirror of parser.py's Parser class).
-// Build objects with `load_all()`, then run the engine; the registries below
-// expose everything a report needs (kpis++ consumes them).
-// ============================================================================
+
 class Parser {
   public:
     json data;
     ShiftManager::DateTime sim_start;
 
-    std::map<std::string, const json*> by_id;              // node id -> node
+    std::map<std::string, const json*> by_id;
     std::map<std::string, std::vector<const json*>> per_kind;
 
     std::map<std::string, Model*> models;
@@ -306,15 +281,15 @@ class Parser {
     std::map<std::string, Intervals> shifts;
     std::map<std::string, Resource*> resources;
     std::map<std::string, OperatorGroup*> operator_groups;
-    std::map<std::string, Outlet*> outlets;                // Buffers and Routers
+    std::map<std::string, Outlet*> outlets;
     std::vector<std::string> scrap_buffers_ids;
     std::map<std::string, Task*> tasks;
-    std::vector<std::string> task_order;                   // JSON order, for stable reporting
+    std::vector<std::string> task_order;
     PieceGenerator* piece_generator = nullptr;
     StoppingCriterion* stopping_criterion = nullptr;
 
     explicit Parser(const std::string& flow_json_text) {
-        data = json::parse(flow_json_text);  // nlohmann decodes UTF-8 (no mojibake, §15b)
+        data = json::parse(flow_json_text);
         sim_start = parse_datetime(data.at("start_date").get<std::string>());
         drop_disabled_nodes();
         discriminate();
@@ -328,10 +303,10 @@ class Parser {
         load_resources();
         load_operators();
         load_non_scrap_buffers();
-        load_routers(/*with_scrap=*/false);
+        load_routers(false);
         load_piece_generator();
         load_scrap_buffers();
-        load_routers(/*with_scrap=*/true);
+        load_routers(true);
         load_piece_tasks();
         load_resource_tasks();
         load_shutdowns();
@@ -385,7 +360,7 @@ class Parser {
 
     std::vector<std::pair<Model*, ModelConfig>> make_models_configs(const json& list) {
         std::vector<std::pair<Model*, ModelConfig>> out;
-        std::map<std::string, SamplerPtr> durations;  // dedup identical duration dicts (shared object)
+        std::map<std::string, SamplerPtr> durations;
         for (const auto& mc : list) {
             Model* model = models.at(mc.at("model").get<std::string>());
             std::string key = mc.at("duration").dump();
@@ -411,10 +386,7 @@ class Parser {
         return false;
     }
 
-    // Mirror of parser.py drop_disabled_nodes: a card saved with "enabled": false
-    // does not exist for this run — the node, the connections touching it, and
-    // every reference to its id are removed before anything is built. Cards
-    // without the field count as enabled (older files).
+
     void drop_disabled_nodes() {
         if (!data.contains("nodes")) return;
         std::set<std::string> dead;
@@ -422,7 +394,7 @@ class Parser {
             if (n.contains("enabled") && n.at("enabled").is_boolean() && !n.at("enabled").get<bool>())
                 dead.insert(n.at("id").get<std::string>());
         if (dead.empty()) return;
-        // a breakdown whose task is disabled has nothing to break: drop it too
+
         for (const auto& n : data.at("nodes"))
             if (n.at("kind") == "Breakdown" && n.contains("task") && n.at("task").is_string()
                 && dead.count(n.at("task").get<std::string>()))
@@ -485,7 +457,7 @@ class Parser {
             for (const auto& d : shift.at("days_off"))
                 base_days_off.insert(closing_days.at(d.get<std::string>()).time_since_epoch().count());
 
-            // parse the weekly weekday config once (it does not move between copies)
+
             std::vector<bool> working_days;
             std::vector<std::vector<std::pair<double, double>>> shifts_per_day;
             if (mode == "weekly") {
@@ -501,9 +473,7 @@ class Parser {
                 throw std::invalid_argument("unknown shift mode: " + shift.at("mode").get<std::string>());
             }
 
-            // Generate one instance (k=0 base, k>0 a copy shifted by k translations):
-            // the source dates and the days off are moved forward by k, so a copy keeps
-            // its calendar dates (leap years handled) and gets that period's days off.
+
             auto generate = [&](long long k) -> Intervals {
                 std::set<long long> days_off;
                 for (long long c : base_days_off)
@@ -545,7 +515,7 @@ class Parser {
                     if (!merged.empty() && iv->start <= merged.back()->end) {
                         if (iv->end > merged.back()->end) merged.back()->end = iv->end;
                     } else {
-                        merged.push_back(interval(iv->start, iv->end));  // copy: never mutate base
+                        merged.push_back(interval(iv->start, iv->end));
                     }
                 }
                 result = merged;
@@ -813,4 +783,4 @@ class Parser {
     }
 };
 
-}  // namespace parser
+}

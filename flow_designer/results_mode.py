@@ -1,15 +1,3 @@
-"""Results mode for the flow designer: everything that reads a finished run.
-
-A run directory (runs/<stamp>_<stem>/) carries report.json — the raw KPI
-numbers keyed by node id, written by parser.Parser.write_machine_report — plus
-flow.json (the exact flow that ran), the CSVs and the graphes/ images. This
-module loads that report and renders it: per-card stats dialogs, the bottom
-results dock, the heat-map metrics. The window-side mode machinery (locking,
-toolbar, menu wiring) lives in flow_designer.py.
-
-Formatting mirrors simulation/kpis.py (fmt_duree / fmt_pct and the column
-sets); keep the two in sync when a KPI is added.
-"""
 from __future__ import annotations
 
 import json
@@ -18,10 +6,6 @@ from datetime import datetime, timedelta
 
 from Qt import QtCore, QtGui, QtWidgets
 
-
-# ----------------------------------------------------------------------------
-# Formatting (mirror of simulation/kpis.py presentation rules)
-# ----------------------------------------------------------------------------
 
 DUREE_COLS = {
     'temps_total', 'temps_ouverture', 'arrets_programmes', 'temps_requis',
@@ -105,12 +89,7 @@ def pretty_label(key: str) -> str:
     return (text[:1].upper() + text[1:]) if text else key
 
 
-# ----------------------------------------------------------------------------
-# Report loading
-# ----------------------------------------------------------------------------
-
 class ResultsData:
-    """A parsed report.json plus path helpers into its run directory."""
 
     def __init__(self, run_dir: str):
         self.run_dir = os.path.abspath(run_dir)
@@ -167,10 +146,6 @@ class ResultsData:
         return "   |   ".join(parts)
 
 
-# ----------------------------------------------------------------------------
-# Small view widgets
-# ----------------------------------------------------------------------------
-
 def _make_table(columns: list, rows: list) -> QtWidgets.QTableWidget:
     table = QtWidgets.QTableWidget(len(rows), len(columns))
     table.setHorizontalHeaderLabels(columns)
@@ -192,7 +167,6 @@ def kv_table(pairs: list) -> QtWidgets.QTableWidget:
     return _make_table(["", ""], [(label, value) for label, value in pairs])
 
 
-# Admin-vs-productive roll-up (mirrors simulation.kpis ADMIN_* metadata).
 _ADMIN_LABELS = {
     'nb_taches': 'Nombre de postes', 'temps_fonctionnement': 'Temps de fonctionnement',
     'cycle_total': 'Temps de cycle total', 'heures_machine': 'Heures machine',
@@ -202,7 +176,6 @@ _ADMIN_DUREE = {'temps_fonctionnement', 'cycle_total', 'heures_machine', 'heures
 
 
 def admin_table(summary: dict) -> QtWidgets.QTableWidget:
-    """The administrative vs productive roll-up, one row per indicator."""
     def value(metric, group):
         v = summary.get(group, {}).get(metric, '')
         if not isinstance(v, (int, float)):
@@ -232,7 +205,6 @@ def dict_kv_pairs(data: dict, skip=()) -> list:
 
 
 class PngView(QtWidgets.QWidget):
-    """A run image scaled to the available width, with an open-externally link."""
 
     def __init__(self, path: str | None, missing_text: str = "(graphique indisponible)", parent=None):
         super().__init__(parent)
@@ -267,10 +239,6 @@ class PngView(QtWidgets.QWidget):
         self._rescale(max(200, self.width() - 40))
 
 
-# ----------------------------------------------------------------------------
-# Per-card stats dialogs
-# ----------------------------------------------------------------------------
-
 class ResultsCardDialog(QtWidgets.QDialog):
     def __init__(self, parent, title: str, tabs: list):
         super().__init__(parent)
@@ -290,7 +258,7 @@ class ResultsCardDialog(QtWidgets.QDialog):
 
 def _task_tabs(uid: str, results: ResultsData) -> list:
     raw = results.tasks[uid]
-    # KPIs grouped the way KPIS.md presents them: temps, taux, production, attentes
+
     order = ['type', 'temps_total', 'temps_ouverture', 'arrets_programmes', 'temps_requis',
              'temps_fonctionnement', 'pannes', 'nb_pannes', 'mtbf', 'mttr', 'gel',
              'mise_en_route', 'nb_mises_en_route',
@@ -358,7 +326,6 @@ def _generator_tabs(results: ResultsData) -> list:
 
 
 def card_dialog(parent, kind: str, uid: str, name: str, results: ResultsData):
-    """The stats dialog for a card, or None when the run has nothing for it."""
     if kind in ("Task", "ResourceTask") and uid in results.tasks:
         return ResultsCardDialog(parent, f"Results: {name}", _task_tabs(uid, results))
     if kind == "Buffer" and uid in results.buffers:
@@ -369,7 +336,6 @@ def card_dialog(parent, kind: str, uid: str, name: str, results: ResultsData):
 
 
 def card_tooltip(kind: str, uid: str, results: ResultsData) -> str | None:
-    """One-line summary shown when hovering a card in results mode."""
     if kind in ("Task", "ResourceTask") and uid in results.tasks:
         raw = results.tasks[uid]
         bits = []
@@ -389,10 +355,6 @@ def card_tooltip(kind: str, uid: str, results: ResultsData) -> str | None:
         return results.outcome_text() or None
     return None
 
-
-# ----------------------------------------------------------------------------
-# Results dock (Run / Flux / Opérateurs / Ligne)
-# ----------------------------------------------------------------------------
 
 class ResultsDock(QtWidgets.QDockWidget):
     def __init__(self, parent, results: ResultsData):
@@ -493,10 +455,6 @@ class ResultsDock(QtWidgets.QDockWidget):
         self.setWidget(host)
 
 
-# ----------------------------------------------------------------------------
-# Heat map
-# ----------------------------------------------------------------------------
-
 def _safe_ratio(num, den):
     try:
         return float(num) / float(den) if den not in ('', None, 0) and num not in ('', None) else None
@@ -515,15 +473,11 @@ def _diff(raw, key_a, key_b):
 
 
 def _passage_only(key):
-    # Exit and scrap buffers only ever fill, so mixing them into a stock or
-    # flux normalization drowns the passage buffers' signal; they stay dimmed
-    # and the scrap bins get their own dedicated metric instead.
+
+
     return lambda raw: _get(raw, key) if raw.get('type') == 'PASSAGE' else None
 
-# (label, section, value-fn, higher_is_better). Values are normalized over the
-# nodes that have one; higher_is_better inverts the color ramp (green = good).
-# When a metric is active, every card outside its section is greyed out so the
-# colored family reads at a glance.
+
 HEAT_METRICS = [
     ("Task: utilization (TF / TR)", 'tasks',
      lambda r: _safe_ratio(r.get('temps_fonctionnement'), r.get('temps_requis')), False),
@@ -547,13 +501,11 @@ HEAT_METRICS = [
      lambda r: _get(r, 'entrees') if r.get('type') == 'SCRAP' else None, False),
 ]
 
-# Cards outside the active metric's family (and cards with no value) fade to
-# this neutral grey so the heat colors stand out.
+
 DIMMED_COLOR = (74, 77, 82)
 
 
 def heat_color(v01: float) -> tuple:
-    """0 -> green, 0.5 -> yellow, 1 -> red."""
     v = min(1.0, max(0.0, v01))
     if v < 0.5:
         f = v / 0.5
@@ -563,7 +515,6 @@ def heat_color(v01: float) -> tuple:
 
 
 def heat_values(metric_index: int, results: ResultsData) -> dict:
-    """{node id: color tuple} for one HEAT_METRICS entry."""
     label, section, fn, higher_is_better = HEAT_METRICS[metric_index]
     rows = results.tasks if section == 'tasks' else results.buffers
     values = {uid: v for uid, raw in rows.items() if (v := fn(raw)) is not None}

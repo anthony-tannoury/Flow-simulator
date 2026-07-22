@@ -51,7 +51,7 @@ class SimulationStopper(Component):
     def setup(self, criterion: StoppingCriterion) -> None:
         self.env = env
         self.criterion = criterion
-    
+
     def process(self):
         self.criterion.allow_dispatch.set(True)
         self.wait(self.criterion.done)

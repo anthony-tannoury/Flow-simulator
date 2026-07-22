@@ -1,17 +1,3 @@
-"""Graphs for a finished run: one graphes/ folder, one sub-folder per family,
-and for every figure both the PNG and the CSV of the plotted data.
-
-    graphes/
-        ressources/    stock_<ressource>.csv|png
-        buffers/       longueur_<buffer>.csv|png
-        ligne/         pieces_en_attente.csv|png, encours.csv|png
-        postes/        occupation_<poste>.csv|png
-        operateurs/    disponibles_<groupe>.csv|png
-        modeles/       trajectoires_<modele>.csv|png, production.csv|png
-
-Everything is read post-run from the monitors salabim already keeps, plus the
-piece journals (buffer in/out + task stamps) filled during the run.
-"""
 from __future__ import annotations
 
 import csv
@@ -42,12 +28,10 @@ def _safe(name: str) -> str:
 
 def _dates(times, sim_start: datetime | None):
     if sim_start is None:
-        return [t / 1440 for t in times]  # days since start
+        return [t / 1440 for t in times]
     return [sim_start + timedelta(minutes=t) for t in times]
 
 
-# Outputs are split by format at the top level, then by category, so every
-# figure lands at  <base>/csv/<category>/<stem>.csv  and  <base>/png/<category>/<stem>.png
 def _out_path(base: str, kind: str, category: str, stem: str, ext: str) -> str:
     folder = os.path.join(base, kind, category)
     os.makedirs(folder, exist_ok=True)
@@ -83,7 +67,6 @@ def _write_series(base: str, category: str, stem: str, times, values, sim_start,
 
 
 def _sum_of_steps(series: list[tuple[list, list]]) -> tuple[list, list]:
-    """Sum step functions given as (values, times) pairs, event by event."""
     events = []
     for idx, (values, times) in enumerate(series):
         events.extend((t, idx, v) for v, t in zip(values, times))
@@ -100,10 +83,6 @@ def _sum_of_steps(series: list[tuple[list, list]]) -> tuple[list, list]:
             out_v.append(total)
     return out_v, out_t
 
-
-# ---------------------------------------------------------------------------
-# time series
-# ---------------------------------------------------------------------------
 
 def resource_graphs(base, resources, sim_start):
     for res in resources:
@@ -132,11 +111,11 @@ def line_graphs(base, buffers, sim_start):
 
 def task_graphs(base, tasks, sim_start):
     for task in tasks:
-        # vacant_slots.claimed_quantity = places prises = max_capacity - places vacantes
+
         values, times = task.vacant_slots.claimed_quantity.xt()
         capacity = task.config.max_capacity
         cap_txt = f"{capacity:g}" if capacity != float('inf') else "illimitée"
-        # scale to the actual occupancy, not the (possibly huge) declared capacity
+
         _write_series(base, 'postes', f"occupation_{_safe(task.name())}", times, values, sim_start,
                       'places occupées', f"Occupation : {task.name()} (capacité max {cap_txt})",
                       color=TASK_COLOR)
@@ -151,15 +130,9 @@ def operator_graphs(base, operator_groups, sim_start):
                       ymax=group.n_operators)
 
 
-# ---------------------------------------------------------------------------
-# trajectories per model
-# ---------------------------------------------------------------------------
-
 def _segments(piece) -> list[tuple[str, str, float]]:
-    """journal -> [(step name, 'attente'|'poste', duration)]; the final stay in
-    the exit/scrap buffer is open-ended and not a step."""
     segments = []
-    in_buffer = None      # (name, t)
+    in_buffer = None
     out_time = None
     task_name = None
     for kind, name, t in piece.journal:
@@ -243,7 +216,7 @@ def trajectory_graphs(base, buffers, piece_generator, sim_start, max_branches: i
                 ax.barh(y, mean, left=left, height=0.5, color=color,
                         alpha=0.55 if seg_type == 'attente' else 0.9,
                         edgecolor='white', linewidth=0.6)
-                # label only when the text actually fits inside the segment
+
                 if mean > (len(step) + 2) * 0.008 * xmax:
                     ax.text(left + mean / 2, y, step, ha='center', va='center',
                             fontsize=6.5, rotation=0, clip_on=True)
@@ -265,18 +238,13 @@ def trajectory_graphs(base, buffers, piece_generator, sim_start, max_branches: i
         plt.close(fig)
 
 
-# ---------------------------------------------------------------------------
-# production histogram
-# ---------------------------------------------------------------------------
-
 def production_histogram(base, buffers, piece_generator):
     from .outlet import BufferType
     if piece_generator is None:
         return
     exits = Counter(p.model for b in buffers if b.buffer_type is BufferType.EXIT for p in b)
 
-    # The rate generator has no per-model objective; only the goal generator does.
-    # Without objectives the chart shows just générées vs produites.
+
     goals = getattr(piece_generator, 'goals', None)
     names = [m.name for m in piece_generator.models]
     generees = list(piece_generator.total_generated)

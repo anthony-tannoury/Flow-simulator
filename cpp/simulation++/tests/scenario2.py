@@ -1,10 +1,3 @@
-# Scenario 2 (Python side) — full factory. Companion of scenario2.cpp: same
-# scenario, same seed; behaviour matches, individual draws do not.
-# Covers: model hierarchy, altruistic collectors, ResourceTask (greedy),
-# RestockableResource, lifespan/ExpiryManager, breakdowns (FailureRate/Bathtub
-# + Exponential), both shutdown kinds, operator alternatives, PER_TASK &
-# PER_UNIT scopes, time-function params (Linear), Router with callable prob,
-# ByPiecesProduced stopper.
 import sys
 
 import salabim as sim
@@ -29,19 +22,19 @@ from simulation.judgement_day import ByPiecesProduced, SimulationStopper
 
 env.trace(False)
 
-# --- models: hierarchy -------------------------------------------------------
+
 model_p = Model("P")
 model_p1 = Model("P1")
 model_p2 = Model("P2")
 model_p1.set_parent(model_p)
 model_p2.set_parent(model_p)
 
-# --- generator ---------------------------------------------------------------
+
 b0 = Buffer("B0", valid_models=[model_p], buffer_type=BufferType.PASSAGE)
 gen = PieceGenerator(models_goals={model_p1: 40, model_p2: 30},
                      shifts=[Interval(0, 1400)], outlets=[b0])
 
-# --- resources ---------------------------------------------------------------
+
 steel = RestockableResource("steel", capacity=300,
                             order_duration=Distribution(sim.Constant, 5),
                             delivery_duration=Distribution(sim.Constant, 30),
@@ -55,21 +48,21 @@ raw_a = Resource("raw_a", capacity=400)
 raw_b = Resource("raw_b", capacity=300)
 mix = Resource("mix", capacity=120, initial_capacity=40)
 
-# --- operators ---------------------------------------------------------------
+
 prod1 = Distribution(sim.Uniform, 0.85, 1.15)
 prod2 = Distribution(sim.Uniform, 0.9, 1.1)
 og1 = OperatorGroup("og1", capacity=2, shifts=[Interval(0, 2400)], productivity=prod1)
 og2 = OperatorGroup("og2", capacity=3, shifts=[Interval(0, 2400)], productivity=prod2)
 og3 = OperatorGroup("og3", capacity=1, shifts=[Interval(0, 2400)], productivity=prod2)
 
-# --- buffers / router --------------------------------------------------------
+
 b1 = Buffer("B1", valid_models=[model_p], buffer_type=BufferType.PASSAGE)
 exit_buffer = Buffer("EXIT", valid_models=[model_p], buffer_type=BufferType.EXIT)
 scrap = Buffer("SCRAP", valid_models=[model_p], buffer_type=BufferType.SCRAP,
                piece_generator=gen)
 router = Router({b1: Linear.generate(0, 0.9, 2000, 0.8), scrap: None})
 
-# --- T1: discriminating altruistic piece task with resources + operators -----
+
 t1_protocols = Protocols(
     pending_carriers_pre_flexible_shutdowns=AbortOrWaitForCarriers(0.5),
     pending_carrier_pre_task_shift_end=AbortPendingCarriers(),
@@ -109,7 +102,7 @@ Breakdown(task=t1,
           mttr=Distribution(sim.Uniform, 15, 25),
           outlets=[b0])
 
-# --- RT: greedy resource task producing 'mix', PER_TASK operators ------------
+
 rt_protocols = Protocols(
     pending_carriers_pre_flexible_shutdowns=AbortPendingCarriers(),
     pending_carrier_pre_task_shift_end=AbortPendingCarriers(),
@@ -145,7 +138,7 @@ rt = ResourceTask(config=rt_config)
 Breakdown(task=rt, mtbf=Distribution(sim.Exponential, 400),
           mttr=Distribution(sim.Constant, 12))
 
-# --- T2: non-discriminating altruistic, consumes 'mix' PER_UNIT --------------
+
 t2_protocols = Protocols(
     pending_carriers_pre_flexible_shutdowns=AbortPendingCarriers(),
     pending_carrier_pre_task_shift_end=AbortPendingCarriers(),

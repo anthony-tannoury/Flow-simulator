@@ -1,5 +1,3 @@
-// Scenario 2 (C++ side) — full factory. Companion of scenario2.py: same
-// scenario, same seed; behaviour matches, individual draws do not.
 #include "simulation.hpp"
 
 #include <cstdio>
@@ -10,19 +8,19 @@ int main() {
     auto& e = init(0, false);
     e.trace(false);
 
-    // --- models: hierarchy ---------------------------------------------------
+
     auto* model_p = new Model("P");
     auto* model_p1 = new Model("P1");
     auto* model_p2 = new Model("P2");
     model_p1->set_parent(model_p);
     model_p2->set_parent(model_p);
 
-    // --- generator -----------------------------------------------------------
+
     auto* b0 = new Buffer("B0", {model_p}, BufferType::PASSAGE);
     auto* gen = sim::make<GoalPieceGenerator>({}, std::vector<std::pair<Model*, int>>{{model_p1, 40}, {model_p2, 30}},
                                           Intervals{interval(0, 1400)}, std::vector<Outlet*>{b0});
 
-    // --- resources -----------------------------------------------------------
+
     auto* steel = new RestockableResource("steel", 300,
                                           distribution(DistType::Constant, {5}),
                                           distribution(DistType::Constant, {30}), 100);
@@ -34,21 +32,21 @@ int main() {
     auto* raw_b = new Resource("raw_b", 300);
     auto* mix = new Resource("mix", 120, 40);
 
-    // --- operators -------------------------------------------------------------
+
     SamplerPtr prod1 = distribution(DistType::Uniform, {0.85, 1.15});
     SamplerPtr prod2 = distribution(DistType::Uniform, {0.9, 1.1});
     auto* og1 = new OperatorGroup("og1", 2, Intervals{interval(0, 2400)}, prod1);
     auto* og2 = new OperatorGroup("og2", 3, Intervals{interval(0, 2400)}, prod2);
     auto* og3 = new OperatorGroup("og3", 1, Intervals{interval(0, 2400)}, prod2);
 
-    // --- buffers / router ------------------------------------------------------
+
     auto* b1 = new Buffer("B1", {model_p}, BufferType::PASSAGE);
     auto* exit_buffer = new Buffer("EXIT", {model_p}, BufferType::EXIT);
     auto* scrap = new Buffer("SCRAP", {model_p}, BufferType::SCRAP, gen);
     auto* router = new Router({{b1, Router::Prob(Param(Linear::generate(0, 0.9, 2000, 0.8)))},
                                {scrap, std::nullopt}});
 
-    // --- T1: discriminating altruistic piece task ------------------------------
+
     Protocols t1_protocols{
         .pending_carriers_pre_flexible_shutdowns = std::make_shared<AbortOrWaitForCarriers>(0.5),
         .pending_carrier_pre_task_shift_end = std::make_shared<AbortPendingCarriers>(),
@@ -85,7 +83,7 @@ int main() {
                          distribution(DistType::Uniform, {15, 25}),
                          std::vector<Outlet*>{b0});
 
-    // --- RT: greedy resource task producing 'mix', PER_TASK operators ----------
+
     Protocols rt_protocols{
         .pending_carriers_pre_flexible_shutdowns = std::make_shared<AbortPendingCarriers>(),
         .pending_carrier_pre_task_shift_end = std::make_shared<AbortPendingCarriers>(),
@@ -121,7 +119,7 @@ int main() {
     sim::make<Breakdown>({}, rt, distribution(DistType::Exponential, {400}),
                          distribution(DistType::Constant, {12}), std::vector<Outlet*>{});
 
-    // --- T2: non-discriminating altruistic, consumes 'mix' PER_UNIT ------------
+
     Protocols t2_protocols{
         .pending_carriers_pre_flexible_shutdowns = std::make_shared<AbortPendingCarriers>(),
         .pending_carrier_pre_task_shift_end = std::make_shared<AbortPendingCarriers>(),

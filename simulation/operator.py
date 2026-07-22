@@ -20,8 +20,8 @@ class OperatorShiftManager(ShiftManager):
         assert isinstance(self.entity, OperatorGroup)
         self.entity.set_capacity(self.entity.n_operators)
         self.entity.trigger.trigger()
-        # a task frozen because these operators had left resumes when they come back,
-        # instead of staying frozen until its own (possibly weeks-away) shift start
+
+
         for task in self.entity.dependent_tasks:
             task.is_frozen.set(False)
         super().on_enter(*args)
@@ -30,12 +30,8 @@ class OperatorShiftManager(ShiftManager):
     def on_leave(self, *args) -> None:
         assert isinstance(self.entity, OperatorGroup)
         self.entity.set_capacity(0)
-        # A crew supervising a task PER_TASK goes home when its group leaves shift.
-        # Release it from any dependent task that is holding it as its crew while
-        # idle (no carrier mid-run) — whether the task is parked in its loaded-wait
-        # starving for pieces or blocked at the top of its loop — so the crew is
-        # not reserved (and booked as off-shift labour) past the boundary. The task
-        # re-acquires whichever group is on shift when it next needs one.
+
+
         for task in self.entity.dependent_tasks:
             if any(group is self.entity for group, _ in task.task_operators):
                 task.hand_off_crew_at_shift_end()
@@ -53,27 +49,27 @@ class OperatorGroup(sim.Resource, HasShifts, Triggerable):
         self.productivity = productivity
         self.n_operators = self.capacity()
         self.set_capacity(0)
-        self.dependent_tasks: list = []  # tasks to unfreeze when this group comes back on shift
+        self.dependent_tasks: list = []
         self.manager = OperatorShiftManager(operator_group=self)
-        
+
 
 class Alternative:
     def __init__(self, *alternatives: list[tuple[OperatorGroup, int]]):
         self.alternatives = alternatives
         if not alternatives:
             return
-        
+
         for alt in alternatives:
             productivity = alt[0][0].productivity
             if not all(o.productivity is productivity for o, _ in alt):
                 raise ValueError("Operators do not have the same productivity")
-            
+
         self.triggers = [r.trigger for alt in alternatives for r, _ in alt]
 
     def request(self, demander: sim.Component, **kwargs) -> list[tuple[OperatorGroup, int]] | None:
         if not self.alternatives:
             return []
-        
+
         if 'fail_at' in kwargs:
             fail_at = kwargs['fail_at']
         elif 'fail_delay' in kwargs:
@@ -98,6 +94,6 @@ class Alternative:
             demander.wait(*self.triggers, fail_at=fail_at, cap_now=cap_now, mode="wait_operators")
             if demander.failed():
                 return None
-            
+
     def __bool__(self):
         return bool(self.alternatives)

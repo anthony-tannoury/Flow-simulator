@@ -1,14 +1,3 @@
-"""Always-on KPI collection and CSV report.
-
-Everything here is a post-run reader: the numbers come from the monitors
-salabim already records (states, resources, stores) plus the light tallies
-filled by the tasks themselves (batch_sizes, cycle_times, startup_times,
-deposited/scrapped, mode tags). Nothing is configurable per node: every task
-and every buffer is measured, every run.
-
-Times are simulation minutes. CSVs are written in utf-8 with BOM so Excel
-opens them with accents intact.
-"""
 from __future__ import annotations
 
 import csv
@@ -22,7 +11,6 @@ from simulation import env
 
 
 def fmt_duree(minutes) -> str:
-    """70 -> '1h 10m', 525600 -> '365j 0h 0m', 3.33 -> '3m 20s', 0.5 -> '30s'."""
     if minutes == '' or minutes is None:
         return ''
     m = float(minutes)
@@ -43,14 +31,12 @@ def fmt_duree(minutes) -> str:
 
 
 def fmt_pct(x) -> str:
-    """0.0812 -> '8.1%', 0.83 -> '83%'."""
     if x == '' or x is None:
         return ''
     return f"{x * 100:.1f}".rstrip('0').rstrip('.') + '%'
 
 
 def fmt_instant(minutes, sim_start: datetime | None) -> str:
-    """A point in simulated time, as a real date when the start date is known."""
     if minutes == '' or minutes is None:
         return ''
     if sim_start is None:
@@ -58,8 +44,6 @@ def fmt_instant(minutes, sim_start: datetime | None) -> str:
     return (sim_start + timedelta(minutes=float(minutes))).strftime('%d-%m-%Y %H:%M')
 
 
-# Work-in-progress level monitor: +1 when a piece is born (Piece.setup),
-# -1 when it reaches an EXIT or SCRAP buffer (Piece.enter).
 WIP = sim.Monitor("wip", level=True)
 
 
@@ -78,8 +62,6 @@ def mode_total(components, tag: str) -> float:
 
 
 def union_mode_duration(components, tags: set) -> float:
-    """Wall-clock time where at least one component is in one of the given
-    modes (event-merged union; concurrent components never double-count)."""
     now = env.now()
     deltas = []
     for component in components:
@@ -102,8 +84,6 @@ def union_mode_duration(components, tags: set) -> float:
 
 
 def level_during(level_monitor, status_monitor, status_value) -> float:
-    """Integral of a level monitor over the time a status monitor holds a value
-    (event-merged, extended to now)."""
     xl, tl = level_monitor.xt()
     xs, ts = status_monitor.xt(force_numeric=False)
     times = sorted(set(tl) | set(ts) | {env.now()})
@@ -120,7 +100,6 @@ def level_during(level_monitor, status_monitor, status_value) -> float:
 
 
 def overlap_duration(mon_a, val_a, mon_b, val_b) -> float:
-    """Time where level monitor a holds val_a AND b holds val_b (event-merged)."""
     xa, ta = mon_a.xt(force_numeric=False)
     xb, tb = mon_b.xt(force_numeric=False)
     times = sorted(set(ta) | set(tb))
@@ -154,8 +133,6 @@ def _product(*values):
 
 
 def ideal_cycle_times(task) -> dict:
-    """tc idéal per model (minutes per piece at nominal pace), from the task's
-    own config: mean duration + mean loading, spread over a full carrier."""
     from .piece_task import PieceTask
     loading = task.config.loading_duration.mean(0.0)
     if isinstance(task, PieceTask):
@@ -177,12 +154,11 @@ def task_kpis(task) -> dict:
     mtbf = ''
     if len(debuts_pannes) > 1:
         mtbf = round(sum(b - a for a, b in zip(debuts_pannes, debuts_pannes[1:])) / (len(debuts_pannes) - 1), 3)
-    # frozen only counts during opening hours: a task that freezes near a shift
-    # end stays frozen through the whole downtime until the next shift start, and
-    # that off-shift stretch is not "gel", it is just closed.
+
+
     gel = overlap_duration(task.is_frozen.value, True, task.is_in_downtime.value, False)
     nc = task.active_carriers.num_carriers.value
-    tf = tt - nc.value_duration(0)  # temps de fonctionnement: union, station has >=1 active carrier
+    tf = tt - nc.value_duration(0)
 
     is_piece_task = isinstance(task, PieceTask)
     tc = ideal_cycle_times(task)
@@ -202,12 +178,7 @@ def task_kpis(task) -> dict:
                   for c in carriers]
     lancements = task.batch_sizes.number_of_entries()
 
-    # OEE / TRS as availability x performance x quality (each in [0, 1]).
-    # Performance compares the ideal value-adding time (TN) with the actual
-    # value-adding machine time (loading + processing summed over every carrier).
-    # Summing over carriers is what makes it correct for stations that run several
-    # carriers in parallel (independent_carriers): the "union" temps_fonctionnement
-    # would undercount that work and push the rate above 100%.
+
     t_loading = mode_total(carriers, 'loading')
     t_processing = mode_total(carriers, 'processing')
     value_add = t_loading + t_processing
@@ -262,11 +233,8 @@ def task_kpis(task) -> dict:
         'temps_collecte': round(mode_total(carriers, 'collecting'), 3),
         'temps_chargement': round(t_loading, 3),
         'temps_traitement': round(t_processing, 3),
-        # heures machine: wall-clock machine time (union of loading + processing
-        # across carriers; a task is one physical machine, so parallel carriers
-        # inside it never multiply the hours). heures main-d'oeuvre:
-        # operator-minutes booked on the task by every crew (loading, processing
-        # PER_BATCH holds, the PER_TASK crew's whole claim window, startup).
+
+
         'heures_machine': round(union_mode_duration(carriers, {'loading', 'processing'}), 3),
         'heures_main_oeuvre': round(task.labor_minutes_total(), 3),
     }
@@ -325,10 +293,8 @@ def operator_kpis(group) -> dict:
     tt = env.now()
     posted = group.is_in_downtime.value.value_duration(False)
     claimed_mean = group.claimed_quantity.mean()
-    # Diagnostic split of the claimed operator-minutes by the group's own posted
-    # hours. The simulation releases a PER_TASK crew at its shift boundary (and
-    # on a freeze-abort), so heures_hors_poste should stay near zero; anything
-    # sizeable left is a batch legitimately finishing past the shift end.
+
+
     en_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, False)
     hors_poste = level_during(group.claimed_quantity, group.is_in_downtime.value, True)
     return {
@@ -339,17 +305,13 @@ def operator_kpis(group) -> dict:
         'heures_en_poste': round(en_poste, 3),
         'heures_hors_poste': round(hors_poste, 3),
         'occupation_max': group.claimed_quantity.maximum(),
-        # mean claimed is averaged over the whole run; scale it back to the time
-        # the group was actually posted, against its full headcount
+
+
         'taux_occupation': ratio(claimed_mean * tt, group.n_operators * posted),
     }
 
 
 def resource_kpis(resource) -> dict:
-    """Per-resource stock metrics, read from the available_quantity ("stock")
-    monitor. Consumption is the total downward movement of the stock; entrées is
-    the total upward movement (restocks for a restockable input, output for a
-    resource produced by a task). A rupture is a fall to an empty stock."""
     tt = env.now()
     stock = resource.available_quantity
     values, _times = stock.xt()
@@ -439,8 +401,8 @@ def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
         scraps_par_modele: dict = {}
         for p in scraps:
             scraps_par_modele[p.model] = scraps_par_modele.get(p.model, 0) + 1
-        # Only the goal generator carries per-model objectives; the rate generator
-        # has none, so its objectif/atteinte columns stay blank.
+
+
         goals = getattr(piece_generator, 'goals', None)
         for i, model in enumerate(piece_generator.models):
             leads = sorted(exits_par_modele.get(model, []))
@@ -459,16 +421,12 @@ def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
     return flux, par_modele
 
 
-# Administrative vs productive (non-admin) task split. Each task carries an
-# `admin` flag (reporting only, no effect on the simulation); this rolls the
-# postes rows up into the two groups and reports each group's share of the
-# whole plus the admin-to-productive ratio, per indicator.
 ADMIN_INDICATEURS = [
-    ('nb_taches', False),            # (metric key, is a duration)
-    ('temps_fonctionnement', True),  # machine running time (>=1 active carrier)
-    ('cycle_total', True),           # sum over batches of their cycle time
-    ('heures_machine', True),        # wall-clock machine hours
-    ('heures_main_oeuvre', True),    # operator-minutes, all crews
+    ('nb_taches', False),
+    ('temps_fonctionnement', True),
+    ('cycle_total', True),
+    ('heures_machine', True),
+    ('heures_main_oeuvre', True),
 ]
 ADMIN_LABELS = {
     'nb_taches': 'Nombre de postes',
@@ -480,7 +438,6 @@ ADMIN_LABELS = {
 
 
 def _task_admin_metrics(row: dict) -> dict:
-    """The admin-summary metrics for one postes row (raw minutes / counts)."""
     launches = row.get('nb_lancements') or 0
     cycle_mean = row.get('cycle_moyen')
     cycle_mean = cycle_mean if isinstance(cycle_mean, (int, float)) else 0
@@ -494,9 +451,6 @@ def _task_admin_metrics(row: dict) -> dict:
 
 
 def admin_summary(task_rows: list[dict]) -> dict:
-    """Roll the postes rows up into administrative vs productive groups: absolute
-    totals, each group's share of the whole, and the admin-to-productive ratio,
-    per indicator. Raw values (minutes / counts / fractions), for report.json."""
     keys = [k for k, _ in ADMIN_INDICATEURS]
     admin = {k: 0.0 for k in keys}
     productif = {k: 0.0 for k in keys}
@@ -517,10 +471,6 @@ def admin_summary(task_rows: list[dict]) -> dict:
 
 
 def admin_synthese_rows(summary: dict) -> list[dict]:
-    """The admin summary as a CSV table, one row per indicator. Cells are
-    pre-formatted (durations / counts / percentages / ratio) so the columns can
-    carry mixed units; the column names stay out of the DUREE/PCT sets so the
-    writer leaves them untouched."""
     def fmt(value, is_duration):
         if value == '' or value is None:
             return ''
@@ -545,9 +495,6 @@ def admin_synthese_rows(summary: dict) -> list[dict]:
     return rows
 
 
-# Presentation: durations become 'Xj Xh Xm', ratios become percentages and
-# instants become calendar dates at write time; the collectors above keep
-# returning raw minutes/fractions so they stay directly usable in code.
 DUREE_COLS = {
     'temps_total', 'temps_ouverture', 'arrets_programmes', 'temps_requis',
     'pannes', 'mtbf', 'mttr', 'gel', 'mise_en_route', 'temps_fonctionnement',
@@ -562,7 +509,7 @@ DUREE_COLS = {
 PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
             'trs', 'trg', 'tre', 'taux_rebut', 'atteinte', 'taux_occupation'}
 INSTANT_COLS = {'creation', 'fin'}
-BOOL_COLS = {'admin'}  # rendered oui/non in the CSVs; report.json keeps the raw bool
+BOOL_COLS = {'admin'}
 
 
 def _format_row(row: dict, sim_start: datetime | None) -> dict:
@@ -607,7 +554,7 @@ def write_report(directory: str, tasks: list, buffers: list, piece_generator=Non
     _write_csv(os.path.join(directory, 'postes.csv'), task_rows, sim_start)
     _write_csv(os.path.join(directory, 'postes_modeles.csv'),
                [row for t in tasks for row in task_model_rows(t)], sim_start)
-    if task_rows:  # administrative vs productive roll-up (rows pre-formatted)
+    if task_rows:
         _write_csv(os.path.join(directory, 'synthese_admin.csv'),
                    admin_synthese_rows(admin_summary(task_rows)))
     _write_csv(os.path.join(directory, 'buffers.csv'),

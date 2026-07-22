@@ -25,10 +25,10 @@ class Breakdown(Component, ABC):
 
         if outlets and isinstance(task, ResourceTask):
             raise ValueError("Breakdown on resource task cannot have outlets")
-        
+
         if not outlets and isinstance(task, PieceTask):
             raise ValueError("Breakdowns on piece tasks must have outlets")
-    
+
         self.task = task
         self.mtbf = mtbf
         self.mttr = mttr
@@ -62,7 +62,7 @@ class Shutdowns(IntervalWaiter, ABC):
     def get_deadline(self) -> float:
         next_shutdown = self.get_next_shutdown()
         return next_shutdown.start if next_shutdown is not None else float('inf')
-    
+
     @override
     def on_enter(self, *args):
         self.task.abort()
@@ -121,7 +121,7 @@ class FlexibleShutdowns(Shutdowns):
                 return True
 
         return False
-    
+
     @override
     def process(self):
         while True:

@@ -43,8 +43,6 @@ class SimNode(BaseNode):
 
 
 class ShutdownsNode(SimNode):
-    """NonFlexibleShutdowns or FlexibleShutdowns (chosen via the type toggle).
-    Intervals are edited in the card menu ('+ interval')."""
     NODE_NAME = "Shutdowns"
     kind = "Shutdowns"
     color = (125, 80, 130)
@@ -52,12 +50,12 @@ class ShutdownsNode(SimNode):
     def __init__(self):
         super().__init__()
         self.add_output("shutdowns", color=PORT_COLORS["shutdown"])
-        # the on-card combo shows display labels; to_clean_json canonicalizes
+
         add_combo_input(self, "shutdown_type", "Type",
                         [sentence_case(t) for t in SHUTDOWN_TYPES], sentence_case("NON_FLEXIBLE"))
-        self.create_property("mode", "custom")   # "custom" (explicit intervals) | "generator" (periodic)
-        self.create_property("intervals", "[]")  # [{start, end}]
-        self.create_property("generator", "{}")  # {in_between, duration, start, end}
+        self.create_property("mode", "custom")
+        self.create_property("intervals", "[]")
+        self.create_property("generator", "{}")
 
     def to_clean_json(self) -> dict:
         mode = self.get_property("mode") if self.has_property("mode") else "custom"
@@ -70,7 +68,7 @@ class ShutdownsNode(SimNode):
             "mode": mode,
             "position": [self.x_pos(), self.y_pos()],
         }
-        # like shifts: only the fields the mode actually uses
+
         if mode == "generator":
             out["generator"] = get_property_json(self, "generator", {})
         else:
@@ -88,7 +86,7 @@ class BufferNode(SimNode):
         self.add_input("from_task", multi_input=True, color=PORT_COLORS["task"])
         self.add_output("to_task", multi_output=True, color=PORT_COLORS["buffer"])
         self.create_property("valid_models", "[]")
-        self.create_property("buffer_type", "PASSAGE")  # PASSAGE | SCRAP | EXIT
+        self.create_property("buffer_type", "PASSAGE")
 
     def to_clean_json(self) -> dict:
         return {
@@ -112,7 +110,7 @@ class RouterNode(SimNode):
         super().__init__()
         self.add_input("from_task", multi_input=True, color=PORT_COLORS["task"])
         self.add_output("to_buffers", multi_output=True, color=PORT_COLORS["buffer"])
-        self.create_property("buffer_probs", "{}")  # {buffer_id: <time-function> | null}; null == freeloader (prob = 1 - others)
+        self.create_property("buffer_probs", "{}")
 
     def to_clean_json(self) -> dict:
         connected_buffers = connected_refs_from_port(self, "to_buffers", "output")
@@ -130,10 +128,6 @@ class RouterNode(SimNode):
 
 
 class PieceGeneratorNode(SimNode):
-    """PieceGenerator: the single source of pieces, wired to its outlets, emitting
-    during the shifts chosen in its card menu. What it emits (models, and either
-    goals or per-model rates) lives in the stopping criterion under Simulation
-    Settings."""
     NODE_NAME = "Piece generator"
     kind = "PieceGenerator"
     color = (145, 80, 80)
@@ -141,7 +135,7 @@ class PieceGeneratorNode(SimNode):
     def __init__(self):
         super().__init__()
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
-        self.create_property("shifts", "[]")   # [shift_name]
+        self.create_property("shifts", "[]")
 
     def to_clean_json(self) -> dict:
         return {
@@ -155,9 +149,6 @@ class PieceGeneratorNode(SimNode):
 
 
 class TaskNode(SimNode):
-    """PieceTask. Everything except the piece-flow wiring lives in the card menu:
-    per-model configs, task-level durations, operator alternatives, scopes, policies,
-    task shifts, carrier settings."""
     NODE_NAME = "Piece task"
     kind = "Task"
     color = (150, 90, 60)
@@ -169,25 +160,24 @@ class TaskNode(SimNode):
         self.add_input("breakdowns", multi_input=True, color=PORT_COLORS["breakdown"])
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
 
-        # per-model: {model, duration:<sampler>, resources:[{resource,value}],
-        #             min_carrier_capacity, max_carrier_capacity}
+
         self.create_property("models_configs", "[]")
-        self.create_property("startup_duration", "")   # <sampler>
-        self.create_property("loading_duration", "")   # <sampler>
-        self.create_property("operators", "[]")        # <alternatives>
+        self.create_property("startup_duration", "")
+        self.create_property("loading_duration", "")
+        self.create_property("operators", "[]")
         self.create_property("loading_operators", "[]")
         self.create_property("startup_operators", "[]")
-        self.create_property("task_shifts", "[]")      # [shift_name]
+        self.create_property("task_shifts", "[]")
         self.create_property("policies", json.dumps(default_policies(PIECE_POLICY_OPTIONS)))
-        self.create_property("operator_scope", "PER_BATCH")   # PER_BATCH | PER_TASK
-        self.create_property("resource_scope", "PER_BATCH")   # PER_UNIT | PER_BATCH
+        self.create_property("operator_scope", "PER_BATCH")
+        self.create_property("resource_scope", "PER_BATCH")
         self.create_property("min_carriers", 1)
         self.create_property("max_capacity", 1.0)
         self.create_property("contiguous_carriers", False)
         self.create_property("independent_carriers", False)
         self.create_property("timeout", 1000000000.0)
         self.create_property("priority", 5)
-        self.create_property("admin", False)   # administrative task: reporting classification only
+        self.create_property("admin", False)
         self.create_property("collector_type", "NON_DISCRIMINATING_GREEDY")
 
     def to_clean_json(self) -> dict:
@@ -209,7 +199,7 @@ class TaskNode(SimNode):
             "max_capacity": as_float(self.get_property("max_capacity"), 1.0),
             "contiguous_carriers": bool(self.get_property("contiguous_carriers")),
             "independent_carriers": bool(self.get_property("independent_carriers")),
-            "timeout": self.get_property("timeout"),  # number of minutes | "inf"
+            "timeout": self.get_property("timeout"),
             "priority": as_int(self.get_property("priority"), 5),
             "admin": bool(self.get_property("admin")),
             "collector_type": self.get_property("collector_type"),
@@ -222,8 +212,6 @@ class TaskNode(SimNode):
 
 
 class ResourceTaskNode(SimNode):
-    """ResourceTask. Consumes/transforms resources into output resources. No piece
-    flow; breakdown and shutdown cards wire directly into it."""
     NODE_NAME = "Resource task"
     kind = "ResourceTask"
     color = (150, 120, 60)
@@ -233,13 +221,13 @@ class ResourceTaskNode(SimNode):
         self.add_input("shutdowns", multi_input=True, color=PORT_COLORS["shutdown"])
         self.add_input("breakdowns", multi_input=True, color=PORT_COLORS["breakdown"])
 
-        self.create_property("non_transformed_resources", "[]")   # [{resource, value(quantity)}]
-        self.create_property("transformed_resources", "[]")       # [{resource, proportion, salvageable}]
-        self.create_property("resources_out", "[]")               # [{resource, distribution:<sampler>}]
-        self.create_property("duration", "")                      # <sampler>
-        self.create_property("startup_duration", "")              # <sampler>
-        self.create_property("loading_duration", "")              # <sampler>
-        self.create_property("operators", "[]")                   # <alternatives>
+        self.create_property("non_transformed_resources", "[]")
+        self.create_property("transformed_resources", "[]")
+        self.create_property("resources_out", "[]")
+        self.create_property("duration", "")
+        self.create_property("startup_duration", "")
+        self.create_property("loading_duration", "")
+        self.create_property("operators", "[]")
         self.create_property("loading_operators", "[]")
         self.create_property("startup_operators", "[]")
         self.create_property("task_shifts", "[]")
@@ -255,7 +243,7 @@ class ResourceTaskNode(SimNode):
         self.create_property("independent_carriers", False)
         self.create_property("timeout", 1000000000.0)
         self.create_property("priority", 5)
-        self.create_property("admin", False)   # administrative task: reporting classification only
+        self.create_property("admin", False)
 
     def to_clean_json(self) -> dict:
         return {
@@ -282,7 +270,7 @@ class ResourceTaskNode(SimNode):
             "max_carrier_capacity": as_float(self.get_property("max_carrier_capacity"), 1.0),
             "contiguous_carriers": bool(self.get_property("contiguous_carriers")),
             "independent_carriers": bool(self.get_property("independent_carriers")),
-            "timeout": self.get_property("timeout"),  # number of minutes | "inf"
+            "timeout": self.get_property("timeout"),
             "priority": as_int(self.get_property("priority"), 5),
             "admin": bool(self.get_property("admin")),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),
@@ -292,18 +280,16 @@ class ResourceTaskNode(SimNode):
 
 
 class BreakdownNode(SimNode):
-    """Breakdown on a task. mtbf is a distribution or a bathtub failure-rate;
-    mttr is a distribution. Piece-task breakdowns need lifeboat outlets."""
     NODE_NAME = "Breakdown"
     kind = "Breakdown"
     color = (150, 65, 85)
 
     def __init__(self):
         super().__init__()
-        self.add_output("breakdown", color=PORT_COLORS["breakdown"])   # wires directly into the task
+        self.add_output("breakdown", color=PORT_COLORS["breakdown"])
         self.add_output("bufs_out", multi_output=True, color=PORT_COLORS["task"])
-        self.create_property("mtbf", "{}")   # {"mode": "distribution"|"bathtub", ...}
-        self.create_property("mttr", "")     # <sampler>
+        self.create_property("mtbf", "{}")
+        self.create_property("mttr", "")
 
     def to_clean_json(self) -> dict:
         tasks = get_output_refs(self, "breakdown")

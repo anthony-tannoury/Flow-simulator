@@ -1,9 +1,3 @@
-# Scenario 1 (Python side) — companion of scenario1.cpp: same scenario, same seed.
-# Behaviour matches the C++ run; the individual draws (and so the exact
-# counts) do not.
-# Generator (2 models, shifts) -> B0 -> PieceTask T1 (discriminating greedy,
-# operators w/ productivity, uniform durations) -> Router(90% B1 / 10% scrap)
-# -> PieceTask T2 (non-discriminating greedy, no operators) -> exit.
 import sys
 
 import salabim as sim

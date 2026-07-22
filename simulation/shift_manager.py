@@ -22,7 +22,7 @@ class HasShifts:
             if shift.end >= env.now():
                 return shift
         return self.shifts[-1] if self.shifts else None
-    
+
     def next_or_current_shift_from(self, cursor: float) -> Interval | None:
         for shift in self.shifts:
             if shift.end > cursor:
@@ -52,7 +52,7 @@ class ShiftManager(IntervalWaiter):
             date2 = datetime.strptime(date2, format_str)
         delta = date2 - date1
         return int(delta.total_seconds() // 60)
-    
+
     @staticmethod
     def generate_weekly_shifts(sim_start: datetime, shifts_per_day: list[list[tuple[float, float]]], working_days: list[bool], days_off: set[date], start: date, end: date) -> list[Interval]:
         if len(shifts_per_day) != 7:
@@ -60,7 +60,7 @@ class ShiftManager(IntervalWaiter):
 
         if len(working_days) != 7:
             raise ValueError("There must be 7 working days per week")
-        
+
         week_offset = sim_start.weekday()
         time_offset = 60 * sim_start.hour + sim_start.minute
         days_off_rel = {(day_off - sim_start.date()).days for day_off in days_off}
@@ -76,7 +76,7 @@ class ShiftManager(IntervalWaiter):
                     all_shifts.append(new_shift)
 
         return all_shifts
-    
+
     @staticmethod
     def generate_custom_shifts(sim_start: datetime, shifts: list[tuple[datetime, datetime]], days_off: set[date]) -> list[Interval]:
         datetime_ranges = []

@@ -60,9 +60,8 @@ class Delivery(Component):
         self.order_duration = order_duration
 
     def process(self):
-        # The delivery owns the whole order timeline (order + transit) so it always
-        # lands and always clears active_order — even if the demander that placed
-        # the order is aborted while it waits.
+
+
         self.hold(self.order_duration)
         missing = self.stock.capacity() - self.stock.available_quantity()
         self.hold(self.delivery_duration.sample_now())
@@ -81,10 +80,8 @@ class RestockableResource(Resource):
     def restock(self, demander: Component):
         if not self.active_order and self.available_quantity() < self.threshold:
             self.active_order = True
-            # Spawn the delivery BEFORE the demander's order wait: the demander can
-            # be freeze-aborted (breakdown, shutdown, shift end) mid-hold, and when
-            # the delivery was only spawned afterwards, that cancel left active_order
-            # stuck True with no delivery coming — a permanent stock-out.
+
+
             order = self.order_duration.sample_now()
             Delivery(stock=self, delivery_duration=self.delivery_duration, order_duration=order)
             demander.hold(order, mode="wait_materials")

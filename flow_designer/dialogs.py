@@ -105,11 +105,6 @@ class ModelRegistryDialog(QtWidgets.QDialog):
 
 
 class ShiftEditorDialog(QtWidgets.QDialog):
-    """A shift definition is either 'weekly' (the recurring weekday creator) or
-    'custom' (an explicit list of absolute date intervals). A type dropdown picks
-    the mode and the matching parameters appear below it; both configurations are
-    kept in the entry. Days off are shared: one list of whole days, either mode,
-    picked from the closing-days registry (Registries > Edit closing days...)."""
 
     SHIFT_MODES = [("Weekly", "weekly"), ("Custom", "custom")]
 
@@ -129,7 +124,7 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self._stack = QtWidgets.QStackedWidget()
         lay.addWidget(self._stack)
 
-        # --- Weekly page: the recurring weekday creator ---
+
         weekly = QtWidgets.QWidget()
         wl = QtWidgets.QVBoxLayout(weekly)
         wl.addWidget(QtWidgets.QLabel("Shifts per weekday (times of day as hours + minutes):"))
@@ -152,8 +147,7 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         wl.addLayout(form2)
         self._stack.addWidget(weekly)
 
-        # --- Custom page: absolute date intervals (the loader converts them to raw
-        #     minutes relative to the simulation start date) ---
+
         custom = QtWidgets.QWidget()
         cl = QtWidgets.QVBoxLayout(custom)
         cl.addWidget(QtWidgets.QLabel("Absolute intervals (dd-mm-yyyy hh:mm). They are converted to\n"
@@ -168,7 +162,7 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.mode.setCurrentIndex(mi if mi >= 0 else 0)
         self._stack.setCurrentIndex(self.mode.currentIndex())
 
-        # --- Days off: shared by both modes, chosen from the closing-days registry ---
+
         closing_days = closing_days or []
         if closing_days:
             lay.addWidget(QtWidgets.QLabel("Days off (check closing days; applies in either mode):"))
@@ -179,11 +173,7 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         self.days_off.setMaximumHeight(140)
         lay.addWidget(self.days_off)
 
-        # --- Repeat: duplicate the whole configured shift a number of extra times,
-        #     each copy shifted later by a fixed duration. The copies are generated
-        #     at load time (both modes), so a seasonal block — e.g. a December-only
-        #     weekly shift, or a custom date range — can be spread across years
-        #     without authoring one shift per year.
+
         rep = entry.get("repeat") or {}
         rep_box = QtWidgets.QGroupBox("Repeat (duplicate this shift, each copy shifted later)")
         rf = QtWidgets.QFormLayout(rep_box)
@@ -229,8 +219,8 @@ class ShiftEditorDialog(QtWidgets.QDialog):
         return out
 
     def accept(self):
-        # Repetitions without a translation would silently repeat in place (and used
-        # to be dropped): refuse OK until the user gives the copies an offset.
+
+
         count = as_int(self.rep_count.text())
         translation = any(as_int(w.text()) for w in (self.rep_y, self.rep_mo, self.rep_w, self.rep_d))
         if count > 0 and not translation:
@@ -244,11 +234,6 @@ class ShiftEditorDialog(QtWidgets.QDialog):
 
 
 class TranslateShiftDialog(QtWidgets.QDialog):
-    """Create a new shift as a copy of an existing one, shifted in time by a chosen
-    duration (days / hours / minutes, either direction). The daily pattern moves as a
-    whole — intervals that cross midnight after the shift are split across weekdays —
-    which is the quick way to build, say, an afternoon or night shift from a morning
-    one (the atelier's APREM = MATIN + 8 h, NUIT = MATIN + 16 h)."""
 
     def __init__(self, parent, entries):
         super().__init__(parent)
@@ -318,7 +303,7 @@ class TranslateShiftDialog(QtWidgets.QDialog):
         src = self._entries[self.source.currentData()]
         name = self.name.text().strip() or f"{src.get('name', 'shift')} {self._duration_tag()}"
         entry = translate_shift_entry(src, self.total_minutes(), name=name)
-        entry.pop("id", None)  # a translated copy is a brand-new shift, not the source
+        entry.pop("id", None)
         return entry
 
 
@@ -415,7 +400,6 @@ class ResourceEditorDialog(QtWidgets.QDialog):
 
 
 class _RegistryDialog(QtWidgets.QDialog):
-    """List of named entries with Add / Edit / Remove; subclasses supply the item editor."""
     reg_title = "Registry"
 
     def __init__(self, parent=None, entries=None):
@@ -479,10 +463,10 @@ class ShiftRegistryDialog(_RegistryDialog):
     def __init__(self, parent=None, entries=None, closing_days=None):
         self._closing_days = closing_days or []
         super().__init__(parent, entries)
-        # A shift can also be created as a time-shifted copy of an existing one.
+
         btn = QtWidgets.QPushButton("New from existing (translated)…")
         btn.clicked.connect(self._add_translated)
-        self.layout().insertWidget(self.layout().count() - 1, btn)  # above OK/Cancel
+        self.layout().insertWidget(self.layout().count() - 1, btn)
 
     def _make_editor(self, entry):
         return ShiftEditorDialog(self, entry, closing_days=self._closing_days)
@@ -501,9 +485,6 @@ class ShiftRegistryDialog(_RegistryDialog):
 
 
 class ClosingDaysRegistryDialog(QtWidgets.QDialog):
-    """The closing-days registry: whole days the factory is closed, defined once and
-    picked (multi-select) inside every shift definition. Edited in place — a row per
-    day: date picker + optional label — so adding many days stays cheap."""
 
     def __init__(self, parent=None, entries=None):
         super().__init__(parent)
@@ -537,7 +518,7 @@ class ClosingDaysRegistryDialog(QtWidgets.QDialog):
         label.setPlaceholderText("Label (optional)")
         rm = QtWidgets.QPushButton("×"); rm.setMaximumWidth(24)
         rl.addWidget(picker); rl.addWidget(label, 1); rl.addWidget(rm)
-        rec = (row, picker, label, entry)  # entry kept so an existing id survives edits
+        rec = (row, picker, label, entry)
         rm.clicked.connect(lambda: self._remove(rec))
         self._rows.append(rec)
         self._vl.insertWidget(self._vl.count() - 1, row)
@@ -569,10 +550,6 @@ class OperatorRegistryDialog(_RegistryDialog):
 
 
 class ShutdownsMenuDialog(QtWidgets.QDialog):
-    """Shutdown windows are either 'custom' (an explicit list of absolute date
-    intervals) or 'generator' (periodic: every N minutes a shutdown of D minutes,
-    placed inside the attached task's shifts by generate_periodic_shutdown). A
-    mode dropdown picks which; both configurations are kept on the node."""
 
     MODES = [("Custom", "custom"), ("Generator", "generator")]
 
@@ -594,7 +571,7 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         self._stack = QtWidgets.QStackedWidget()
         lay.addWidget(self._stack)
 
-        # --- Custom page: the explicit interval list ---
+
         custom = QtWidgets.QWidget()
         cl = QtWidgets.QVBoxLayout(custom); cl.setContentsMargins(0, 0, 0, 0)
         cl.addWidget(QtWidgets.QLabel("Intervals (absolute dates, dd-mm-yyyy hh:mm):"))
@@ -603,7 +580,7 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         cl.addStretch(1)
         self._stack.addWidget(custom)
 
-        # --- Generator page: periodic shutdowns placed inside the task's shifts ---
+
         gen = QtWidgets.QWidget()
         gl = QtWidgets.QVBoxLayout(gen); gl.setContentsMargins(0, 0, 0, 0)
         gl.addWidget(QtWidgets.QLabel("Periodic: a shutdown every 'in between' minutes, placed inside\n"
@@ -632,7 +609,7 @@ class ShutdownsMenuDialog(QtWidgets.QDialog):
         bb.accepted.connect(self.accept); bb.rejected.connect(self.reject); lay.addWidget(bb)
 
     def apply(self):
-        # the on-card combo lists display labels, so store the label form
+
         self.node.set_property("shutdown_type", sentence_case(self.type.currentData()))
         self.node.set_property("mode", self.mode.currentData())
         set_property_json(self.node, "intervals", self.intervals.value())
@@ -653,7 +630,7 @@ class BufferMenuDialog(QtWidgets.QDialog):
         tabs = QtWidgets.QTabWidget()
         lay.addWidget(tabs)
 
-        # --- Buffer tab: valid models + type ---
+
         buf_tab = QtWidgets.QWidget()
         bl = QtWidgets.QVBoxLayout(buf_tab)
         bl.addWidget(QtWidgets.QLabel("Valid models (selecting a model selects its children):"))
@@ -686,7 +663,7 @@ class RouterMenuDialog(QtWidgets.QDialog):
         self._widgets = {}
         if not self._buffers:
             lay.addWidget(QtWidgets.QLabel("Wire this router's 'to_buffers' output into buffers first."))
-        # At most one freeloader: its probability is 1 - sum(others), so its slot is greyed out.
+
         self.freeloader = QtWidgets.QComboBox()
         self.freeloader.addItem("(none)", None)
         for b in self._buffers:
@@ -724,9 +701,6 @@ class RouterMenuDialog(QtWidgets.QDialog):
 
 
 class GeneratorMenuDialog(QtWidgets.QDialog):
-    """The piece generator's only card setting: the shifts during which it emits.
-    What it emits (models + goals or per-model rates) lives in the stopping
-    criterion under Simulation Settings."""
 
     def __init__(self, parent, node, shift_names):
         super().__init__(parent)
@@ -744,16 +718,6 @@ class GeneratorMenuDialog(QtWidgets.QDialog):
 
 
 class SimulationSettingsDialog(QtWidgets.QDialog):
-    """Simulation settings: the start date (the calendar anchor every absolute date
-    is converted against, always set) and the stopping criterion, which carries the
-    piece generator's mix (the generator's shifts live on its own card). Each
-    criterion type has its own section:
-      - Pieces produced: one integer goal per leaf model and a timeout in minutes.
-        The run ends when every goal is met (or the timeout elapses first); pieces
-        are paced to hit the goals over the generator's shifts.
-      - Time: an explicit stop date, a gap (constant or a function of time) and a
-        per-model probability mix (each constant or a function of time), with one
-        model optionally left as the freeloader (probability 1 - sum(others))."""
 
     def __init__(self, parent, start_date, criterion, model_registry, seed=0):
         super().__init__(parent)
@@ -832,8 +796,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self._widgets["goals"] = goals
         self._add_row("Model goals (one goal per leaf model)", goals)
 
-        # Pacing: automatic (gap computed so the goals fill the shifts minus a grace
-        # period) or a hand-set gap. A saved criterion carrying "gap" is manual.
+
         pacing = QtWidgets.QWidget()
         pl = QtWidgets.QVBoxLayout(pacing)
         pl.setContentsMargins(0, 0, 0, 0)
@@ -870,7 +833,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         self._add_row("Timeout (minutes)", timeout)
 
     def _build_time(self, src):
-        stop = DateTimeWidget(src.get("time", ""))  # an absolute stop date
+        stop = DateTimeWidget(src.get("time", ""))
         self._widgets["time"] = stop
         self._add_row("Stop at", stop)
         gap = TimeFunctionWidget(src.get("gap") or {"kind": "constant", "value": 1.0})
@@ -884,7 +847,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
         canonical = self.type.currentData()
         if canonical == "ByPiecesProduced":
             out = {"type": "ByPiecesProduced",
-                   "timeout": self._widgets["timeout"].get_value()}  # minutes | "inf"
+                   "timeout": self._widgets["timeout"].get_value()}
             if self._widgets["auto_gap"].isChecked():
                 out["grace_period"] = as_float(self._widgets["grace"].text())
             else:
@@ -892,7 +855,7 @@ class SimulationSettingsDialog(QtWidgets.QDialog):
             out["models_goals"] = self._widgets["goals"].value()
             return out
         return {"type": "ByTime",
-                "time": self._widgets["time"].get_value(),  # "dd-mm-yyyy hh:mm"
+                "time": self._widgets["time"].get_value(),
                 "gap": self._widgets["gap"].get_value(),
                 "models_probs": self._widgets["probs"].value()}
 
@@ -916,7 +879,7 @@ class BreakdownMenuDialog(QtWidgets.QDialog):
         for k, d in (("a", 0.001), ("tau", 500.0), ("c", 0.01), ("beta", 2.0), ("eta", 300.0),
                      ("tolerance", 60.0), ("max_iters", 10000)):
             e = QtWidgets.QLineEdit(str(mtbf.get(k, d))); self.bt[k] = e
-            # formula symbols (a, tau, ...) match the title; only word-y params get prettified
+
             bl.addRow(k if len(k) <= 4 else sentence_case(k), e)
         lay.addWidget(self.bathtub_box)
         self.mode.currentTextChanged.connect(self._upd)
@@ -943,16 +906,11 @@ class BreakdownMenuDialog(QtWidgets.QDialog):
 
 
 def _carrier_common_tab(node, operator_names, shift_names, collector_types, extra=None, policy_options=None):
-    """Build the shared task-config tabs, one concept per tab (durations, operators,
-    carriers, scopes, protocols, shifts). `extra` injects caller-owned rows into a tab:
-    {"durations": [(label, widget)], "carriers": [...], "scopes": [...]}; those widgets
-    are read back by the caller, not by _apply_carrier_common.
-    Returns (list-of-(label, widget), accessor-dict)."""
     extra = extra or {}
     tabs = []
     acc = {}
 
-    # durations
+
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
     f.addWidget(QtWidgets.QLabel("Startup duration:")); acc["startup_duration"] = SamplerWidget(get_property_json(node, "startup_duration", None)); f.addWidget(acc["startup_duration"])
     f.addWidget(QtWidgets.QLabel("Loading duration:")); acc["loading_duration"] = SamplerWidget(get_property_json(node, "loading_duration", None)); f.addWidget(acc["loading_duration"])
@@ -961,14 +919,14 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
     f.addStretch(1)
     tabs.append(("Durations", _scroll(t)))
 
-    # operators
+
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
     f.addWidget(QtWidgets.QLabel("Operators (alternatives):")); acc["operators"] = AlternativesWidget(operator_names, get_property_json(node, "operators", [])); f.addWidget(acc["operators"])
     f.addWidget(QtWidgets.QLabel("Loading operators:")); acc["loading_operators"] = AlternativesWidget(operator_names, get_property_json(node, "loading_operators", [])); f.addWidget(acc["loading_operators"])
     f.addWidget(QtWidgets.QLabel("Startup operators:")); acc["startup_operators"] = AlternativesWidget(operator_names, get_property_json(node, "startup_operators", [])); f.addWidget(acc["startup_operators"])
     tabs.append(("Operators", _scroll(t)))
 
-    # carriers (also the general task-settings tab)
+
     t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
     acc["admin"] = QtWidgets.QCheckBox(); acc["admin"].setChecked(bool(node.get_property("admin")))
     acc["admin"].setToolTip("Administrative task (inspection, waiting, storage, ...). Does not change "
@@ -985,7 +943,7 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
         f.addRow(label, wdg)
     tabs.append(("Carriers", _scroll(t)))
 
-    # scopes
+
     t = QtWidgets.QWidget(); f = QtWidgets.QFormLayout(t)
     acc["operator_scope"] = QtWidgets.QComboBox(); fill_combo(acc["operator_scope"], ["PER_BATCH", "PER_TASK"], node.get_property("operator_scope"))
     acc["resource_scope"] = QtWidgets.QComboBox(); fill_combo(acc["resource_scope"], ["PER_UNIT", "PER_BATCH"], node.get_property("resource_scope"))
@@ -999,13 +957,13 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
         f.addRow(label, wdg)
     tabs.append(("Scopes", _scroll(t)))
 
-    # protocols (stored under the "policies" property/JSON key)
+
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
     acc["policies"] = PoliciesWidget(get_property_json(node, "policies", {}), policy_options=policy_options)
     f.addWidget(acc["policies"]); f.addStretch(1)
     tabs.append(("Protocols", _scroll(t)))
 
-    # shifts
+
     t = QtWidgets.QWidget(); f = QtWidgets.QVBoxLayout(t)
     f.addWidget(QtWidgets.QLabel("Task shifts:")); acc["task_shifts"] = ShiftPickerWidget(shift_names, get_property_json(node, "task_shifts", [])); f.addWidget(acc["task_shifts"]); f.addStretch(1)
     tabs.append(("Shifts", _scroll(t)))
@@ -1029,7 +987,7 @@ def _apply_carrier_common(node, acc):
         node.set_property("collector_type", acc["collector_type"].currentData())
     node.set_property("min_carriers", as_int(acc["min_carriers"].text(), 1))
     node.set_property("max_capacity", as_float(acc["max_capacity"].text(), 1.0))
-    node.set_property("timeout", acc["timeout"].get_value())  # number of minutes | "inf"
+    node.set_property("timeout", acc["timeout"].get_value())
     node.set_property("priority", as_int(acc["priority"].text(), 5))
     node.set_property("contiguous_carriers", acc["contiguous_carriers"].isChecked())
     node.set_property("independent_carriers", acc["independent_carriers"].isChecked())
@@ -1070,7 +1028,7 @@ class ResourceTaskMenuDialog(QtWidgets.QDialog):
         rnames = _names(win.resource_registry)
         lay = QtWidgets.QVBoxLayout(self)
         tabs = QtWidgets.QTabWidget(); lay.addWidget(tabs)
-        # resources tab (resource I/O only)
+
         t0 = QtWidgets.QWidget(); f0 = QtWidgets.QVBoxLayout(t0)
         f0.addWidget(QtWidgets.QLabel("Non-transformed inputs (quantity consumed):"))
         self.non_transformed = ResourcePickerWidget(rnames, "quantity",
@@ -1083,7 +1041,7 @@ class ResourceTaskMenuDialog(QtWidgets.QDialog):
         self.outputs = _OutputsWidget(rnames, get_property_json(node, "resources_out", []))
         f0.addWidget(self.outputs)
         tabs.addTab(_scroll(t0), "Resources")
-        # resource-task-specific fields, injected into the shared tabs where they belong
+
         self.duration = SamplerWidget(get_property_json(node, "duration", None))
         self.min_cc = QtWidgets.QLineEdit(str(node.get_property("min_carrier_capacity")))
         self.max_cc = QtWidgets.QLineEdit(str(node.get_property("max_carrier_capacity")))
@@ -1111,21 +1069,15 @@ class ResourceTaskMenuDialog(QtWidgets.QDialog):
 
 
 class RunSimulationDialog(QtWidgets.QDialog):
-    """Progress popup for a simulation run. The simulation runs in a subprocess
-    (sim_runner.py) that prints machine-readable '@@TAG {json}' lines; this dialog
-    shows elapsed wall time, the simulated date and, per stopping criterion,
-    either time progress (By time) or pieces produced (By pieces produced), with
-    an 'n / total' caption above the progress bar. When the run finishes, the
-    report folder is one click away."""
 
-    BAR_STEPS = 1000  # progress bar resolution (fractions map to 0..BAR_STEPS)
+    BAR_STEPS = 1000
 
     def __init__(self, parent, json_path: str, cpp_exe: str | None = None):
         super().__init__(parent)
         self.setWindowTitle("Run simulation")
         self.setMinimumWidth(460)
         self._json_path = json_path
-        self._cpp_exe = cpp_exe  # None -> Python sim_runner.py; else the native engine
+        self._cpp_exe = cpp_exe
         self._meta = None
         self._sim_start = None
         self._report_dir = None
@@ -1189,7 +1141,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
         buttons.addWidget(self.cancel_btn)
         lay.addLayout(buttons)
 
-        # wall clock, ticking every half second
+
         self._wall = QtCore.QElapsedTimer()
         self._wall.start()
         self._tick = QtCore.QTimer(self)
@@ -1197,26 +1149,25 @@ class RunSimulationDialog(QtWidgets.QDialog):
         self._tick.timeout.connect(self._update_elapsed)
         self._tick.start()
 
-        # the simulation subprocess
+
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sim_runner.py")
         self._proc = QtCore.QProcess(self)
         self._proc.setWorkingDirectory(repo_root)
         env = QtCore.QProcessEnvironment.systemEnvironment()
-        env.insert("MPLBACKEND", "Agg")  # report figures only; never open windows
+        env.insert("MPLBACKEND", "Agg")
         self._proc.setProcessEnvironment(env)
         self._proc.readyReadStandardOutput.connect(self._on_stdout)
         self._proc.readyReadStandardError.connect(self._on_stderr)
         self._proc.finished.connect(self._on_finished)
-        # Both engines honour the same <exe> <flow.json> -> @@TAG contract, so the
-        # native binary is a drop-in for the Python runner.
+
+
         if self._cpp_exe:
             file_lbl.setText(f"Running {os.path.basename(json_path)}  (C++ engine)")
             self._proc.start(self._cpp_exe, [json_path])
         else:
             self._proc.start(sys.executable, ["-u", runner, json_path])
 
-    # --- subprocess plumbing ---
 
     def _on_stdout(self):
         data = bytes(self._proc.readAllStandardOutput()).decode("utf-8", errors="replace")
@@ -1243,7 +1194,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
             self._sim_start = parse_date_time(info.get("sim_start"))
             is_pieces = info.get("criterion") == "ByPiecesProduced"
             self._set_form_row_visible(self._pieces_row, self.pieces_lbl, is_pieces)
-            timeout = info.get("timeout")  # only present when finite
+            timeout = info.get("timeout")
             if is_pieces and timeout:
                 if self._sim_start is not None:
                     deadline = self._sim_start + timedelta(minutes=timeout)
@@ -1252,7 +1203,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
                 else:
                     self.timeout_lbl.setText(f"{timeout:g} minutes")
                 self._set_form_row_visible(self._timeout_row, self.timeout_lbl, True)
-            # piece generator's gap (minutes between two pieces): manual / automatic / function
+
             gap = info.get("gap")
             gap_mode = info.get("gap_mode")
             if gap_mode == "function":
@@ -1296,8 +1247,6 @@ class RunSimulationDialog(QtWidgets.QDialog):
                 self.bar.setValue(min(self.BAR_STEPS, int(self.BAR_STEPS * sim_now / total)))
 
     def _outcome_line(self) -> str:
-        """How the run ended, from the criterion's point of view: the goal was
-        met, the timeout cut in first, or the simulation simply ran out of work."""
         meta = self._meta or {}
         if meta.get("criterion") == "ByPiecesProduced":
             pieces = self._last_progress.get("pieces")
@@ -1333,11 +1282,6 @@ class RunSimulationDialog(QtWidgets.QDialog):
             self.status_lbl.setText(self._outcome_line())
 
     def _render_cpp_graphs_if_needed(self):
-        """The native engine writes graph_data.json instead of drawing anything;
-        turn it into the graphes/ PNGs and fill report.json's graphs map with the
-        shared Python renderer, so results mode shows the same graphs a Python run
-        would. No-op for the Python engine (it draws its own) or if the data is
-        absent. A render failure is non-fatal — the report and KPIs are unaffected."""
         if not self._cpp_exe or not self._report_dir:
             return
         if not os.path.isfile(os.path.join(self._report_dir, "graph_data.json")):
@@ -1356,12 +1300,11 @@ class RunSimulationDialog(QtWidgets.QDialog):
                 bytes(proc.readAllStandardError()).decode("utf-8", errors="replace").splitlines())
             self._stderr_tail = self._stderr_tail[-30:]
 
-    # --- UI helpers ---
 
     def _set_form_row_visible(self, row: int, field_widget, visible: bool):
         try:
             self._form.setRowVisible(row, visible)
-        except Exception:  # Qt < 6.4 fallback: hide the widgets themselves
+        except Exception:
             field_widget.setVisible(visible)
             lbl = self._form.labelForField(field_widget)
             if lbl is not None:
@@ -1412,7 +1355,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
         else:
             event.ignore()
 
-    def reject(self):  # Esc key lands here too
+    def reject(self):
         if self._finished:
             super().reject()
         elif self._confirm_abort():

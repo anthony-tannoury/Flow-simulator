@@ -169,7 +169,7 @@ class AltruisticMixin:
                     valid_pieces.sort(key=lambda pb: pb[0].enter_time(pb[1]))
                 case ExitOrder.FIRST_CREATED_FIRST_OUT:
                     valid_pieces.sort(key=lambda pb: pb[0].creation_time())
-            
+
             truncate = min(max_carrier_capacity, self.task.vacant_slots.available_quantity() + min_carrier_capacity)
             valid_pieces = valid_pieces[:truncate]
 
@@ -315,9 +315,8 @@ class PieceCarrier(Carrier):
 
         self.task.pending_carriers.remove(self)
         self.task.active_carriers.remove(self)
-        # the task is frozen (or aborting) at this point: a held PER_TASK crew
-        # must not stay reserved through the frozen wait, but only once no other
-        # carrier is still mid-run with it
+
+
         if not self.task.active_carriers:
             self.task.release_task_operators()
         self.cancel()
@@ -337,14 +336,14 @@ class PieceCarrier(Carrier):
     @override
     def get_ideal_loading_duration(self):
         return self.task.config.loading_duration.sample_now()
-    
+
     @override
     def get_ideal_duration(self):
         assert isinstance(self.task.config, PieceTaskConfig)
         model = self.piece_collector.collected_pieces[0].model
         model_config = self.task.config.get_model_config(model)
         return model_config.duration.sample_now()
-    
+
     @override
     def request_resources(self, fail_at):
         assert isinstance(self.task.config, PieceTaskConfig)
@@ -384,10 +383,10 @@ class PieceTask(Task, PickyPieceTaker):
             first_config = next(iter(config.models_configs.values()))
             if not all(cfg.duration is first_config.duration for cfg in config.models_configs.values()):
                 raise ValueError("Piece task cannot have different durations for models and not discriminate")
-            
+
             if not all(cfg.min_carrier_capacity == first_config.min_carrier_capacity for cfg in config.models_configs.values()):
                 raise ValueError("Piece task cannot have different min_carrrier_capacity for models and not discriminate")
-            
+
             if not all(cfg.max_carrier_capacity == first_config.max_carrier_capacity for cfg in config.models_configs.values()):
                 raise ValueError("Piece task cannot have different max_carrrier_capacity for models and not discriminate")
 

@@ -1,7 +1,3 @@
-# Scenario 3 (Python side) — midnight-crossing weekly shifts + touching-
-# interval merging. Companion of scenario3.cpp. Requires the merge changes:
-# merge_touching_sorted_intervals applied in HasShifts/IntervalWaiter and
-# generate_weekly_shifts taking minutes-of-day pairs.
 import sys
 from datetime import date, datetime
 
@@ -23,15 +19,13 @@ env.trace(False)
 
 model_a = Model("A")
 
-# Mon..Fri: early piece 00:00-06:00 + night piece 22:00-24:00 (in minutes).
-# Consecutive working days merge at midnight into 22:00 -> 06:00 night shifts;
-# Wednesday is a day off, so Tuesday's night piece stays a 22:00-24:00 stub.
+
 night = [(0.0, 360.0), (1320.0, 1440.0)]
 gen_shifts = ShiftManager.generate_weekly_shifts(
-    sim_start=datetime(2026, 1, 5),                # a Monday, 00:00
+    sim_start=datetime(2026, 1, 5),
     shifts_per_day=[night] * 5 + [[]] * 2,
     working_days=[True] * 5 + [False] * 2,
-    days_off={date(2026, 1, 7)},                   # Wednesday off
+    days_off={date(2026, 1, 7)},
     start=date(2026, 1, 5),
     end=date(2026, 1, 11),
 )
@@ -40,7 +34,7 @@ print("gen_shifts:", " ".join(f"({s.start:g}, {s.end:g})" for s in gen_shifts), 
 b0 = Buffer("B0", valid_models=[model_a], buffer_type=BufferType.PASSAGE)
 gen = PieceGenerator(models_goals={model_a: 40}, shifts=gen_shifts, outlets=[b0])
 
-# an operator whose schedule is two back-to-back shift lists: merged on arrival
+
 og1 = OperatorGroup("og1", capacity=1,
                     shifts=[Interval(360, 840)] + [Interval(840, 1320)],
                     productivity=Distribution(sim.Uniform, 0.9, 1.1))
@@ -77,7 +71,7 @@ t1_config = PieceTaskConfig(
     piece_collector_type=PieceCollectorType.NON_DISCRIMINATING_GREEDY,
 )
 t1 = PieceTask(config=t1_config, inlets=[b0], outlets=[exit_buffer])
-# two shutdown windows touching at 560: must behave as one 500-620 window
+
 NonFlexibleShutdowns(task=t1, intervals=[Interval(500, 560), Interval(560, 620)])
 
 criterion = ByTime(time=9000)

@@ -1,18 +1,3 @@
-"""Render graphs for a run produced by the C++ engine.
-
-The native engine (``engine/``) writes ``graph_data.json`` — raw monitor
-time-series, finished-piece journals and the generator's production tallies —
-instead of drawing anything itself. This module turns that data into the *exact
-same* ``graphes/`` PNGs the Python engine produces, by feeding lightweight shim
-objects to :func:`simulation.graphs.write_graphs` unchanged, then fills in
-``report.json``'s ``graphs`` map the way :meth:`Parser.write_machine_report`
-does. All the matplotlib / naming logic stays in ``graphs.py`` — a single source
-of truth for both engines.
-
-Usage::
-
-    python -m simulation.render_from_data <run_dir>
-"""
 from __future__ import annotations
 
 import json
@@ -29,7 +14,6 @@ _BUFFER_TYPES = {'PASSAGE': BufferType.PASSAGE, 'EXIT': BufferType.EXIT, 'SCRAP'
 
 
 class _Monitor:
-    """A salabim level monitor, as far as graphs.py needs it: xt() -> (values, times)."""
 
     def __init__(self, block: dict):
         self._v = list(block.get('v', []))
@@ -80,7 +64,7 @@ class _Resource(_Named):
 
 
 class _Model:
-    # A hashable stand-in (identity hash) — Counter in production_histogram keys on it.
+
     __slots__ = ('name',)
 
     def __init__(self, name: str):
@@ -90,7 +74,7 @@ class _Model:
 class _Piece:
     def __init__(self, model, journal):
         self.model = model
-        self.journal = [tuple(entry) for entry in journal]  # (kind, name, t)
+        self.journal = [tuple(entry) for entry in journal]
 
 
 def _png_if_exists(run_dir: str, category: str, stem: str) -> str | None:
@@ -110,8 +94,7 @@ def render(run_dir: str) -> None:
     operators = [_Group(r) for r in gd.get('operators', [])]
     resources = [_Resource(r) for r in gd.get('resources', [])]
 
-    # Intern models by name so that piece.model *is* the generator's model object
-    # (graphs.py groups trajectories and counts exits by identity).
+
     interned: dict[str, _Model] = {}
 
     def model(name: str) -> _Model:
@@ -130,14 +113,13 @@ def render(run_dir: str) -> None:
             goals=gen_block.get('goals'),
         )
 
-    kpis.WIP = _Monitor(gd.get('wip', {}))  # line_graphs reads kpis.WIP.xt()
+    kpis.WIP = _Monitor(gd.get('wip', {}))
 
     graphs.write_graphs(os.path.join(run_dir, 'graphes'), tasks=tasks, buffers=buffers,
                         resources=resources, operator_groups=operators,
                         piece_generator=generator, sim_start=sim_start)
 
-    # Fill report.json's graphs map (node id -> relative png), mirroring
-    # Parser.write_machine_report so results mode finds every figure.
+
     safe = graphs._safe
 
     def keyed(rows, category, stem_of):

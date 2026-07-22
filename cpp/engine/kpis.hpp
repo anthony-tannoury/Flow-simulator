@@ -1,10 +1,3 @@
-// kpis++ — post-run KPI collection and the report (mirror of simulation/kpis.py).
-//
-// Every value is read after the run from the monitors salabim++ already keeps
-// (State value monitors, Resource claimed_quantity, Queue length / length_of_stay,
-// the Component mode timeline) plus the light tallies the tasks fill
-// (batch_sizes / cycle_times / startup_times, deposited / scrapped, WIP). Times
-// are simulation minutes. CSVs are utf-8 with a BOM so Excel keeps the accents.
 #pragma once
 
 #include "simulation.hpp"
@@ -22,21 +15,21 @@
 
 namespace kpis {
 
-using ojson = nlohmann::ordered_json;  // insertion-ordered: preserves CSV column order
+using ojson = nlohmann::ordered_json;
 using namespace simulation;
 namespace fs = std::filesystem;
 
-// --- small numeric helpers --------------------------------------------------
+
 inline double roundn(double x, int n) {
     double f = std::pow(10.0, n);
     return std::round(x * f) / f;
 }
-// round to 4 dp, or blank ("") when the denominator is 0 / value undefined.
+
 inline ojson num(double x) { return roundn(x, 4); }
 inline ojson blank() { return std::string(); }
 inline ojson ratio(double numv, double denv) { return denv ? ojson(roundn(numv / denv, 4)) : blank(); }
 
-// --- formatting (raw minutes/fractions -> display) --------------------------
+
 inline std::string fmt_duree(double m) {
     if (m < 1) return std::to_string((long long)std::llround(m * 60)) + "s";
     if (m < 60) {
@@ -55,14 +48,14 @@ inline std::string fmt_duree(double m) {
 inline std::string fmt_pct(double x) {
     char buf[32];
     std::snprintf(buf, sizeof buf, "%.1f", x * 100.0);
-    std::string s = buf;  // strip trailing 0 / '.'
+    std::string s = buf;
     if (s.find('.') != std::string::npos) {
         while (s.back() == '0') s.pop_back();
         if (s.back() == '.') s.pop_back();
     }
     return s + "%";
 }
-// a point in simulated time as a real calendar date (dd-mm-yyyy HH:MM)
+
 inline std::string fmt_instant(double minutes, const ShiftManager::DateTime& sim_start) {
     long long total = sim_start.hour * 60LL + sim_start.minute + (long long)std::llround(minutes);
     long long day_add = total / 1440;
@@ -76,7 +69,7 @@ inline std::string fmt_instant(double minutes, const ShiftManager::DateTime& sim
     return buf;
 }
 
-// --- monitor-timeline helpers (read x_raw()/t_raw() like Python's xt) -------
+
 inline int rising_edges(const sim::Monitor& mon, double value) {
     const auto& xs = mon.x_raw();
     int n = 0;
@@ -92,7 +85,7 @@ inline std::vector<double> edge_times(const sim::Monitor& mon, double value) {
         if (xs[i] == value && xs[i - 1] != value) out.push_back(ts[i]);
     return out;
 }
-// total time a component spent in `tag` (mode timeline; last entry runs to now).
+
 inline double mode_total_one(const Component* c, const std::string& tag, double now) {
     const auto& log = c->mode_log();
     double total = 0.0;
@@ -108,7 +101,7 @@ inline double mode_total(const std::vector<Component*>& cs, const std::string& t
     for (const Component* c : cs) total += mode_total_one(c, tag, now);
     return total;
 }
-// wall-clock time where at least one component is in one of the modes (union).
+
 inline double union_mode_duration(const std::vector<Component*>& cs, const std::set<std::string>& tags) {
     double now = env->now();
     std::vector<std::pair<double, int>> deltas;
@@ -133,7 +126,7 @@ inline double union_mode_duration(const std::vector<Component*>& cs, const std::
     }
     return total;
 }
-// integral of a level monitor over the time a status monitor holds a value.
+
 inline double level_during(const sim::Monitor& level, const sim::Monitor& status, double status_value) {
     const auto& xl = level.x_raw();
     const auto& tl = level.t_raw();
@@ -153,7 +146,7 @@ inline double level_during(const sim::Monitor& level, const sim::Monitor& status
     }
     return total;
 }
-// time where level monitor a holds val_a AND b holds val_b (event-merged).
+
 inline double overlap_duration(const sim::Monitor& a, double va, const sim::Monitor& b, double vb) {
     const auto& xa = a.x_raw();
     const auto& ta = a.t_raw();
@@ -173,7 +166,7 @@ inline double overlap_duration(const sim::Monitor& a, double va, const sim::Moni
     return total;
 }
 
-// --- ideal cycle times per model (from the task's own config) ---------------
+
 inline const Model* config_key(const PieceTaskConfig& cfg, const Model* model) {
     const Model* m = model;
     while (m != nullptr) {
@@ -197,7 +190,7 @@ inline std::map<const Model*, double> ideal_cycle_times(Task* task) {
     return tc;
 }
 
-// collectors of a carrier list, as Components (for mode_total over collectors)
+
 inline std::vector<Component*> collectors_of(const std::vector<Carrier*>& carriers) {
     std::vector<Component*> out;
     for (Carrier* c : carriers) {
@@ -212,7 +205,7 @@ inline std::vector<Component*> as_components(const std::vector<Carrier*>& carrie
 
 inline ojson num_opt(const std::optional<double>& v) { return v ? ojson(roundn(*v, 4)) : blank(); }
 
-// --- collectors -------------------------------------------------------------
+
 inline ojson task_kpis(Task* task) {
     double tt = env->now();
     double to = task->is_in_downtime.value_monitor().value_duration(0.0);
@@ -378,10 +371,7 @@ inline ojson operator_kpis(OperatorGroup* g) {
     return r;
 }
 
-// Per-resource stock metrics from the available_quantity ("stock") monitor:
-// consommation = total downward movement, entrées = total upward movement
-// (restocks for a restockable input, output for a resource a task produces),
-// rupture = a fall to an empty stock. Mirrors kpis.resource_kpis.
+
 inline ojson resource_kpis(sim::Resource* res) {
     double tt = env->now();
     sim::Monitor& stock = res->available_quantity;
@@ -408,7 +398,7 @@ inline ojson resource_kpis(sim::Resource* res) {
     return r;
 }
 
-// --- flow / lead-time -------------------------------------------------------
+
 inline ojson lead_stats(std::vector<double> leads) {
     std::sort(leads.begin(), leads.end());
     auto pct = [&](double q) -> ojson {
@@ -515,12 +505,12 @@ inline std::pair<ojson, std::vector<ojson>> flow_kpis(const std::vector<Buffer*>
     return {flux, par_modele};
 }
 
-// --- administrative vs productive roll-up -----------------------------------
-inline double cell_num(const ojson& v) {  // number, or 0 for a blank/undefined cell
+
+inline double cell_num(const ojson& v) {
     return v.is_number() ? v.get<double>() : 0.0;
 }
 
-// (metric key, is-a-duration)
+
 inline const std::vector<std::pair<std::string, bool>>& admin_indicateurs() {
     static const std::vector<std::pair<std::string, bool>> t = {
         {"nb_taches", false}, {"temps_fonctionnement", true}, {"cycle_total", true},
@@ -532,7 +522,7 @@ inline std::string admin_label(const std::string& k) {
     if (k == "temps_fonctionnement") return "Temps de fonctionnement";
     if (k == "cycle_total") return "Temps de cycle total";
     if (k == "heures_machine") return "Heures machine";
-    return "Heures main-d'\xC5\x93uvre";  // œ
+    return "Heures main-d'\xC5\x93uvre";
 }
 
 inline ojson admin_summary(const std::vector<ojson>& task_rows) {
@@ -593,7 +583,7 @@ inline std::vector<ojson> admin_synthese_rows(const ojson& s) {
     return rows;
 }
 
-// --- CSV writer -------------------------------------------------------------
+
 inline const std::set<std::string>& duree_cols() {
     static const std::set<std::string> s = {
         "temps_total", "temps_ouverture", "arrets_programmes", "temps_requis", "pannes", "mtbf",
@@ -626,7 +616,7 @@ inline std::string csv_cell(const ojson& v) {
     if (v.is_boolean()) return v.get<bool>() ? "true" : "false";
     if (v.is_number_integer()) return std::to_string(v.get<long long>());
     if (v.is_number()) {
-        std::string s = ojson(v).dump();  // no trailing-zero noise from printf
+        std::string s = ojson(v).dump();
         return s;
     }
     return "";
@@ -634,7 +624,7 @@ inline std::string csv_cell(const ojson& v) {
 
 inline ojson format_cell(const std::string& key, const ojson& v,
                          const ShiftManager::DateTime& sim_start) {
-    if (!v.is_number()) {  // blanks / strings / bools pass through (bool handled below)
+    if (!v.is_number()) {
         if (key == "admin") return ojson(v.get<bool>() ? "oui" : "non");
         return v;
     }
@@ -649,7 +639,7 @@ inline void write_csv(const fs::path& path, const std::vector<ojson>& rows,
                       const ShiftManager::DateTime& sim_start) {
     if (rows.empty()) return;
     std::ofstream f(path, std::ios::binary);
-    f << "\xEF\xBB\xBF";  // utf-8 BOM so Excel keeps accents
+    f << "\xEF\xBB\xBF";
     bool first = true;
     for (auto& [k, v] : rows[0].items()) { f << (first ? "" : ",") << k; first = false; }
     f << "\r\n";
@@ -663,7 +653,7 @@ inline void write_csv(const fs::path& path, const std::vector<ojson>& rows,
     }
 }
 
-// key/value CSV (run.csv, flux.csv) from an object, formatting each value.
+
 inline void write_kv_csv(const fs::path& path, const ojson& obj,
                          const ShiftManager::DateTime& sim_start) {
     std::vector<ojson> rows;
@@ -676,7 +666,7 @@ inline void write_kv_csv(const fs::path& path, const ojson& obj,
     write_csv(path, rows, sim_start);
 }
 
-// --- the full CSV report ----------------------------------------------------
+
 inline void write_report(const fs::path& dir, const std::vector<Task*>& tasks,
                          const std::vector<Buffer*>& buffers, PieceGenerator* gen,
                          const std::vector<OperatorGroup*>& operator_groups, ojson run_info,
@@ -687,7 +677,7 @@ inline void write_report(const fs::path& dir, const std::vector<Task*>& tasks,
     ojson run;
     run["duree_simulee"] = fmt_duree(env->now());
     run["graine"] = simulation::SEED;
-    for (auto& [k, v] : run_info.items()) run[k] = v;  // fichier / criterion / ... from the caller
+    for (auto& [k, v] : run_info.items()) run[k] = v;
     write_kv_csv(dir / "run.csv", run, sim_start);
 
     std::vector<ojson> task_rows;
@@ -720,4 +710,4 @@ inline void write_report(const fs::path& dir, const std::vector<Task*>& tasks,
     write_csv(dir / "temps_traversee.csv", lead_time_rows(buffers), sim_start);
 }
 
-}  // namespace kpis
+}

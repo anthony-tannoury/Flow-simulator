@@ -1,6 +1,3 @@
-// Scenario 1 (C++ side) — companion of scenario1.py: same scenario, same seed.
-// Behaviour matches the Python run; the individual draws (and so the exact
-// counts) do not.
 #include "simulation.hpp"
 
 #include <cstdio>

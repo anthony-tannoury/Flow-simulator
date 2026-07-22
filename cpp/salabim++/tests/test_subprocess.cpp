@@ -1,7 +1,3 @@
-// Stress test for the new sub-process (call) facility in salabim.hpp.
-// Verifies: nested holds/requests/waits inside helper coroutines, values via
-// out-params, immediate-return helpers, 3-level nesting, exceptions, and
-// cancel-from-outside mid-subprocess (no leaks under ASan).
 #include "salabim.hpp"
 #include <cassert>
 #include <cstdio>
@@ -26,15 +22,15 @@ struct Worker : sim::Component {
     sim::Process middle(double* out) {
         logf("middle start t=" + std::to_string((int)env->now()));
         co_await hold(1);
-        co_await call(inner(out));           // 3-level nesting
-        co_await request(*res);              // request inside a sub-process
+        co_await call(inner(out));
+        co_await request(*res);
         logf("middle got res t=" + std::to_string((int)env->now()));
         release();
-        co_await wait(*flag);                // wait inside a sub-process
+        co_await wait(*flag);
         logf("middle saw flag t=" + std::to_string((int)env->now()));
     }
 
-    sim::Process instant() { logf("instant ran"); co_return; }  // never suspends
+    sim::Process instant() { logf("instant ran"); co_return; }
 
     sim::Process process() override {
         co_await call(instant());
@@ -68,7 +64,7 @@ struct Thrower : sim::Component {
     }
 };
 
-struct Sleeper : sim::Component {           // gets cancelled mid-subprocess
+struct Sleeper : sim::Component {
     sim::Process nap() { co_await hold(1000); }
     sim::Process process() override {
         co_await call(nap());
@@ -81,7 +77,7 @@ struct Canceller : sim::Component {
     explicit Canceller(Sleeper* v) : victim(v) {}
     sim::Process process() override {
         co_await hold(3);
-        victim->cancel();                   // destroys the sub-frame chain
+        victim->cancel();
         logf("cancelled sleeper t=" + std::to_string((int)env->now()));
     }
 };
@@ -101,7 +97,7 @@ int main() {
 
         env.run(sim::RunOpts{.till = 100});
 
-        assert(w->got == 8);                 // 2 (root) + 1 (middle) + 5 (inner)
+        assert(w->got == 8);
         assert(t->caught);
         assert(s->isdata());
         for (auto& l : log_) std::puts(l.c_str());

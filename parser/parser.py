@@ -47,15 +47,10 @@ def join_shifts(shifts: list[list[Interval]]) -> list[Interval]:
 
 
 def canon_name(value: str) -> str:
-    """Normalization for type names: the canonical identifiers (ByTime, PER_BATCH,
-    AbortPendingCarriers) and their sentence-case display forms (By time, Per batch,
-    Abort pending carriers) collapse to one key, so files written with either
-    naming parse the same."""
     return ''.join(ch for ch in str(value) if ch.isalnum()).lower()
 
 
 def lookup(table: dict, value: str, what: str):
-    """table[value], accepting any spelling canon_name folds together."""
     if value in table:
         return table[value]
     key = canon_name(value)
@@ -211,15 +206,12 @@ PIECE_DEFAULT_POLICIES = {
 class Parser:
     def __init__(self, filename: str) -> None:
         self.filename = filename
-        # encoding='utf-8' is not optional: without it Python uses the locale
-        # code page (cp1252 on Western Windows), which reads UTF-8 accents as
-        # mojibake ('Entrée' -> 'Entrée'). That corrupted string would then be
-        # written faithfully to the report CSVs. The flow JSON is always UTF-8.
+
+
         with open(filename, 'r', encoding='utf-8') as file:
             self.data = json.load(file)
-        # Re-seed the shared environment before anything is built or drawn, so the
-        # run is reproducible for the flow's seed (0 by default) and differs between
-        # seeds. Must happen here, ahead of load_all's object construction.
+
+
         self.seed = int(self.data.get('seed', 0))
         reseed(self.seed)
         self.sim_start = to_datetime(self.data['start_date'])
@@ -228,15 +220,11 @@ class Parser:
         self.by_id = {n['id']: n for n in self.data['nodes']}
 
     def drop_disabled_nodes(self) -> None:
-        """A card saved with "enabled": false does not exist for this run: the node
-        itself, every connection touching it, and every reference to its id are
-        removed before anything is built. Cards without the field count as enabled
-        (older files)."""
         nodes = self.data.get('nodes', [])
         dead = {n['id'] for n in nodes if not n.get('enabled', True)}
         if not dead:
             return
-        # a breakdown whose task is disabled has nothing to break: drop it too
+
         dead |= {n['id'] for n in nodes
                  if n['kind'] == 'Breakdown' and n.get('task') in dead}
         self.data['nodes'] = [n for n in nodes if n['id'] not in dead]
@@ -252,8 +240,6 @@ class Parser:
 
     @staticmethod
     def _describe_fn(fn) -> str:
-        """Compact text for a time-function dict: constants show as the bare
-        number, anything else as kind(param=value, ...)."""
         if not isinstance(fn, dict):
             return str(fn)
         if canon_name(fn.get('kind', 'constant')) == 'constant':
@@ -262,8 +248,6 @@ class Parser:
         return f"{fn['kind']}({params})"
 
     def describe_criterion(self) -> str:
-        """The stopping criterion as readable text: model ids resolved to names,
-        durations rendered like the rest of the report, functions compacted."""
         parts = []
         for key, value in self.data['stopping_criterion'].items():
             if key == 'type':
@@ -322,10 +306,6 @@ class Parser:
         return directory
 
     def write_machine_report(self, directory: str, run_info: dict) -> None:
-        """report.json + flow.json next to the CSVs: the raw (unformatted) KPI
-        dicts keyed by node id, the graph-file map, and a snapshot of the flow
-        that ran — everything the designer's results mode needs to dress the
-        graph back up with numbers."""
         from simulation.outlet import BufferType
         import simulation as simulation_pkg
 
@@ -475,10 +455,6 @@ class Parser:
 
     @staticmethod
     def _shift_date(when, k: int, rep: dict):
-        """`when` (a date or datetime) moved forward by k repeat-translations: k*years
-        and k*months as calendar arithmetic (the day is clamped to the target month, so
-        29 Feb in a non-leap year lands on 28 Feb), then k*(weeks*7 + days) fixed days.
-        Returns the same type as `when`, so a yearly repeat keeps the calendar date."""
         import calendar as _calendar
         months = k * (int(rep.get('years', 0)) * 12 + int(rep.get('months', 0)))
         total = when.year * 12 + (when.month - 1) + months
@@ -491,8 +467,6 @@ class Parser:
 
     def _generate_shift(self, shift: dict, days_off: set,
                         custom_intervals=None, horizon=None) -> list[Interval]:
-        """Generate one shift's intervals. The source dates (weekly horizon or custom
-        intervals) and the days off may be overridden to render a translated copy."""
         match canon_name(shift['mode']):
             case 'weekly':
                 working_days = [d['working'] for d in shift['days']]
@@ -519,11 +493,7 @@ class Parser:
             base_days_off = {self.closing_days[d] for d in shift['days_off']}
             intervals = self._generate_shift(shift, base_days_off)
 
-            # Repeat: append `count` translated copies of the whole shift. Each copy k
-            # is regenerated from source dates moved forward by k translations (see
-            # _shift_date), with its days off shifted the same way — so a December block
-            # repeated yearly keeps its dates (leap years handled) and gets that year's
-            # equivalent days off. Union-merge keeps the result sorted and disjoint.
+
             rep = shift.get('repeat') or {}
             count = int(rep.get('count', 0))
             has_translation = any(int(rep.get(u, 0)) for u in ('years', 'months', 'weeks', 'days'))
@@ -622,17 +592,15 @@ class Parser:
             if id_ not in self.outlets:
                 raise ValueError(f"piece generator outlet {id_} is (or routes into) a scrap buffer")
 
-        # the generator emits during its own shifts; what it emits is set by the
-        # stopping criterion: a fixed set of goals (ByPiecesProduced) or a stream at
-        # a given gap and mix (ByTime)
+
         shifts = join_shifts([self.shifts[id_] for id_ in node['shifts']])
         outlets = [self.outlets[id_] for id_ in node['outlets']]
 
         match canon_name(criterion['type']):
             case 'bypiecesproduced':
                 models_goals = {self.models[mg['model']]: mg['goal'] for mg in criterion['models_goals']}
-                # a criterion carrying 'gap' fixes the pacing by hand; otherwise it is
-                # computed from the shifts and goals, minus the optional grace period
+
+
                 if criterion.get('gap') is not None:
                     pacing = {'gap': float(criterion['gap'])}
                 else:

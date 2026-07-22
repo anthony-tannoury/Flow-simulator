@@ -37,7 +37,7 @@ def check_probabilities(probs: list[float]) -> None:
 
 def check_outlet_validity(giver: PickyPieceTaker, outlets: list[Outlet]) -> None:
     from .piece import PickyPieceTaker
-    
+
     if not outlets:
         raise ValueError("Giver must have at least one outlet")
 
@@ -51,7 +51,7 @@ def check_outlet_validity(giver: PickyPieceTaker, outlets: list[Outlet]) -> None
 
     if not giver.can_flush_into(PickyPieceTaker(list(union))):
         raise ValueError("Giver must be able to flush all models into outlets")
-    
+
 
 def place(pieces: list[Piece], outlets: list[Outlet]):
     for piece in pieces:
@@ -61,5 +61,5 @@ def place(pieces: list[Piece], outlets: list[Outlet]):
                 piece.enter(outlet.get())
                 placed = True
                 break
-        
+
         assert placed

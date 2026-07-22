@@ -1,24 +1,3 @@
-// Flow-simulator C++ engine ("flow_sim").
-//
-// Drop-in alternative to flow_designer/sim_runner.py. Same contract:
-//   * invoked as   flow_sim <flow.json>
-//   * prints machine-readable progress to stdout, one tagged line at a time:
-//        @@META {...}      once, after loading: criterion + totals
-//        @@PROGRESS {...}  during the run: sim clock, wall time, pieces
-//        @@DONE {...}      once, after the report is written: the run directory
-//        @@ERROR {...}     on a fatal error, before exiting nonzero
-//   * writes runs/<stamp>_<stem>/ with report.json and flow.json
-//
-// The flow JSON is now parsed into a real simulation (parser++); the run is
-// sliced exactly like sim_runner.py so the stopper's plain-run semantics hold
-// (the SimulationStopper activates main, the slice returns early). The full KPI
-// report (postes/buffers/flux CSVs + the rich report.json) is kpis++, still
-// pending; until then a minimal, well-formed report.json is written and every
-// such site is tagged `TODO(kpis++)`.
-//
-// Build with Clang or MSVC — salabim.hpp uses C++20 coroutines that GCC<=13
-// miscompiles (internal compiler error).
-
 #include "kpis.hpp"
 #include "parser.hpp"
 
@@ -39,7 +18,7 @@ namespace fs = std::filesystem;
 namespace {
 
 void emit(const char* tag, const json& payload) {
-    std::cout << "@@" << tag << ' ' << payload.dump() << std::endl;  // endl flushes: read live
+    std::cout << "@@" << tag << ' ' << payload.dump() << std::endl;
 }
 
 std::string timestamp() {
@@ -53,7 +32,7 @@ double wall_seconds(std::chrono::steady_clock::time_point t0) {
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 }
 
-}  // namespace
+}
 
 int main(int argc, char** argv) {
     try {
@@ -69,13 +48,11 @@ int main(int argc, char** argv) {
         }
         std::stringstream buffer;
         buffer << f.rdbuf();
-        std::string flow_text = buffer.str();  // nlohmann decodes UTF-8 (no mojibake)
+        std::string flow_text = buffer.str();
 
-        // Parse the flow first (no sim objects are built yet), read its seed
-        // (0 by default), then create the environment with it. init() recreates
-        // the env, so it must run before load_all builds anything or draws.
+
         parser::Parser p(flow_text);
-        long long seed = 0;  // default; coerce int or float (matches Python's int(seed))
+        long long seed = 0;
         if (p.data.contains("seed") && p.data["seed"].is_number())
             seed = static_cast<long long>(p.data["seed"].get<double>());
         auto& e = init(seed, false);
@@ -85,7 +62,7 @@ int main(int argc, char** argv) {
         StoppingCriterion* criterion = p.stopping_criterion;
         Buffer* exit_buffer = p.exit_buffer();
 
-        // --- @@META + slice stride (mirror sim_runner.py) ----------------------
+
         json meta = {{"engine", "cpp"},
                      {"file", json_path.string()},
                      {"sim_start", p.data.value("start_date", "")}};
@@ -93,21 +70,18 @@ int main(int argc, char** argv) {
         if (auto* bt = dynamic_cast<ByTime*>(criterion)) {
             meta["criterion"] = "ByTime";
             meta["total_time"] = bt->time;
-            stride = std::max(1.0, bt->time / 1000.0);  // ~1000 progress points
+            stride = std::max(1.0, bt->time / 1000.0);
         } else if (auto* bp = dynamic_cast<ByPiecesProduced*>(criterion)) {
             meta["criterion"] = "ByPiecesProduced";
             meta["goal"] = bp->total;
             if (!std::isinf(bp->timeout)) meta["timeout"] = bp->timeout;
-            stride = 30.0;  // sim minutes per slice; grows when slices turn out empty
+            stride = 30.0;
         } else {
             emit("ERROR", {{"message", "unknown stopping criterion"}});
             return 1;
         }
 
-        // The piece generator's gap (minutes between two pieces), for the run window.
-        // "automatic" only for a goal generator whose criterion set no explicit gap;
-        // a set gap, or a constant-rate generator, is "manual"; a time-varying rate
-        // gap has no single value ("function"). Mirrors sim_runner.py.
+
         if (auto* gg = dynamic_cast<GoalPieceGenerator*>(p.piece_generator)) {
             meta["gap"] = gg->gap;
             meta["gap_mode"] = p.data.at("stopping_criterion").contains("gap") ? "manual" : "automatic";
@@ -128,13 +102,12 @@ int main(int argc, char** argv) {
                         {"pieces", static_cast<int>(exit_buffer ? exit_buffer->size() : 0)}};
         };
 
-        // Slice so progress can be reported from outside the sim; the stopper
-        // activates main, so a slice returns early when the criterion fires.
+
         double last_emit = -1.0;
         while (!criterion->done()) {
             auto slice_started = std::chrono::steady_clock::now();
             e.run(sim::RunOpts{.till = e.now() + stride});
-            if (std::isinf(e.peek()) && !criterion->done()) break;  // nothing left to schedule
+            if (std::isinf(e.peek()) && !criterion->done()) break;
             double now = wall_seconds(t0);
             if (now - last_emit >= 0.1) {
                 emit("PROGRESS", snapshot());
@@ -144,12 +117,12 @@ int main(int argc, char** argv) {
         }
         emit("PROGRESS", snapshot());
 
-        // --- run folder + report ----------------------------------------------
+
         fs::path out_dir =
             fs::current_path() / "runs" / (timestamp() + "_" + json_path.stem().string());
         fs::create_directories(out_dir);
 
-        // Ordered task/operator lists (task_order for stable columns).
+
         std::vector<Task*> tasks_ordered;
         for (const std::string& id : p.task_order) tasks_ordered.push_back(p.tasks.at(id));
         std::vector<OperatorGroup*> op_groups;
@@ -161,7 +134,7 @@ int main(int argc, char** argv) {
         const json& crit = p.data.at("stopping_criterion");
         int exit_pieces = static_cast<int>(exit_buffer ? exit_buffer->size() : 0);
 
-        // The CSV report (postes/buffers/flux/operateurs/... utf-8-sig).
+
         kpis::ojson run_info;
         run_info["fichier"] = json_path.string();
         run_info["debut"] = p.data.value("start_date", "");
@@ -169,9 +142,7 @@ int main(int argc, char** argv) {
         kpis::write_report(out_dir, tasks_ordered, buffers, p.piece_generator, op_groups, run_info,
                            p.sim_start, resources_list);
 
-        // report.json: the raw (unformatted) KPI dicts keyed by node id, plus a run
-        // block — everything the designer's results mode reads (mirror of
-        // Parser.write_machine_report; graphs stay a Python concern, so empty here).
+
         std::optional<int> goal_total;
         std::optional<bool> goal_reached;
         if (parser::same_name(crit.value("type", ""), "ByPiecesProduced")) {
@@ -220,23 +191,19 @@ int main(int argc, char** argv) {
         report["resources"] = resources_j;
         report["flux"] = flux;
         report["flux_modeles"] = flux_modeles;
-        report["graphs"] = kpis::ojson::object();  // C++ engine produces no graphs
+        report["graphs"] = kpis::ojson::object();
         std::ofstream(out_dir / "report.json") << report.dump(1);
-        std::ofstream(out_dir / "flow.json") << flow_text;  // byte copy of the flow that ran
+        std::ofstream(out_dir / "flow.json") << flow_text;
 
-        // graph_data.json: raw monitor time-series + finished-piece journals + the
-        // generator's production tallies. The Python renderer (simulation/render_from_data.py)
-        // turns this into graphes/ PNGs and fills report.json's graphs map — all the
-        // matplotlib/presentation logic stays in one place (Python).
+
         {
-            const double off = e.offset_raw_();  // t_raw is raw env time; display = raw - offset
+            const double off = e.offset_raw_();
             auto series = [&](sim::Monitor& m) {
                 kpis::ojson t = kpis::ojson::array(), v = kpis::ojson::array();
                 const auto& tr = m.t_raw(); const auto& xr = m.x_raw();
                 for (size_t i = 0; i < tr.size(); ++i) { t.push_back(tr[i] - off); v.push_back(xr[i]); }
-                // salabim's Monitor.xt() appends the still-current value at now, so
-                // Python graphs run to the end of the sim even when nothing changed
-                // late in the run; mirror that or the plots stop at the last change.
+
+
                 if (!tr.empty() && tr.back() - off < e.now())
                     { t.push_back(e.now()); v.push_back(xr.back()); }
                 return kpis::ojson{{"t", t}, {"v", v}};

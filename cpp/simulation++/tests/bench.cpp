@@ -1,5 +1,3 @@
-// Benchmark (C++ side) — scenario1 scaled to 20,000 pieces, trace off.
-// Companion of bench.py: same scenario, same seed; time both to compare.
 #include "simulation.hpp"
 
 #include <cstdio>
