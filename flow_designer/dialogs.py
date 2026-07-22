@@ -1324,7 +1324,14 @@ class RunSimulationDialog(QtWidgets.QDialog):
         env.insert("MPLBACKEND", "Agg")
         proc.setProcessEnvironment(env)
         proc.start(sys.executable, ["-m", "simulation.render_from_data", self._report_dir])
-        if not proc.waitForFinished(120000) or proc.exitCode() != 0:
+        loop = QtCore.QEventLoop(self)
+        proc.finished.connect(lambda *_: loop.quit())
+        QtCore.QTimer.singleShot(120000, loop.quit)
+        if proc.state() != QtCore.QProcess.NotRunning:
+            loop.exec()
+        if proc.state() != QtCore.QProcess.NotRunning:
+            proc.kill()
+        if proc.exitCode() != 0:
             self._stderr_tail.extend(
                 bytes(proc.readAllStandardError()).decode("utf-8", errors="replace").splitlines())
             self._stderr_tail = self._stderr_tail[-30:]

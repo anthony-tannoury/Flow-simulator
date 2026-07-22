@@ -104,6 +104,7 @@ def write_machine_report(parser, directory: str, run_info: dict) -> None:
         'format': 'flow-simulator-report',
         'version': 1,
         'run': {
+            'engine': 'python',
             **run_info,
             'source_file': os.path.abspath(parser.filename),
             'flow_snapshot': 'flow.json',

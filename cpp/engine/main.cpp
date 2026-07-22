@@ -241,12 +241,18 @@ int main(int argc, char** argv) {
         report["version"] = 1;
         kpis::ojson run;
         run["engine"] = "cpp";
+        for (auto& [k, v] : run_info.items()) run[k] = v;
         run["source_file"] = json_path.string();
         run["flow_snapshot"] = "flow.json";
         run["sim_end_minutes"] = kpis::roundn(e.now(), 3);
         run["graine"] = simulation::SEED;
+        {
+            std::time_t now_t = std::time(nullptr);
+            char iso[32];
+            std::strftime(iso, sizeof iso, "%Y-%m-%dT%H:%M:%S", std::localtime(&now_t));
+            run["genere_le"] = iso;
+        }
         run["criterion"] = crit;
-        run["critere_arret"] = crit.value("type", "");
         run["pieces_sorties"] = exit_pieces;
         run["objectif_total"] = goal_total ? kpis::ojson(*goal_total) : kpis::ojson(nullptr);
         run["objectif_atteint"] = goal_reached ? kpis::ojson(*goal_reached) : kpis::ojson(nullptr);
