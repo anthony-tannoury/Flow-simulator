@@ -732,35 +732,35 @@
     "models_goals": [
       {
         "model": "model_c1c20e4c",
-        "goal": 1000
+        "goal": 3000
       },
       {
         "model": "model_f551538b",
-        "goal": 1000
+        "goal": 3000
       },
       {
         "model": "model_f8a1d4ad",
-        "goal": 1000
+        "goal": 3000
       },
       {
         "model": "model_742fd366",
-        "goal": 1000
+        "goal": 3000
       },
       {
         "model": "model_300990ff",
-        "goal": 1500
+        "goal": 4500
       },
       {
         "model": "model_e093ec36",
-        "goal": 1500
+        "goal": 4500
       },
       {
         "model": "model_02d3ef7d",
-        "goal": 1500
+        "goal": 4500
       },
       {
         "model": "model_256d4101",
-        "goal": 1500
+        "goal": 4500
       }
     ]
   },
@@ -1880,9 +1880,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -2807,9 +2807,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 5.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -3503,9 +3503,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -3715,9 +3715,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 5.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -3906,9 +3906,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 5.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -4096,9 +4096,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
