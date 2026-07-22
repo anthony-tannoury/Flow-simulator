@@ -1,0 +1,5 @@
+﻿groupe,effectif,temps_poste,occupation_moyenne,heures_en_poste,heures_hors_poste,occupation_max,taux_occupation
+POOL_CIRE_SAM,4.0,17j 8h 0m,0.112,40j 21h 49m,0s,4.0,59%
+POOL_CIRE_NUIT,4.0,71j 8h 0m,0.153,55j 15h 53m,8m 9s,4.0,19.5%
+POOL_CIRE_MATIN,4.0,84j 8h 0m,0.824,300j 17h 24m,41m 12s,4.0,89.2%
+POOL_CIRE_APREM,4.0,84j 8h 0m,0.616,224j 19h 40m,17m 43s,4.0,66.6%

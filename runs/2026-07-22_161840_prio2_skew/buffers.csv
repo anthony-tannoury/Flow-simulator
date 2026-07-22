@@ -1,0 +1,4 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+InA,PASSAGE,92.283,186.0,53.781,0,1j 22h 9m,3j 20h 44m,200,200,47.992,47.992,30m
+InB,PASSAGE,93.055,186.0,54.032,0,1j 22h 32m,3j 20h 51m,200,200,47.992,47.992,30m
+Out,EXIT,199.3,400.0,115.489,400,,,400,0,95.984,0.0,15m

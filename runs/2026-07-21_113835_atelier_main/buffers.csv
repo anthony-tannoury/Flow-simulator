@@ -1,0 +1,28 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+Entrée M88 ET Retouche / Prep noyaux,PASSAGE,592.064,2771,975.821,2771,1j 18h 43m,106j 1h 37m,13200,10429,36.164,28.573,39m 49s
+Prep noyaux / Injection manuelle,PASSAGE,1.224,31,3.914,0,1h 2m,2j 8h 7m,10459,10459,28.655,28.655,50m 15s
+Entrée LEAP / Injection cire moule,PASSAGE,15.919,155,35.845,0,7h 28m,1j 23h 58m,18667,18667,51.142,51.142,28m 9s
+Injection cire noyaux / Prison 1,PASSAGE,55.432,114,30.111,16,32j 2h 35m,60j 10h 23m,643,627,1.762,1.718,13h 37m
+Injection cire / Attente 4h,PASSAGE,6.357,71,9.719,0,1h 59m,2j 12h 5m,28118,28118,77.036,77.036,18m 42s
+Attente 4h / Marquage laser,PASSAGE,9727.773,17880,6464.881,17447,85j 10h 27m,197j 22h 42m,27701,10254,75.893,28.093,18m 58s
+Marquage laser / Stockage,PASSAGE,10.41,100,17.943,81,9h 15m,3j 16h 5m,9867,9786,27.033,26.811,53m 16s
+Marquage laser / Contrôle US,PASSAGE,2.471,18,2.572,2,11h 14m,4j 8h 36m,1453,1451,3.981,3.975,6h 2m
+Contrôle US / Contrôle RX,PASSAGE,0.163,7,0.553,0,1h 16m,2j 23h 59m,1136,1136,3.112,3.112,7h 43m
+Contrôle RX / Expertise cire,PASSAGE,0.158,10,0.705,0,1h 11m,2j 16h 3m,1161,1161,3.181,3.181,7h 33m
+Expertise cire / Prison 3,PASSAGE,0.136,3,0.483,0,11h 32m,3j 9h 13m,103,103,0.282,0.282,3j 13h 3m
+Expertise cire / Stockage,PASSAGE,0.028,2,0.209,0,14m,1j 14h 4m,1066,1066,2.921,2.921,8h 13m
+Prison 1 / Rework,PASSAGE,0.003,2,0.055,0,5m 51s,8h 7m,266,266,0.729,0.729,1j 8h 56m
+Sorties,EXIT,4784.908,9683,3062.892,9683,,,9683,0,26.529,0.0,54m 17s
+Prison 3 / Rework 3,PASSAGE,0.002,1,0.044,0,17m 59s,8h 23m,57,57,0.156,0.156,6j 9h 41m
+Prison 3 / Rework 2,PASSAGE,0.0,0,0.0,0,0s,0s,58,58,0.159,0.159,6j 7h 2m
+Contrôle US / Prison 2,PASSAGE,0.233,4,0.637,0,15h 21m,3j 11h 48m,133,133,0.364,0.364,2j 17h 52m
+Rebuts 1,SCRAP,107.008,192,72.107,192,,,192,0,0.526,0.0,1j 21h 38m
+Rebuts 2,SCRAP,89.769,180,63.907,180,,,180,0,0.493,0.0,2j 0h 40m
+Rebuts 4,SCRAP,13.028,21,7.708,21,,,21,0,0.058,0.0,17j 9h 9m
+Rebuts 3,SCRAP,19.134,30,10.404,30,,,30,0,0.082,0.0,12j 4h 0m
+Rebuts après panne 1,SCRAP,23.348,50,16.865,50,,,50,0,0.137,0.0,7j 7h 12m
+Rebuts après panne 2,SCRAP,29.393,66,20.96,66,,,66,0,0.181,0.0,5j 12h 44m
+Rebuts après panne 3,SCRAP,46.293,89,30.332,89,,,89,0,0.244,0.0,4j 2h 26m
+Rebuts après panne 4,SCRAP,41.225,79,26.761,79,,,79,0,0.216,0.0,4j 14h 53m
+Rebuts après panne 5,SCRAP,0.0,0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 6,SCRAP,0.0,0,0.0,0,,,0,0,0.0,0.0,

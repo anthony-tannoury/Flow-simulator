@@ -1,0 +1,28 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+Prep noyaux / Injection manuelle,PASSAGE,0.0,0.0,0.0,0,0s,0s,17,17,1.7,1.7,14h 7m
+Injection cire / Attente 4h,PASSAGE,0.776,2.0,0.801,2,2h 36m,2j 10h 58m,52,50,5.2,5.0,4h 37m
+Injection cire noyaux / Prison 1,PASSAGE,0.0,0.0,0.0,0,0s,0s,2,2,0.2,0.2,5j 0h 0m
+Rebuts après panne 5,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 1,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts 2,SCRAP,0.824,1.0,0.38,1,,,1,0,0.1,0.0,10j 0h 0m
+Marquage laser / Contrôle US,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Marquage laser / Stockage,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 3,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 4,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Prison 1 / Rework,PASSAGE,0.0,0.0,0.0,0,0s,0s,1,1,0.1,0.1,10j 0h 0m
+Rebuts après panne 2,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Attente 4h / Marquage laser,PASSAGE,16.996,44.0,15.736,44,,,44,0,4.4,0.0,5h 27m
+Sorties,EXIT,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Contrôle US / Prison 2,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Contrôle RX / Expertise cire,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Entrée M88 ET Retouche / Prep noyaux,PASSAGE,0.507,2.0,0.847,0,6h 5m,2j 8h 11m,20,20,2.0,2.0,12h 0m
+Entrée LEAP / Injection cire moule,PASSAGE,0.0,0.0,0.0,0,0s,0s,32,32,3.2,3.2,7h 30m
+Contrôle US / Contrôle RX,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Prison 3 / Rework 3,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 6,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Expertise cire / Prison 3,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Prison 3 / Rework 2,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Expertise cire / Stockage,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts 4,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts 3,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts 1,SCRAP,0.212,1.0,0.409,1,,,1,0,0.1,0.0,10j 0h 0m

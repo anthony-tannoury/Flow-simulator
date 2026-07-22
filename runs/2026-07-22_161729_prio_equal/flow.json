@@ -1,0 +1,321 @@
+{
+ "editor": {
+  "name": "test",
+  "version": "0",
+  "format": "clean-json"
+ },
+ "models": [
+  {
+   "id": "m1",
+   "name": "M",
+   "parent": null
+  }
+ ],
+ "resources": [],
+ "operators": [
+  {
+   "id": "op1",
+   "name": "POOL",
+   "capacity": 1,
+   "shifts": [
+    "sh1"
+   ],
+   "productivity": {
+    "dist_type": "Constant",
+    "params": {
+     "value": {
+      "kind": "constant",
+      "value": 1.0
+     }
+    }
+   }
+  }
+ ],
+ "closing_days": [],
+ "shifts": [
+  {
+   "id": "sh1",
+   "name": "always",
+   "mode": "custom",
+   "custom_intervals": [
+    {
+     "start": "01-01-2026 00:00",
+     "end": "01-03-2026 00:00"
+    }
+   ],
+   "days_off": []
+  }
+ ],
+ "stopping_criterion": {
+  "type": "ByPiecesProduced",
+  "timeout": 43200.0,
+  "grace_period": 0.0,
+  "models_goals": [
+   {
+    "model": "m1",
+    "goal": 400
+   }
+  ]
+ },
+ "start_date": "01-01-2026 00:00",
+ "seed": 0,
+ "nodes": [
+  {
+   "id": "gen",
+   "kind": "PieceGenerator",
+   "name": "Gen",
+   "enabled": true,
+   "shifts": [
+    "sh1"
+   ],
+   "outlets": [
+    "bin"
+   ],
+   "position": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "bin",
+   "kind": "Buffer",
+   "name": "In",
+   "enabled": true,
+   "buffer_type": "PASSAGE",
+   "valid_models": [
+    "m1"
+   ],
+   "position": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "thigh",
+   "kind": "Task",
+   "name": "HIGH",
+   "enabled": true,
+   "models_configs": [
+    {
+     "model": "m1",
+     "duration": {
+      "dist_type": "Constant",
+      "params": {
+       "value": {
+        "kind": "constant",
+        "value": 10.0
+       }
+      }
+     },
+     "resources": [],
+     "min_carrier_capacity": 1,
+     "max_carrier_capacity": 1
+    }
+   ],
+   "startup_duration": {
+    "dist_type": "Constant",
+    "params": {
+     "value": {
+      "kind": "constant",
+      "value": 0.0
+     }
+    }
+   },
+   "loading_duration": {
+    "dist_type": "Constant",
+    "params": {
+     "value": {
+      "kind": "constant",
+      "value": 5.0
+     }
+    }
+   },
+   "operators": [
+    [
+     {
+      "operator": "op1",
+      "count": 1
+     }
+    ]
+   ],
+   "loading_operators": [
+    [
+     {
+      "operator": "op1",
+      "count": 1
+     }
+    ]
+   ],
+   "startup_operators": [],
+   "task_shifts": [
+    "sh1"
+   ],
+   "policies": {
+    "pending_carriers_pre_flexible_shutdowns": {
+     "type": "AbortPendingCarriers"
+    },
+    "pending_carrier_pre_task_shift_end": {
+     "type": "AbortPendingCarriers"
+    },
+    "operator_shift_constraint": {
+     "type": "NotConstrainedByShift"
+    },
+    "task_shift_constraint": {
+     "type": "NotConstrainedByShift"
+    },
+    "operators_self_conscious": {
+     "type": "Unconscious"
+    },
+    "piece_exit_order": {
+     "type": "FirstInFirstOut"
+    },
+    "batch_model_choice": {
+     "type": "MostPresent"
+    }
+   },
+   "operator_scope": "PER_BATCH",
+   "resource_scope": "PER_BATCH",
+   "min_carriers": 1,
+   "max_capacity": 1,
+   "contiguous_carriers": false,
+   "independent_carriers": true,
+   "timeout": "inf",
+   "priority": 10,
+   "admin": false,
+   "collector_type": "NON_DISCRIMINATING_GREEDY",
+   "bufs_in": [
+    "bin"
+   ],
+   "bufs_out": [
+    "bout"
+   ],
+   "shutdowns": [],
+   "breakdowns": [],
+   "position": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "tlow",
+   "kind": "Task",
+   "name": "LOW",
+   "enabled": true,
+   "models_configs": [
+    {
+     "model": "m1",
+     "duration": {
+      "dist_type": "Constant",
+      "params": {
+       "value": {
+        "kind": "constant",
+        "value": 10.0
+       }
+      }
+     },
+     "resources": [],
+     "min_carrier_capacity": 1,
+     "max_carrier_capacity": 1
+    }
+   ],
+   "startup_duration": {
+    "dist_type": "Constant",
+    "params": {
+     "value": {
+      "kind": "constant",
+      "value": 0.0
+     }
+    }
+   },
+   "loading_duration": {
+    "dist_type": "Constant",
+    "params": {
+     "value": {
+      "kind": "constant",
+      "value": 5.0
+     }
+    }
+   },
+   "operators": [
+    [
+     {
+      "operator": "op1",
+      "count": 1
+     }
+    ]
+   ],
+   "loading_operators": [
+    [
+     {
+      "operator": "op1",
+      "count": 1
+     }
+    ]
+   ],
+   "startup_operators": [],
+   "task_shifts": [
+    "sh1"
+   ],
+   "policies": {
+    "pending_carriers_pre_flexible_shutdowns": {
+     "type": "AbortPendingCarriers"
+    },
+    "pending_carrier_pre_task_shift_end": {
+     "type": "AbortPendingCarriers"
+    },
+    "operator_shift_constraint": {
+     "type": "NotConstrainedByShift"
+    },
+    "task_shift_constraint": {
+     "type": "NotConstrainedByShift"
+    },
+    "operators_self_conscious": {
+     "type": "Unconscious"
+    },
+    "piece_exit_order": {
+     "type": "FirstInFirstOut"
+    },
+    "batch_model_choice": {
+     "type": "MostPresent"
+    }
+   },
+   "operator_scope": "PER_BATCH",
+   "resource_scope": "PER_BATCH",
+   "min_carriers": 1,
+   "max_capacity": 1,
+   "contiguous_carriers": false,
+   "independent_carriers": true,
+   "timeout": "inf",
+   "priority": 10,
+   "admin": false,
+   "collector_type": "NON_DISCRIMINATING_GREEDY",
+   "bufs_in": [
+    "bin"
+   ],
+   "bufs_out": [
+    "bout"
+   ],
+   "shutdowns": [],
+   "breakdowns": [],
+   "position": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "bout",
+   "kind": "Buffer",
+   "name": "Out",
+   "enabled": true,
+   "buffer_type": "EXIT",
+   "valid_models": [
+    "m1"
+   ],
+   "position": [
+    0,
+    0
+   ]
+  }
+ ],
+ "connections": []
+}

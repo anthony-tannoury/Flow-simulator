@@ -1,0 +1,9 @@
+﻿modele,objectif,genere,sorties,rebuts,taux_rebut,atteinte,traversee_moyenne,traversee_mediane,traversee_p90,traversee_max
+MBP M88,3000,156,17,6,26.1%,0.6%,5j 19h 34m,5j 2h 59m,8j 4h 52m,17j 1h 4m
+MHP M88,3000,192,49,7,12.5%,1.6%,9j 18h 14m,11j 10h 57m,13j 5h 17m,17j 2h 4m
+DHP M88 Dr,3000,195,44,6,12%,1.5%,11j 7h 52m,12j 6h 35m,17j 7h 49m,18j 8h 15m
+DHP M88 Gche,3000,179,31,11,26.2%,1%,14j 19h 5m,14j 7h 41m,18j 8h 40m,20j 23h 30m
+RM1 LEAP 1A,4500,283,130,4,3%,2.9%,8j 11h 9m,7j 5h 59m,14j 10h 44m,15j 3h 8m
+RM2 LEAP 1B,4500,257,115,3,2.5%,2.6%,9j 14h 28m,11j 1h 58m,14j 1h 45m,19j 23h 4m
+RM3 LEAP 1B,4500,295,147,6,3.9%,3.3%,8j 8h 23m,8j 6h 58m,14j 6h 12m,20j 10h 43m
+D1 LEAP 1B,4500,249,106,2,1.8%,2.4%,8j 11h 54m,6j 19h 51m,15j 4h 5m,16j 8h 0m

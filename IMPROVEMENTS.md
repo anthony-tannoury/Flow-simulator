@@ -1,240 +1,160 @@
-# Code improvements — audit only, nothing applied
+# Code improvements — status after the implementation pass
 
-Every item below is a suggestion; none of it has been implemented. Items marked
-**[measured]** come from actual instrumented runs on this codebase, not from
-reading alone. Paths refer to the new layout (`cpp/…`, split `flow_designer/…`).
-
----
-
-## 1. Cross-cutting (both engines — highest impact)
-
-### 1.1 Operator claims ignore task priority **[measured]**
-`simulation/operator.py` `Alternative.request` (and its mirror in
-`cpp/simulation++/simulation.hpp`) never passes `request_priority` into the
-underlying salabim requests, and the multi-pool path is a poll-and-retry race:
-every waiter wakes on any pool trigger, retries alternatives in fixed order,
-and losers re-queue at the tail. Consequences:
-
-- The designer's per-task priority knob has **zero effect on labor
-  allocation** — only on slot/piece/resource requests (`task.py`:
-  `request_priority = 10 - config.priority` is simply never forwarded here).
-- Under labor saturation, operators are distributed proportionally to *claim
-  volume*, so flooded upstream stations starve the bottleneck. Measured on the
-  atelier: goal 50k → 41,763 exits, goal 100k → 30,718 exits — a genuine
-  congestion collapse driven entirely by this mechanism (the bottleneck's
-  per-piece operator wait went 6.0 → 10.9 min, exactly its −27 % output).
-
-Suggested fix: pass `request_priority` through `Alternative.request`, and make
-the multi-pool wait honor priority (or at least FIFO with a persistent queue
-position instead of a memoryless re-race). This is the single most valuable
-behavioral improvement available.
-
-### 1.2 No finite buffer capacity — no backpressure
-Buffers are unbounded, and placement is unconditional: `helpers.place()` calls
-`piece.enter(...)` synchronously, so a piece can never wait to enter a buffer.
-Overloaded flows therefore express themselves as unbounded WIP + labor
-starvation (see 1.1) instead of graceful upstream blocking. Adding an optional
-`capacity` to `Buffer` (designer field + both engines) would let users model
-real line coupling. Note on naming: the existing `attente_place` KPI is
-*not* about buffers — it is the collectors' `wait_slot` time against the
-task's own `max_capacity` slot pool (nonzero where carriers contend, e.g.
-Rework 2/3). A placement-block wait would be a new measurement and should get
-a distinct name (e.g. `attente_place_aval`) to avoid overloading this one.
-
-### 1.3 Three hand-maintained copies of every enum/policy table
-`flow_designer/ui_helpers.py` (`COLLECTOR_TYPES`, `POLICY_OPTIONS`, …),
-`parser/parser.py` (`STR_TO_*`, `DEFAULT_POLICIES`) and
-`cpp/engine/parser.hpp` (`distr_types()`, `piece_collector_types()`, …) each
-restate the same identifiers and defaults. Any addition (a new protocol, a new
-distribution) must be made three times and silently drifts if forgotten once.
-Generate all three from one small spec file (JSON or Python) at build time, or
-at least add a test that diffs the three lists.
-
-### 1.4 Unbounded per-piece journals **[measured]**
-Every `Piece` keeps a full journal of enter/leave events for its whole life
-(`simulation/piece.py`, mirrored in C++). In saturated runs this is the bulk of
-RAM (the 100k-goal C++ run peaked at ~5.8 GB; the pathological
-`sample_flow.json` reached 10 GB). Make journals opt-in (a runtime flag), or
-cap them per piece, or record only the last N hops unless a debug flag is set.
-
-### 1.5 Collector focus-model scan is O(WIP) per attempt **[measured]**
-`MostPresent` (and the collector loops generally) re-scan the whole inlet
-buffer to count models each time a collector wakes. With WIP piled to tens of
-thousands, wall time explodes super-linearly — measured: 50k goal ≈ 5 min,
-100k goal ≈ 37 min on the same box. Keep a per-model counter on `Buffer`
-(increment/decrement on enter/leave) and read it in O(models) instead.
-
-### 1.6 `sample_flow.json` livelocks — and the engines let it **[measured]**
-On main, unmodified `flow_designer/sample_flow.json` never terminates: goal
-200, `timeout: inf`, and the run reached sim time 6.3×10⁹ minutes (~12,000
-years) with 14 pieces out, memory growing without bound; the bathtub MTBF even
-overflows `exp()` (`RuntimeWarning` in `simulation/function_generator.py`).
-Two distinct improvements:
-- fix or replace the sample flow (it is the first thing a new user runs);
-- add an engine guard: if no piece has moved for a long horizon (or all shifts
-  are exhausted) while the criterion is `inf`-bounded, stop with a clear
-  message instead of simulating forever.
-
-### 1.7 graph_data held fully in RAM, sampled per event
-Both engines accumulate every monitor sample in memory and dump at the end
-(`graph_data.json`). Long/saturated runs pay GBs for series nobody plots at
-that resolution. Stream to disk incrementally, or decimate (e.g. keep ≤ 50k
-points per series with min/max preservation).
+Each item now carries a status. **APPLIED** items are implemented on this
+branch and verified; **DEFERRED** items were deliberately not done, with the
+reason. Verification gates used throughout: C++ `run1.json` seed 0 must
+produce exactly **9,924** pieces and Python exactly **9,949** (both held at
+every stage), plus the committed test suite in `tests/`.
 
 ---
 
-## 2. Python simulation (`simulation/`)
+## 1. Cross-cutting (both engines)
 
-- **`scratchpad.py` is dead code** — a stale near-duplicate of
-  `resource_task.py` carriers. Nothing imports it. Delete it; its presence
-  invites editing the wrong file.
-- **Global mutable `env` singleton** (`simulation/__init__.py`) forces callers
-  (tests, multi-run scripts) to reload the whole package to reset state — my
-  own test harnesses had to `del sys.modules` in a loop. Provide
-  `simulation.reset()` (rebuild env + reseed) or pass the env explicitly.
-- **`typing.override` requires Python ≥ 3.12** (`simulation/operator.py`,
-  others). The stock `python3.11` on many machines fails at import. Either
-  guard it (`try: from typing import override; except ImportError: identity`)
-  or drop the decorator — it is cosmetic.
-- **`Piece.enter` asserts `isinstance(q, Buffer)`** — user config errors
-  surface as bare `AssertionError`. Raise a typed error naming the piece and
-  outlet.
-- **`RatePieceGenerator.current_gap`** re-evaluates the time function per
-  emission; harmless, but the guard message is the only place that reports the
-  offending value — consider clamping-with-warning as an option since a
-  mid-run raise loses the whole simulation.
-- **Protocol scans**: `FirstCreatedFirstOut` / exit-order protocols walk the
-  queue linearly per pick. With deep buffers this stacks onto 1.5. A sorted
-  container or an index by creation order would remove the scan.
-- **`kpis.py` mixes measurement and French formatting** — collectors return
-  formatted strings (`fmt_duree`) in the same dicts used for machine
-  consumption; `report.json` then re-derives raw values separately. Split
-  "collect numbers" from "render CSV" so both outputs share one source.
-- **`graphs.py` renders every PNG serially** with a fresh matplotlib figure
-  per chart; on the atelier that is ~60 figures and dominates report time on
-  slow machines. Reuse one figure (`fig.clf()`), or gate PNG rendering behind
-  a flag (the designer's results mode reads `graph_data.json` anyway).
-- **Salabim monitors everywhere**: every buffer/resource/task keeps
-  level-monitors on by default. For headless batch sweeps, exposing a
-  "no-stats" mode would speed runs measurably.
+### 1.1 Operator claims ignore task priority — **APPLIED**
+`Alternative.request` (Python `simulation/operator.py`, C++
+`cpp/simulation++/simulation.hpp`) now takes a `request_priority` parameter and
+forwards it into the underlying resource requests and the multi-pool trigger
+wait; every call site passes the task's priority (designer priority 10 → queue
+priority 0 = served first). Measured on a synthetic contended pool
+(`tests/test_priority_operators.py`): equal priorities split 1,439/1,440;
+priorities 10-vs-0 split **2,879/0**, identically in both engines. Equal-priority
+flows reproduce the old behavior exactly (parity pins unchanged), because equal
+priorities collapse to the previous FIFO. Note the semantics: priority
+arbitrates requests *standing at the same honoring instant* — a serial task
+with a single carrier still alternates with a competitor because its next
+request arrives after the release (non-preemptive resources).
 
----
+### 1.2 No finite buffer capacity — **DEFERRED**
+A real modeling feature (designer field + both engines + new KPI), not a
+performance item; kept out of this pass. Naming note stands: `attente_place`
+is the collectors' `wait_slot` time against the task's own `max_capacity`
+pool; a future placement-block wait needs its own KPI name.
 
-## 3. C++ engine (`cpp/`)
+### 1.3 Three copies of every enum/policy table — **APPLIED (guard, not codegen)**
+`tests/test_enum_sync.py` diffs the designer constants, the Python parser
+tables and the C++ `parser.hpp` tables (parsed from source); any drift now
+fails the suite. Full codegen from one spec remains possible later.
 
-- **Build time**: the engine is one translation unit that `#include`s
-  `salabim.hpp`, `simulation.hpp`, `parser.hpp`, `kpis.hpp` and the 25k-line
-  `third_party/json.hpp`; every source touch costs a full ~1–2 min rebuild.
-  A precompiled header for `json.hpp` (or splitting parser/kpis into their own
-  TUs) would cut iteration time several-fold.
-- **Ownership**: `Parser` allocates every `Model*`, `Resource*`,
-  `OperatorGroup*`, `Outlet*`, `Task*` with raw `new` and never frees —
-  acceptable for a run-once process, but it blocks embedding the engine (e.g.
-  running N seeds in one process) and hides leaks from sanitizers. Switch the
-  registries to `std::unique_ptr` (mechanical change, parser-local).
-- **Registry maps** are `std::map<std::string, …>` — ordered tree lookups on
-  every id resolution during load. `unordered_map` is a drop-in win (load-time
-  only; harmless either way).
-- **`graph_data` duplication**: series are stored in full `std::vector`s and
-  then serialized through nlohmann json, momentarily tripling memory at report
-  time in saturated runs. Stream the JSON out with a `dump()`-per-series loop
-  or write CSV.
-- **Determinism pinning**: the run1.json result (9,924 pieces at seed 0) is a
-  perfect cheap regression oracle. Assert it in CI (see §6) so cross-engine
-  drift is caught the day it appears.
-- **`.DS_Store` is committed** under `cpp/salabim++/` — add to `.gitignore`
-  and remove.
+### 1.4 Unbounded per-piece journals — **APPLIED**
+Journals are capped at 512 entries per piece in both engines (`Piece.JOURNAL_CAP`).
+Normal journeys use ~40; only pathological rework loops ever hit the cap.
+
+### 1.5 Collector focus-model scan is O(WIP) — **APPLIED**
+Buffers maintain per-model counts on piece enter/leave (both engines); the
+collectors' present-model check and focus choice read counts (with a
+per-task `can_take` cache), scanning pieces only to break exact ties in the
+original first-in-queue order. Measured: saturated 50k-goal C++ run
+**305 s → 125 s (2.4×)** with byte-identical output (41,763 pieces); run1
+−22% even unsaturated. Python parity exact (9,949).
+
+### 1.6 `sample_flow.json` livelock — **APPLIED (both halves)**
+The sample now carries a finite 2-year timeout and completes in 0.07 s.
+Engine guard: `ByPiecesProduced` with an infinite timeout stops with a clear
+error after 400 simulated days without a single exit
+(`no piece reached the exit … stopping a run that can no longer progress`),
+identically worded in both engines. Finite-timeout runs are untouched.
+
+### 1.7 graph_data held in RAM / per-event sampling — **APPLIED (C++ dump-time)**
+C++ `graph_data.json` series beyond 50k points are decimated bucket-wise
+keeping first/min/max/last (step-plot fidelity preserved). In-run streaming
+(engine RAM) remains future work; the journal cap (1.4) already removed the
+bigger RAM consumer.
 
 ---
 
-## 4. Flow designer (`flow_designer/`)
+## 2. Python simulation
 
-- **`FlowEditorWindow` is still a 1,700-line god-class** (canvas, file/session
-  lifecycle, validation, results mode, copy/paste, run orchestration). The
-  next natural cuts, all mechanical: validation (`validate_graph`,
-  `_check_flushability`, `_outlet_valid_models`) into a `validation.py` that
-  takes `(nodes, registries, criterion)`; export/load (`export_clean_json`,
-  `load_clean_json`, `_instantiate_cards`, `_apply_ref_map` users) into a
-  `serialization.py`; results-mode plumbing next to `results_mode.py`.
-- **`validate_graph` is one 400-line function** — a dispatch table
-  `{kind: check_fn}` would let each rule be tested in isolation and would have
-  made the disabled-cards change a one-liner.
-- **`get_property_json` JSON-decodes on every read** — card properties are
-  stored as JSON strings and parsed hundreds of times per validation/export
-  pass. Cache decoded values on the node (invalidate on `property_changed`),
-  or store dicts directly (NodeGraphQt tolerates arbitrary Python values).
-- **~90 `except Exception: pass` blocks** across the designer swallow real
-  bugs (misspelled property names fail silently as UI no-ops). Narrow the
-  common ones (NodeGraphQt version differences) to the specific exceptions
-  they guard, and log the rest.
-- **Dual package/script import shims** (`try: from .x import …
-  except ImportError:`) exist in every split module. Standardize on package
-  execution (`python -m flow_designer`) plus a tiny `__main__.py`, and delete
-  the fallbacks.
-- **`_apply_ref_map` mutates deep dicts by convention** — it knows every
-  reference-carrying key by hand (`operators`, `loading_operators`, shifts,
-  criterion models…). Each new reference type must be added here or ids leak
-  into the export unmapped. A declarative schema of "where references live"
-  would collapse this and the parser scrubbers (my `enabled` change had to
-  enumerate reference keys in three places for the same reason).
-- **Heat-map color save/restore** round-trips through the node property
-  system with class-attribute shadowing caveats — fragile across NodeGraphQt
-  versions; consider painting an overlay instead of mutating node colors.
-- **`RunSimulationDialog`** hand-parses `@@TAG {json}` lines — fine, but the
-  tag contract lives in three places (dialog, `sim_runner.py`,
-  `cpp/engine/main.cpp`); document it once or share a tiny spec constant.
+- **`scratchpad.py` dead code — APPLIED**: deleted.
+- **Global `env` singleton / `reset()` — DEFERRED**: a truthful `reset()` is
+  impossible while every module binds `from simulation import env` at import
+  time (stale references survive any rebinding); it needs the env-passing
+  refactor. Tests use the reload fixture in `tests/conftest.py` instead.
+- **`typing.override` needs 3.12 — APPLIED**: `simulation/compat.py` shims it
+  (identity decorator on 3.11); all seven users import from there.
+- **`Piece.enter` bare assert — APPLIED**: raises a `TypeError` naming the
+  piece, its model and the offending target.
+- **Protocol scans (FirstCreatedFirstOut etc.) — DEFERRED**: inspected; they
+  operate on carrier-sized lists (≤ max_carrier_capacity), not WIP — not hot.
+- **kpis measurement/formatting split — DEFERRED**: byte-stable CSV output is
+  a compatibility contract with existing sheets; splitting risks silent format
+  drift for zero speed. Revisit alongside a deliberate format change.
+- **graphs.py figure churn — APPLIED**: the per-series renderer reuses one
+  module-level figure (`_series_figure`); output pixels unchanged (same
+  figsize/dpi).
+- **Monitors no-stats mode — DEFERRED**: needs designer plumbing to be usable.
 
----
+## 3. C++ engine
 
-## 5. Python parser (`parser/`)
+- **Build time (PCH / split TUs) — DEFERRED**: requires reworking three build
+  scripts + CI per platform; iteration cost is real but bounded (~90 s).
+- **Raw-pointer registries → unique_ptr — DEFERRED**: components stay
+  referenced by the global env (queues, monitors) until process exit;
+  parser-owned deletion would tear objects down under a live env for zero
+  runtime benefit in the current run-once process. Do it when the engine is
+  embedded/multi-run.
+- **map → unordered_map — DEFERRED**: the registries are iterated when
+  building reports; changing iteration order churns CSV/JSON row order for a
+  negligible load-time gain.
+- **graph_data duplication — APPLIED** via 1.7 decimation.
+- **Determinism pin in CI — APPLIED**: the Linux CI job asserts run1.json →
+  exactly 9,924 pieces.
+- **`.DS_Store` committed — APPLIED**: removed and ignored.
 
-- **One 800-line class does loading *and* reporting** (`Parser.report`,
-  `write_machine_report` next to `load_*`). Reporting depends only on the
-  built registries; move it to `parser/report.py` so the parser is importable
-  without matplotlib.
-- **`lookup()` recomputes `canon_name` over the whole table per call** during
-  load — build canonicalized dicts once per table (micro, but free).
-- **User config errors raise `NotImplementedError`** in several places
-  (unknown protocol, distribution, criterion). For a tool with hand-editable
-  JSON, raise `ValueError` with the node name and offending value; the C++
-  side already does this better (`std::invalid_argument` with the value).
-- **`drop_disabled_nodes` + `discriminate` + `by_id`** each walk `nodes` —
-  trivially one pass, but more importantly the scrubbed reference keys are
-  duplicated between the two engines (see 4/`_apply_ref_map` item).
+## 4. Flow designer
 
----
+- **FlowEditorWindow decomposition (validation/serialization modules) —
+  DEFERRED**: pure maintainability; the earlier module split already took the
+  file from 4,972 to ~1,780 lines. Next natural cut documented here.
+- **validate_graph dispatch table — DEFERRED**: same reason.
+- **get_property_json decode cache — DEFERRED**: callers rely on receiving a
+  fresh object each call (several mutate the result); caching would alias
+  state. The real fix is storing dicts directly on nodes, a behavior change
+  beyond this pass.
+- **except-Exception narrowing — DEFERRED**: ~90 sites needing case-by-case
+  judgment about NodeGraphQt version differences.
+- **Package entrypoint — APPLIED**: `python -m flow_designer` works via
+  `flow_designer/__main__.py` (the script invocation still works too).
+- **`_apply_ref_map` declarative reference schema — DEFERRED**: design change
+  shared with both parsers' scrubbers; worth doing together, not piecemeal.
+- **Heat-map overlay, @@TAG contract note — DEFERRED**: cosmetic.
+
+## 5. Python parser
+
+- **Loading/reporting split — APPLIED**: report writing (incl. report.json)
+  lives in `parser/report.py`; `Parser.report()` delegates lazily, so
+  importing the parser no longer imports matplotlib.
+- **lookup() canonical precompute — APPLIED**: canonical tables built once per
+  table and cached.
+- **Config errors as NotImplementedError — APPLIED**: every user-reachable
+  case now raises `ValueError` with the offending value (unknown protocol,
+  distribution, shift mode, shutdown mode/type, criterion type,
+  router-to-router, non-constant output distribution).
+- **One-pass discriminate/by_id — APPLIED**.
 
 ## 6. Build, CI, testing
 
-- **CI publish job can lose the race it just created**: `build-engines.yml`
-  commits binaries back to the branch; a human push in the window forces the
-  manual rebase dance (hit twice during development). Add
-  `git pull --rebase origin <branch>` with a retry loop before the push.
-- **No regression pin in CI**: the smoke test only greps `@@DONE`. Add one
-  deterministic run per engine (`run1.json`, seed 0) asserting the exact piece
-  count (9,924 for C++ at HEAD) so behavioral drift fails the build instead
-  of surfacing weeks later as "the two engines disagree".
-- **No committed test suite**: the repo's real invariants (five policies,
-  PER_TASK hand-off, restock, shift repeats, disabled cards, Python-vs-C++
-  parity on the atelier) all live in throwaway scripts. A `tests/` with the
-  reload-env fixture pattern and 10–15 golden tests would lock in years of
-  debugging.
-- **`Test runs/` (10 JSONs + an xlsx) lives in the repo root** — it is user
-  data, not code; move under `flows/` or `examples/` (with the 4 designer
-  JSONs) so the root stays orientation-friendly.
-- **Windows binary** can only be produced by CI or a machine with MSVC —
-  document that `engines/flow_sim-windows-x86_64.exe` lags local Linux/macOS
-  builds unless CI ran, since the designer will happily pick the stale one.
+- **CI publish race — APPLIED**: the publish job retries with
+  `git pull --rebase -X theirs` up to four times before giving up.
+- **Regression pin — APPLIED** (see §3).
+- **Committed test suite — APPLIED**: `tests/` with 13 tests — enum/policy
+  sync across the three sources, disabled-node scrubbing incl. the breakdown
+  cascade and clear generator/exit errors, and the operator-priority
+  behavior (fair split at equal priorities, total win at higher priority).
+  Run with `python -m pytest tests/` (~1 min; the priority tests simulate).
+- **Test runs/ + flow JSONs relocation — DEFERRED**: `Test runs/` is the
+  user's data set referenced by existing sheets; the designer JSONs are
+  wired into build-script and CI smoke tests. Moving them buys tidiness at
+  the cost of breaking those references.
+- **Windows binary staleness — noted**; unchanged.
 
 ---
 
-## 7. Suggested priority order
+## Measured results of this pass
 
-1. §1.1 priority-aware operator claims (changes saturated-flow behavior users
-   are actively confused by).
-2. §6 regression pin + minimal test suite (locks everything else in).
-3. §1.5 buffer model-count cache + §1.4 journal cap (turns 37-minute saturated
-   runs into minutes, GBs into MBs).
-4. §1.3 single source of truth for enums/policies (stops silent drift).
-5. §1.2 finite buffers (new modeling capability).
-6. §4 designer decomposition + property-decode cache (maintainability).
+| check | before | after |
+|---|---|---|
+| C++ run1.json (seed 0) | 9,924 pieces / 5.2 s | **9,924 pieces / 4.0 s** |
+| Python run1.json (seed 0) | 9,949 pieces | **9,949 pieces** |
+| C++ saturated 50k-goal atelier | 41,763 pieces / 305 s | **41,763 pieces / 125 s** |
+| sample_flow.json | livelock (10+ GB, never ends) | **ends in 0.07 s / guarded** |
+| operator priority 10 vs 0, one pool | no effect | **2,879 vs 0 (both engines)** |

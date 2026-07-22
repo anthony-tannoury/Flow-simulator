@@ -1,0 +1,4 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+Raw Bodies,PASSAGE,nan,0,nan,0,,,0,0,,,
+Passed QC,EXIT,nan,0,nan,0,,,0,0,,,
+Scrap,SCRAP,nan,0,nan,0,,,0,0,,,

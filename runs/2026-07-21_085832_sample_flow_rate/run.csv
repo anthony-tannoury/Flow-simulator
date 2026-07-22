@@ -1,0 +1,10 @@
+﻿cle,valeur
+genere_le,2026-07-21T08:58:32
+graine,0
+duree_simulee,0s
+fichier,flow_designer/sample_flow_rate.json
+debut,05-01-2026 00:00
+fin,05-01-2026 00:00
+temps_calcul,0s
+critere_arret,ByTime
+critere_details,"time = 15-01-2026 00:00; gap = linear(x1=0, y1=8, x2=10000, y2=3); models_probs: WidgetA = 0.4, WidgetB = reste"

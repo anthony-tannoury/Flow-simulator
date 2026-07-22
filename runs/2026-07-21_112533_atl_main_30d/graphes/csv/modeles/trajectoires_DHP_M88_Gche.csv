@@ -1,0 +1,379 @@
+﻿modele,trajectoire,n_pieces,part,ordre,etape,type,duree_moyenne_min,duree_moyenne
+DHP M88 Gche,1,6,14.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.47,28s
+DHP M88 Gche,1,6,14.3%,2,PREP_NOY_02,poste,12.1,12m 6s
+DHP M88 Gche,1,6,14.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,1,6,14.3%,4,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,1,6,14.3%,5,Injection cire / Attente 4h,attente,863.4,14h 23m
+DHP M88 Gche,1,6,14.3%,6,Attente de 4h,poste,295.79,4h 56m
+DHP M88 Gche,1,6,14.3%,7,Attente 4h / Marquage laser,attente,21250.33,14j 18h 10m
+DHP M88 Gche,1,6,14.3%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,1,6,14.3%,9,Marquage laser / Contrôle US,attente,1070.42,17h 50m
+DHP M88 Gche,1,6,14.3%,10,EQUIPEMENTCABINEUS,poste,29.35,29m 21s
+DHP M88 Gche,1,6,14.3%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,1,6,14.3%,12,EQUIPEMENTCABINERX,poste,67.07,1h 7m
+DHP M88 Gche,1,6,14.3%,13,Contrôle RX / Expertise cire,attente,23.04,23m 2s
+DHP M88 Gche,1,6,14.3%,14,PCEXPCIRE_01,poste,24.55,24m 33s
+DHP M88 Gche,1,6,14.3%,15,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,1,6,14.3%,16,Stockage,poste,498.02,8h 18m
+DHP M88 Gche,2,5,11.9%,1,Entrée M88 ET Retouche / Prep noyaux,attente,4.24,4m 14s
+DHP M88 Gche,2,5,11.9%,2,PREP_NOY_02,poste,16.45,16m 27s
+DHP M88 Gche,2,5,11.9%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,2,5,11.9%,4,PRSINJM88_02,poste,13.76,13m 46s
+DHP M88 Gche,2,5,11.9%,5,Injection cire / Attente 4h,attente,249.06,4h 9m
+DHP M88 Gche,2,5,11.9%,6,Attente de 4h,poste,274.78,4h 35m
+DHP M88 Gche,2,5,11.9%,7,Attente 4h / Marquage laser,attente,18827.7,13j 1h 48m
+DHP M88 Gche,2,5,11.9%,8,MACHINEMARQUAGELASER,poste,24.46,24m 28s
+DHP M88 Gche,2,5,11.9%,9,Marquage laser / Contrôle US,attente,739.05,12h 19m
+DHP M88 Gche,2,5,11.9%,10,EQUIPEMENTCABINEUS,poste,37.01,37m
+DHP M88 Gche,2,5,11.9%,11,Contrôle US / Contrôle RX,attente,16.94,16m 56s
+DHP M88 Gche,2,5,11.9%,12,EQUIPEMENTCABINERX,poste,67.43,1h 7m
+DHP M88 Gche,2,5,11.9%,13,Contrôle RX / Expertise cire,attente,4.82,4m 49s
+DHP M88 Gche,2,5,11.9%,14,PCEXPCIRE_02,poste,26.58,26m 35s
+DHP M88 Gche,2,5,11.9%,15,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,2,5,11.9%,16,Stockage,poste,508.0,8h 28m
+DHP M88 Gche,3,3,7.1%,1,Entrée M88 ET Retouche / Prep noyaux,attente,9.33,9m 20s
+DHP M88 Gche,3,3,7.1%,2,PREP_NOY_01,poste,43.37,43m 22s
+DHP M88 Gche,3,3,7.1%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,3,3,7.1%,4,PRSINJM88_01,poste,24.08,24m 5s
+DHP M88 Gche,3,3,7.1%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,3,3,7.1%,6,Attente de 4h,poste,259.64,4h 20m
+DHP M88 Gche,3,3,7.1%,7,Attente 4h / Marquage laser,attente,18442.36,12j 19h 22m
+DHP M88 Gche,3,3,7.1%,8,MACHINEMARQUAGELASER,poste,24.63,24m 38s
+DHP M88 Gche,3,3,7.1%,9,Marquage laser / Contrôle US,attente,729.04,12h 9m
+DHP M88 Gche,3,3,7.1%,10,EQUIPEMENTCABINEUS,poste,34.11,34m 6s
+DHP M88 Gche,3,3,7.1%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,3,3,7.1%,12,EQUIPEMENTCABINERX,poste,77.49,1h 17m
+DHP M88 Gche,3,3,7.1%,13,Contrôle RX / Expertise cire,attente,38.17,38m 10s
+DHP M88 Gche,3,3,7.1%,14,PCEXPCIRE_01,poste,33.36,33m 21s
+DHP M88 Gche,3,3,7.1%,15,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,3,3,7.1%,16,Stockage,poste,502.72,8h 23m
+DHP M88 Gche,4,3,7.1%,1,Entrée M88 ET Retouche / Prep noyaux,attente,43.17,43m 10s
+DHP M88 Gche,4,3,7.1%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,4,3,7.1%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,4,3,7.1%,4,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,5,2,4.8%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.7,42s
+DHP M88 Gche,5,2,4.8%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,5,2,4.8%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,5,2,4.8%,4,PRSINJM88_02,poste,8.82,8m 49s
+DHP M88 Gche,5,2,4.8%,5,Injection cire / Attente 4h,attente,1707.07,1j 4h 27m
+DHP M88 Gche,5,2,4.8%,6,Attente de 4h,poste,287.21,4h 47m
+DHP M88 Gche,5,2,4.8%,7,Attente 4h / Marquage laser,attente,17379.79,12j 1h 40m
+DHP M88 Gche,5,2,4.8%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,5,2,4.8%,9,Marquage laser / Contrôle US,attente,719.35,11h 59m
+DHP M88 Gche,5,2,4.8%,10,EQUIPEMENTCABINEUS,poste,40.77,40m 46s
+DHP M88 Gche,5,2,4.8%,11,Contrôle US / Contrôle RX,attente,42.35,42m 21s
+DHP M88 Gche,5,2,4.8%,12,EQUIPEMENTCABINERX,poste,54.41,54m 25s
+DHP M88 Gche,5,2,4.8%,13,Contrôle RX / Expertise cire,attente,17.94,17m 56s
+DHP M88 Gche,5,2,4.8%,14,PCEXPCIRE_01,poste,26.18,26m 11s
+DHP M88 Gche,5,2,4.8%,15,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,5,2,4.8%,16,Stockage,poste,502.65,8h 23m
+DHP M88 Gche,6,2,4.8%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,6,2,4.8%,2,PREP_NOY_01,poste,7.75,7m 45s
+DHP M88 Gche,6,2,4.8%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,6,2,4.8%,4,PRSINJM88_02,poste,8.82,8m 49s
+DHP M88 Gche,6,2,4.8%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,6,2,4.8%,6,Attente de 4h,poste,246.42,4h 6m
+DHP M88 Gche,6,2,4.8%,7,Attente 4h / Marquage laser,attente,18948.8,13j 3h 49m
+DHP M88 Gche,6,2,4.8%,8,MACHINEMARQUAGELASER,poste,56.76,56m 46s
+DHP M88 Gche,6,2,4.8%,9,Marquage laser / Contrôle US,attente,157.86,2h 38m
+DHP M88 Gche,6,2,4.8%,10,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+DHP M88 Gche,6,2,4.8%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,6,2,4.8%,12,EQUIPEMENTCABINERX,poste,11.76,11m 46s
+DHP M88 Gche,6,2,4.8%,13,Contrôle RX / Expertise cire,attente,0.0,0s
+DHP M88 Gche,6,2,4.8%,14,PCEXPCIRE_01,poste,12.25,12m 15s
+DHP M88 Gche,6,2,4.8%,15,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,6,2,4.8%,16,Stockage,poste,493.7,8h 14m
+DHP M88 Gche,7,2,4.8%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.7,42s
+DHP M88 Gche,7,2,4.8%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,7,2,4.8%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,7,2,4.8%,4,PRSINJM88_02,poste,8.82,8m 49s
+DHP M88 Gche,8,2,4.8%,1,Entrée M88 ET Retouche / Prep noyaux,attente,90.32,1h 30m
+DHP M88 Gche,8,2,4.8%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,8,2,4.8%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,8,2,4.8%,4,PRSINJM88_02,poste,8.82,8m 49s
+DHP M88 Gche,8,2,4.8%,5,Injection cire noyaux / Prison 1,attente,9108.0,6j 7h 48m
+DHP M88 Gche,8,2,4.8%,6,(interrompu),poste,0.0,0s
+DHP M88 Gche,8,2,4.8%,7,Injection cire noyaux / Prison 1,attente,9573.73,6j 15h 34m
+DHP M88 Gche,8,2,4.8%,8,Prison 1,poste,508.71,8h 29m
+DHP M88 Gche,9,2,4.8%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,9,2,4.8%,2,(interrompu),poste,50.28,50m 17s
+DHP M88 Gche,10,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,10,1,2.4%,2,PREP_NOY_01,poste,7.76,7m 45s
+DHP M88 Gche,10,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,10,1,2.4%,4,PRSINJM88_02,poste,8.82,8m 49s
+DHP M88 Gche,10,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,10,1,2.4%,6,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,10,1,2.4%,7,Attente 4h / Marquage laser,attente,53.95,53m 57s
+DHP M88 Gche,10,1,2.4%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,10,1,2.4%,9,Marquage laser / Contrôle US,attente,527.45,8h 47m
+DHP M88 Gche,10,1,2.4%,10,(interrompu),poste,41.49,41m 30s
+DHP M88 Gche,10,1,2.4%,11,Marquage laser / Contrôle US,attente,3376.5,2j 8h 16m
+DHP M88 Gche,10,1,2.4%,12,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+DHP M88 Gche,10,1,2.4%,13,Contrôle US / Contrôle RX,attente,8.24,8m 14s
+DHP M88 Gche,10,1,2.4%,14,EQUIPEMENTCABINERX,poste,11.76,11m 46s
+DHP M88 Gche,10,1,2.4%,15,Contrôle RX / Expertise cire,attente,100.0,1h 40m
+DHP M88 Gche,10,1,2.4%,16,PCEXPCIRE_01,poste,29.41,29m 25s
+DHP M88 Gche,10,1,2.4%,17,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,10,1,2.4%,18,Stockage,poste,500.0,8h 20m
+DHP M88 Gche,11,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,11,1,2.4%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,11,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,11,1,2.4%,4,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,11,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,11,1,2.4%,6,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,11,1,2.4%,7,Attente 4h / Marquage laser,attente,106.46,1h 46m
+DHP M88 Gche,11,1,2.4%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,11,1,2.4%,9,Marquage laser / Contrôle US,attente,360.27,6h 0m
+DHP M88 Gche,11,1,2.4%,10,(interrompu),poste,41.49,41m 30s
+DHP M88 Gche,11,1,2.4%,11,Marquage laser / Contrôle US,attente,3376.5,2j 8h 16m
+DHP M88 Gche,11,1,2.4%,12,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+DHP M88 Gche,11,1,2.4%,13,Contrôle US / Prison 2,attente,0.0,0s
+DHP M88 Gche,11,1,2.4%,14,Prison 2,poste,822.35,13h 42m
+DHP M88 Gche,11,1,2.4%,15,Prison 3 / Rework 2,attente,0.0,0s
+DHP M88 Gche,11,1,2.4%,16,Rework 2,poste,29.41,29m 25s
+DHP M88 Gche,11,1,2.4%,17,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,11,1,2.4%,18,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,11,1,2.4%,19,Injection cire / Attente 4h,attente,561.76,9h 22m
+DHP M88 Gche,11,1,2.4%,20,Attente de 4h,poste,327.54,5h 28m
+DHP M88 Gche,11,1,2.4%,21,Attente 4h / Marquage laser,attente,13453.37,9j 8h 13m
+DHP M88 Gche,11,1,2.4%,22,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,11,1,2.4%,23,Marquage laser / Contrôle US,attente,595.21,9h 55m
+DHP M88 Gche,11,1,2.4%,24,EQUIPEMENTCABINEUS,poste,45.18,45m 11s
+DHP M88 Gche,11,1,2.4%,25,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,11,1,2.4%,26,EQUIPEMENTCABINERX,poste,82.35,1h 22m
+DHP M88 Gche,11,1,2.4%,27,Contrôle RX / Expertise cire,attente,27.06,27m 4s
+DHP M88 Gche,11,1,2.4%,28,PCEXPCIRE_02,poste,40.0,40m
+DHP M88 Gche,11,1,2.4%,29,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,11,1,2.4%,30,Stockage,poste,507.06,8h 27m
+DHP M88 Gche,12,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,12,1,2.4%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,12,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,12,1,2.4%,4,PRSINJM88_02,poste,9.06,9m 3s
+DHP M88 Gche,12,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,12,1,2.4%,6,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,12,1,2.4%,7,Attente 4h / Marquage laser,attente,18709.7,12j 23h 50m
+DHP M88 Gche,12,1,2.4%,8,MACHINEMARQUAGELASER,poste,24.0,24m
+DHP M88 Gche,12,1,2.4%,9,Marquage laser / Contrôle US,attente,71.65,1h 12m
+DHP M88 Gche,12,1,2.4%,10,(interrompu),poste,302.67,5h 3m
+DHP M88 Gche,12,1,2.4%,11,Marquage laser / Contrôle US,attente,636.15,10h 36m
+DHP M88 Gche,12,1,2.4%,12,EQUIPEMENTCABINEUS,poste,27.29,27m 18s
+DHP M88 Gche,12,1,2.4%,13,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,12,1,2.4%,14,EQUIPEMENTCABINERX,poste,38.82,38m 49s
+DHP M88 Gche,12,1,2.4%,15,Contrôle RX / Expertise cire,attente,0.0,0s
+DHP M88 Gche,12,1,2.4%,16,PCEXPCIRE_02,poste,37.65,37m 39s
+DHP M88 Gche,12,1,2.4%,17,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,12,1,2.4%,18,Stockage,poste,506.47,8h 26m
+DHP M88 Gche,13,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,58.16,58m 10s
+DHP M88 Gche,13,1,2.4%,2,PREP_NOY_01,poste,24.71,24m 42s
+DHP M88 Gche,13,1,2.4%,3,Prep noyaux / Injection manuelle,attente,1.07,1m 4s
+DHP M88 Gche,13,1,2.4%,4,PRSINJM88_01,poste,25.4,25m 24s
+DHP M88 Gche,13,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,13,1,2.4%,6,Attente de 4h,poste,254.12,4h 14m
+DHP M88 Gche,13,1,2.4%,7,Attente 4h / Marquage laser,attente,14288.8,9j 22h 9m
+DHP M88 Gche,13,1,2.4%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,13,1,2.4%,9,Marquage laser / Contrôle US,attente,53.58,53m 35s
+DHP M88 Gche,13,1,2.4%,10,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+DHP M88 Gche,13,1,2.4%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,13,1,2.4%,12,EQUIPEMENTCABINERX,poste,12.59,12m 35s
+DHP M88 Gche,13,1,2.4%,13,Contrôle RX / Expertise cire,attente,0.0,0s
+DHP M88 Gche,13,1,2.4%,14,(interrompu),poste,5.88,5m 53s
+DHP M88 Gche,13,1,2.4%,15,Contrôle RX / Expertise cire,attente,3842.43,2j 16h 2m
+DHP M88 Gche,13,1,2.4%,16,PCEXPCIRE_01,poste,29.71,29m 42s
+DHP M88 Gche,13,1,2.4%,17,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,13,1,2.4%,18,Stockage,poste,554.3,9h 14m
+DHP M88 Gche,14,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,21.51,21m 31s
+DHP M88 Gche,14,1,2.4%,2,PREP_NOY_02,poste,20.0,20m
+DHP M88 Gche,14,1,2.4%,3,Prep noyaux / Injection manuelle,attente,4.01,4m
+DHP M88 Gche,14,1,2.4%,4,PRSINJM88_01,poste,21.29,21m 17s
+DHP M88 Gche,14,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,14,1,2.4%,6,Attente de 4h,poste,249.3,4h 9m
+DHP M88 Gche,14,1,2.4%,7,Attente 4h / Marquage laser,attente,14284.33,9j 22h 4m
+DHP M88 Gche,14,1,2.4%,8,MACHINEMARQUAGELASER,poste,29.7,29m 42s
+DHP M88 Gche,14,1,2.4%,9,Marquage laser / Contrôle US,attente,0.0,0s
+DHP M88 Gche,14,1,2.4%,10,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+DHP M88 Gche,14,1,2.4%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,14,1,2.4%,12,EQUIPEMENTCABINERX,poste,12.59,12m 35s
+DHP M88 Gche,14,1,2.4%,13,Contrôle RX / Expertise cire,attente,8.32,8m 19s
+DHP M88 Gche,14,1,2.4%,14,(interrompu),poste,470.0,7h 50m
+DHP M88 Gche,14,1,2.4%,15,Contrôle RX / Expertise cire,attente,3370.0,2j 8h 10m
+DHP M88 Gche,14,1,2.4%,16,PCEXPCIRE_02,poste,32.35,32m 21s
+DHP M88 Gche,14,1,2.4%,17,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,14,1,2.4%,18,Stockage,poste,565.59,9h 26m
+DHP M88 Gche,15,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,15,1,2.4%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,15,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,15,1,2.4%,4,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,15,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,15,1,2.4%,6,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,15,1,2.4%,7,Attente 4h / Marquage laser,attente,14294.37,9j 22h 14m
+DHP M88 Gche,15,1,2.4%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,15,1,2.4%,9,Marquage laser / Contrôle US,attente,23.88,23m 53s
+DHP M88 Gche,15,1,2.4%,10,(interrompu),poste,401.85,6h 42m
+DHP M88 Gche,15,1,2.4%,11,Marquage laser / Contrôle US,attente,3396.98,2j 8h 37m
+DHP M88 Gche,15,1,2.4%,12,EQUIPEMENTCABINEUS,poste,87.06,1h 27m
+DHP M88 Gche,15,1,2.4%,13,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,15,1,2.4%,14,EQUIPEMENTCABINERX,poste,32.35,32m 21s
+DHP M88 Gche,15,1,2.4%,15,Contrôle RX / Expertise cire,attente,61.18,1h 1m
+DHP M88 Gche,15,1,2.4%,16,PCEXPCIRE_02,poste,32.35,32m 21s
+DHP M88 Gche,15,1,2.4%,17,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,15,1,2.4%,18,Stockage,poste,506.88,8h 27m
+DHP M88 Gche,16,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,16,1,2.4%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,16,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,16,1,2.4%,4,PRSINJM88_01,poste,11.26,11m 15s
+DHP M88 Gche,16,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,16,1,2.4%,6,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,16,1,2.4%,7,Attente 4h / Marquage laser,attente,18467.03,12j 19h 47m
+DHP M88 Gche,16,1,2.4%,8,MACHINEMARQUAGELASER,poste,24.9,24m 54s
+DHP M88 Gche,16,1,2.4%,9,Marquage laser / Contrôle US,attente,0.0,0s
+DHP M88 Gche,16,1,2.4%,10,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+DHP M88 Gche,16,1,2.4%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,16,1,2.4%,12,EQUIPEMENTCABINERX,poste,11.76,11m 46s
+DHP M88 Gche,16,1,2.4%,13,Contrôle RX / Expertise cire,attente,11.76,11m 46s
+DHP M88 Gche,16,1,2.4%,14,PCEXPCIRE_02,poste,19.79,19m 48s
+DHP M88 Gche,16,1,2.4%,15,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,16,1,2.4%,16,(interrompu),poste,0.0,0s
+DHP M88 Gche,16,1,2.4%,17,Expertise cire / Stockage,attente,0.89,53s
+DHP M88 Gche,16,1,2.4%,18,(interrompu),poste,0.0,0s
+DHP M88 Gche,16,1,2.4%,19,Expertise cire / Stockage,attente,960.0,16h 0m
+DHP M88 Gche,16,1,2.4%,20,Stockage,poste,502.83,8h 23m
+DHP M88 Gche,17,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,17,1,2.4%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,17,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,17,1,2.4%,4,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,17,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,17,1,2.4%,6,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,17,1,2.4%,7,Attente 4h / Marquage laser,attente,18363.32,12j 18h 3m
+DHP M88 Gche,17,1,2.4%,8,MACHINEMARQUAGELASER,poste,31.18,31m 11s
+DHP M88 Gche,17,1,2.4%,9,Marquage laser / Contrôle US,attente,55.6,55m 36s
+DHP M88 Gche,17,1,2.4%,10,(interrompu),poste,414.7,6h 55m
+DHP M88 Gche,17,1,2.4%,11,Marquage laser / Contrôle US,attente,522.16,8h 42m
+DHP M88 Gche,17,1,2.4%,12,EQUIPEMENTCABINEUS,poste,79.41,1h 19m
+DHP M88 Gche,17,1,2.4%,13,Contrôle US / Contrôle RX,attente,1.88,1m 53s
+DHP M88 Gche,17,1,2.4%,14,EQUIPEMENTCABINERX,poste,30.59,30m 35s
+DHP M88 Gche,17,1,2.4%,15,Contrôle RX / Expertise cire,attente,61.76,1h 2m
+DHP M88 Gche,17,1,2.4%,16,PCEXPCIRE_01,poste,30.59,30m 35s
+DHP M88 Gche,17,1,2.4%,17,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,17,1,2.4%,18,Stockage,poste,501.65,8h 22m
+DHP M88 Gche,18,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,18,1,2.4%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,18,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,18,1,2.4%,4,PRSINJM88_02,poste,8.82,8m 49s
+DHP M88 Gche,18,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,18,1,2.4%,6,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,18,1,2.4%,7,Attente 4h / Marquage laser,attente,149.15,2h 29m
+DHP M88 Gche,18,1,2.4%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,18,1,2.4%,9,Marquage laser / Contrôle US,attente,240.12,4h 0m
+DHP M88 Gche,18,1,2.4%,10,(interrompu),poste,41.49,41m 30s
+DHP M88 Gche,18,1,2.4%,11,Marquage laser / Contrôle US,attente,3376.5,2j 8h 16m
+DHP M88 Gche,18,1,2.4%,12,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+DHP M88 Gche,18,1,2.4%,13,Contrôle US / Prison 2,attente,822.35,13h 42m
+DHP M88 Gche,18,1,2.4%,14,(interrompu),poste,0.0,0s
+DHP M88 Gche,18,1,2.4%,15,Contrôle US / Prison 2,attente,600.0,10h 0m
+DHP M88 Gche,18,1,2.4%,16,Prison 2,poste,754.6,12h 35m
+DHP M88 Gche,18,1,2.4%,17,Prison 3 / Rework 2,attente,0.0,0s
+DHP M88 Gche,18,1,2.4%,18,Rework 2,poste,29.41,29m 25s
+DHP M88 Gche,18,1,2.4%,19,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,18,1,2.4%,20,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,18,1,2.4%,21,Injection cire / Attente 4h,attente,647.17,10h 47m
+DHP M88 Gche,18,1,2.4%,22,Attente de 4h,poste,293.31,4h 53m
+DHP M88 Gche,18,1,2.4%,23,Attente 4h / Marquage laser,attente,17496.46,12j 3h 36m
+DHP M88 Gche,18,1,2.4%,24,MACHINEMARQUAGELASER,poste,29.04,29m 2s
+DHP M88 Gche,18,1,2.4%,25,Marquage laser / Contrôle US,attente,0.0,0s
+DHP M88 Gche,18,1,2.4%,26,(interrompu),poste,414.7,6h 55m
+DHP M88 Gche,18,1,2.4%,27,Marquage laser / Contrôle US,attente,522.16,8h 42m
+DHP M88 Gche,18,1,2.4%,28,EQUIPEMENTCABINEUS,poste,79.41,1h 19m
+DHP M88 Gche,18,1,2.4%,29,Contrôle US / Contrôle RX,attente,1.88,1m 53s
+DHP M88 Gche,18,1,2.4%,30,EQUIPEMENTCABINERX,poste,30.59,30m 35s
+DHP M88 Gche,18,1,2.4%,31,Contrôle RX / Expertise cire,attente,92.35,1h 32m
+DHP M88 Gche,18,1,2.4%,32,PCEXPCIRE_01,poste,29.41,29m 25s
+DHP M88 Gche,18,1,2.4%,33,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,18,1,2.4%,34,Stockage,poste,494.52,8h 15m
+DHP M88 Gche,19,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,19,1,2.4%,2,PREP_NOY_02,poste,11.76,11m 46s
+DHP M88 Gche,19,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,19,1,2.4%,4,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,19,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,19,1,2.4%,6,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,19,1,2.4%,7,Attente 4h / Marquage laser,attente,18524.58,12j 20h 45m
+DHP M88 Gche,19,1,2.4%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,19,1,2.4%,9,Marquage laser / Contrôle US,attente,802.83,13h 23m
+DHP M88 Gche,19,1,2.4%,10,EQUIPEMENTCABINEUS,poste,36.36,36m 22s
+DHP M88 Gche,19,1,2.4%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,19,1,2.4%,12,EQUIPEMENTCABINERX,poste,80.59,1h 21m
+DHP M88 Gche,19,1,2.4%,13,Contrôle RX / Expertise cire,attente,29.41,29m 25s
+DHP M88 Gche,19,1,2.4%,14,PCEXPCIRE_02,poste,31.18,31m 11s
+DHP M88 Gche,19,1,2.4%,15,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,19,1,2.4%,16,Stockage,poste,500.59,8h 21m
+DHP M88 Gche,20,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,20,1,2.4%,2,PREP_NOY_02,poste,14.56,14m 34s
+DHP M88 Gche,20,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,20,1,2.4%,4,PRSINJM88_01,poste,11.89,11m 53s
+DHP M88 Gche,20,1,2.4%,5,Injection cire noyaux / Prison 1,attente,4072.23,2j 19h 52m
+DHP M88 Gche,20,1,2.4%,6,Prison 1,poste,508.71,8h 29m
+DHP M88 Gche,20,1,2.4%,7,Prison 1 / Rework,attente,0.0,0s
+DHP M88 Gche,20,1,2.4%,8,Rework 1,poste,29.41,29m 25s
+DHP M88 Gche,20,1,2.4%,9,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,20,1,2.4%,10,PRSINJM88_02,poste,8.82,8m 49s
+DHP M88 Gche,20,1,2.4%,11,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,20,1,2.4%,12,Attente de 4h,poste,245.88,4h 6m
+DHP M88 Gche,20,1,2.4%,13,Attente 4h / Marquage laser,attente,19669.65,13j 15h 50m
+DHP M88 Gche,20,1,2.4%,14,MACHINEMARQUAGELASER,poste,34.04,34m 3s
+DHP M88 Gche,20,1,2.4%,15,Marquage laser / Contrôle US,attente,27.06,27m 4s
+DHP M88 Gche,20,1,2.4%,16,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+DHP M88 Gche,20,1,2.4%,17,Contrôle US / Contrôle RX,attente,0.0,0s
+DHP M88 Gche,20,1,2.4%,18,EQUIPEMENTCABINERX,poste,11.76,11m 46s
+DHP M88 Gche,20,1,2.4%,19,Contrôle RX / Expertise cire,attente,0.0,0s
+DHP M88 Gche,20,1,2.4%,20,PCEXPCIRE_02,poste,11.76,11m 46s
+DHP M88 Gche,20,1,2.4%,21,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,20,1,2.4%,22,Stockage,poste,497.42,8h 17m
+DHP M88 Gche,21,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,21,1,2.4%,2,PREP_NOY_01,poste,84.23,1h 24m
+DHP M88 Gche,21,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.52,31s
+DHP M88 Gche,21,1,2.4%,4,PRSINJM88_02,poste,26.47,26m 28s
+DHP M88 Gche,21,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,21,1,2.4%,6,Attente de 4h,poste,256.65,4h 17m
+DHP M88 Gche,21,1,2.4%,7,Attente 4h / Marquage laser,attente,24377.82,16j 22h 18m
+DHP M88 Gche,21,1,2.4%,8,MACHINEMARQUAGELASER,poste,25.77,25m 46s
+DHP M88 Gche,21,1,2.4%,9,Marquage laser / Contrôle US,attente,0.0,0s
+DHP M88 Gche,21,1,2.4%,10,EQUIPEMENTCABINEUS,poste,8.24,8m 14s
+DHP M88 Gche,21,1,2.4%,11,Contrôle US / Contrôle RX,attente,1143.46,19h 3m
+DHP M88 Gche,21,1,2.4%,12,EQUIPEMENTCABINERX,poste,84.71,1h 25m
+DHP M88 Gche,21,1,2.4%,13,Contrôle RX / Expertise cire,attente,0.0,0s
+DHP M88 Gche,21,1,2.4%,14,PCEXPCIRE_02,poste,24.12,24m 7s
+DHP M88 Gche,21,1,2.4%,15,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,21,1,2.4%,16,Stockage,poste,500.0,8h 20m
+DHP M88 Gche,22,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,22,1,2.4%,2,PREP_NOY_01,poste,11.86,11m 52s
+DHP M88 Gche,22,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,22,1,2.4%,4,PRSINJM88_02,poste,8.82,8m 49s
+DHP M88 Gche,22,1,2.4%,5,Injection cire / Attente 4h,attente,0.0,0s
+DHP M88 Gche,22,1,2.4%,6,Attente de 4h,poste,250.25,4h 10m
+DHP M88 Gche,22,1,2.4%,7,Attente 4h / Marquage laser,attente,24467.75,16j 23h 48m
+DHP M88 Gche,22,1,2.4%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+DHP M88 Gche,22,1,2.4%,9,Marquage laser / Contrôle US,attente,0.0,0s
+DHP M88 Gche,22,1,2.4%,10,(interrompu),poste,449.62,7h 30m
+DHP M88 Gche,22,1,2.4%,11,Marquage laser / Contrôle US,attente,522.86,8h 43m
+DHP M88 Gche,22,1,2.4%,12,EQUIPEMENTCABINEUS,poste,82.35,1h 22m
+DHP M88 Gche,22,1,2.4%,13,Contrôle US / Contrôle RX,attente,2.35,2m 21s
+DHP M88 Gche,22,1,2.4%,14,EQUIPEMENTCABINERX,poste,26.47,26m 28s
+DHP M88 Gche,22,1,2.4%,15,Contrôle RX / Expertise cire,attente,73.53,1h 14m
+DHP M88 Gche,22,1,2.4%,16,PCEXPCIRE_02,poste,28.53,28m 32s
+DHP M88 Gche,22,1,2.4%,17,Expertise cire / Stockage,attente,0.0,0s
+DHP M88 Gche,22,1,2.4%,18,Stockage,poste,491.76,8h 12m
+DHP M88 Gche,23,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,23,1,2.4%,2,PREP_NOY_01,poste,7.06,7m 4s
+DHP M88 Gche,23,1,2.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+DHP M88 Gche,23,1,2.4%,4,PRSINJM88_01,poste,8.82,8m 49s
+DHP M88 Gche,23,1,2.4%,5,Injection cire noyaux / Prison 1,attente,4506.73,3j 3h 7m
+DHP M88 Gche,23,1,2.4%,6,(interrompu),poste,0.0,0s
+DHP M88 Gche,23,1,2.4%,7,Injection cire noyaux / Prison 1,attente,5236.47,3j 15h 16m
+DHP M88 Gche,23,1,2.4%,8,Prison 1,poste,508.71,8h 29m
+DHP M88 Gche,24,1,2.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+DHP M88 Gche,24,1,2.4%,2,(interrompu),poste,456.03,7h 36m
+DHP M88 Gche,24,1,2.4%,3,Entrée M88 ET Retouche / Prep noyaux,attente,486.0,8h 6m
+DHP M88 Gche,24,1,2.4%,4,PREP_NOY_02,poste,40.48,40m 29s
+DHP M88 Gche,24,1,2.4%,5,Prep noyaux / Injection manuelle,attente,69.89,1h 10m
+DHP M88 Gche,24,1,2.4%,6,PRSINJM88_01,poste,27.17,27m 10s
+DHP M88 Gche,24,1,2.4%,7,Injection cire noyaux / Prison 1,attente,9942.46,6j 21h 42m
+DHP M88 Gche,24,1,2.4%,8,Prison 1,poste,514.6,8h 35m

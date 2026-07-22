@@ -1,0 +1,10 @@
+﻿cle,valeur
+genere_le,2026-07-21T08:58:29
+graine,0
+duree_simulee,0s
+fichier,flow_designer/sample_flow.json
+debut,05-01-2026 00:00
+fin,05-01-2026 00:00
+temps_calcul,0s
+critere_arret,ByPiecesProduced
+critere_details,"timeout = inf; models_goals: WidgetA = 120, WidgetB = 80"

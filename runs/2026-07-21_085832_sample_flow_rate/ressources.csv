@@ -1,0 +1,4 @@
+﻿ressource,capacite,stock_moyen,stock_min,stock_max,stock_final,consommation_totale,entrees_totales,consommation_j,nb_ruptures,temps_rupture
+steel,500.0,nan,0.0,0.0,0.0,0.0,0.0,,0,0s
+primer,100.0,nan,0.0,0.0,0.0,0.0,0.0,,0,0s
+painted_body,1000.0,nan,0.0,0.0,0.0,0.0,0.0,,0,0s

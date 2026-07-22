@@ -1,0 +1,5 @@
+﻿modele,trajectoire,n_pieces,part,ordre,etape,type,duree_moyenne_min,duree_moyenne
+WidgetA,1,29,93.5%,1,Raw Bodies,attente,5.16,5m 10s
+WidgetA,1,29,93.5%,2,Weld & Assemble,poste,8.08,8m 5s
+WidgetA,2,2,6.5%,1,Raw Bodies,attente,262.27,4h 22m
+WidgetA,2,2,6.5%,2,(interrompu),poste,45.0,45m

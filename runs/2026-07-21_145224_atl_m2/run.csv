@@ -1,0 +1,10 @@
+﻿cle,valeur
+genere_le,2026-07-21T14:52:24
+graine,1
+duree_simulee,730j 0h 0m
+fichier,/tmp/atl_m2.json
+debut,01-01-2026 00:00
+fin,01-01-2028 00:00
+temps_calcul,3m 49s
+critere_arret,ByPiecesProduced
+critere_details,"timeout = 730j 0h 0m; grace_period = 20j 20h 0m; models_goals: MBP M88 = 1000, MHP M88 = 1000, DHP M88 Dr = 1000, DHP M88 Gche = 1000, RM1 LEAP 1A = 1500, RM2 LEAP 1B = 1500, RM3 LEAP 1B = 1500, D1 LEAP 1B = 1500"

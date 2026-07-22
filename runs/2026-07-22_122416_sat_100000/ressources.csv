@@ -1,0 +1,3 @@
+﻿ressource,capacite,stock_moyen,stock_min,stock_max,stock_final,consommation_totale,entrees_totales,consommation_j,nb_ruptures,temps_rupture
+NOYAU MBP M88,100.0,56.609,0.0,100.0,98.0,31944.0,31992.0,43.759,33,1j 2h 47m
+CIRE_BRUTE,100.0,56.981,-0.0,100.0,86.0,35816.4,35872.4,49.064,0,0s

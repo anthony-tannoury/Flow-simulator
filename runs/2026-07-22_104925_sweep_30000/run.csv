@@ -1,0 +1,6 @@
+﻿cle,valeur
+duree_simulee,704j 14h 22m
+graine,1
+fichier,/tmp/testruns/sweep_30000.json
+debut,01-01-2026 00:00
+critere_arret,ByPiecesProduced

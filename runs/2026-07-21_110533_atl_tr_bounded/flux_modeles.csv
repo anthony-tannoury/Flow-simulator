@@ -1,0 +1,9 @@
+﻿modele,objectif,genere,sorties,rebuts,taux_rebut,atteinte,traversee_moyenne,traversee_mediane,traversee_p90,traversee_max
+MBP M88,300,1,0,0,,0%,,,,
+MHP M88,300,9,0,1,100%,0%,,,,
+DHP M88 Dr,300,2,0,1,100%,0%,,,,
+DHP M88 Gche,300,4,0,0,,0%,,,,
+RM1 LEAP 1A,450,5,0,0,,0%,,,,
+RM2 LEAP 1B,450,13,0,0,,0%,,,,
+RM3 LEAP 1B,450,7,0,0,,0%,,,,
+D1 LEAP 1B,450,7,0,0,,0%,,,,

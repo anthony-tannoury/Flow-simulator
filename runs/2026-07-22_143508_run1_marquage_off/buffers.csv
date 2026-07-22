@@ -1,0 +1,28 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+Prep noyaux / Injection manuelle,PASSAGE,0.097,8.0,0.325,0,21m 19s,3j 8h 1m,4777,4777,6.544,6.544,3h 40m
+Injection cire / Attente 4h,PASSAGE,1.078,6.0,1.514,0,1h 49m,3j 11h 25m,10433,10433,14.292,14.292,1h 41m
+Injection cire noyaux / Prison 1,PASSAGE,0.0,1.0,0.006,0,8s,11m 46s,227,227,0.311,0.311,3j 5h 11m
+Rebuts après panne 5,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 1,SCRAP,60.852,123.0,40.545,123,,,123,0,0.168,0.0,5j 22h 26m
+Rebuts 2,SCRAP,51.836,102.0,30.345,102,,,102,0,0.14,0.0,7j 3h 46m
+Marquage laser / Contrôle US,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Marquage laser / Stockage,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 3,SCRAP,15.704,33.0,10.935,33,,,33,0,0.045,0.0,22j 2h 55m
+Rebuts après panne 4,SCRAP,15.772,32.0,10.694,32,,,32,0,0.044,0.0,22j 19h 30m
+Prison 1 / Rework,PASSAGE,0.0,1.0,0.009,0,43s,23m 6s,127,127,0.174,0.174,5j 17h 57m
+Rebuts après panne 2,SCRAP,21.854,45.0,14.373,45,,,45,0,0.062,0.0,16j 5h 20m
+Attente 4h / Marquage laser,PASSAGE,4983.291,10000.0,3026.2,10000,,,10000,0,13.699,0.0,1h 45m
+Sorties,EXIT,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Contrôle US / Prison 2,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Contrôle RX / Expertise cire,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Entrée M88 ET Retouche / Prep noyaux,PASSAGE,1.61,27.0,3.968,0,5h 46m,3j 7h 25m,4894,4894,6.704,6.704,3h 35m
+Entrée LEAP / Injection cire moule,PASSAGE,1.787,33.0,5.247,0,4h 50m,3j 6h 5m,6478,6478,8.874,8.874,2h 42m
+Contrôle US / Contrôle RX,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Prison 3 / Rework 3,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 6,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Expertise cire / Prison 3,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Prison 3 / Rework 2,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Expertise cire / Stockage,PASSAGE,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts 4,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts 3,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts 1,SCRAP,38.945,86.0,26.183,86,,,86,0,0.118,0.0,8j 11h 43m

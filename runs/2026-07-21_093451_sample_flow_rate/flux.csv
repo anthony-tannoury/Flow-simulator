@@ -1,0 +1,13 @@
+﻿cle,valeur
+duree_simulee,10j 0h 0m
+sorties,87
+rebuts,52
+taux_rebut,37.4%
+debit_sorties_j,8.7
+traversee_moyenne,1h 19m
+traversee_mediane,23m 49s
+traversee_p90,2h 29m
+traversee_max,15h 35m
+encours_moyen,334.94
+encours_max,1278.0
+encours_final,1278

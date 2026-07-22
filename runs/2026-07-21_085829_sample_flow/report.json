@@ -1,0 +1,354 @@
+{
+ "format": "flow-simulator-report",
+ "version": 1,
+ "run": {
+  "fichier": "flow_designer/sample_flow.json",
+  "debut": "05-01-2026 00:00",
+  "fin": "05-01-2026 00:00",
+  "temps_calcul": "0s",
+  "critere_arret": "ByPiecesProduced",
+  "critere_details": "timeout = inf; models_goals: WidgetA = 120, WidgetB = 80",
+  "source_file": "/home/user/Flow-simulator/flow_designer/sample_flow.json",
+  "flow_snapshot": "flow.json",
+  "sim_end_minutes": 0,
+  "graine": 0,
+  "genere_le": "2026-07-21T08:58:32",
+  "criterion": {
+   "type": "ByPiecesProduced",
+   "timeout": "inf",
+   "models_goals": [
+    {
+     "model": "m_widgetA",
+     "goal": 120
+    },
+    {
+     "model": "m_widgetB",
+     "goal": 80
+    }
+   ]
+  },
+  "pieces_sorties": 0,
+  "objectif_total": 200,
+  "objectif_atteint": false
+ },
+ "tasks": {
+  "weld": {
+   "poste": "Weld & Assemble",
+   "type": "piece",
+   "admin": false,
+   "temps_total": 0,
+   "temps_ouverture": 0,
+   "arrets_programmes": 0,
+   "temps_requis": 0,
+   "pannes": 0,
+   "nb_pannes": 0,
+   "mtbf": "",
+   "mttr": "",
+   "gel": 0.0,
+   "mise_en_route": 0.0,
+   "nb_mises_en_route": 0,
+   "temps_fonctionnement": 0.0,
+   "taux_de_charge": "",
+   "disponibilite": "",
+   "performance": "",
+   "qualite": "",
+   "trs": "",
+   "trg": "",
+   "tre": "",
+   "pieces_produites": 0,
+   "pieces_bonnes": 0,
+   "pieces_rebutees": 0,
+   "nb_lancements": 0,
+   "taille_lot_moyenne": "",
+   "cycle_moyen": "",
+   "cycle_p90": "",
+   "cycle_max": "",
+   "debit_pieces_j": "",
+   "flux_entrant_j": "",
+   "flux_sortant_j": "",
+   "attente_pieces": 0,
+   "attente_place": 0,
+   "attente_operateurs": 0,
+   "attente_matiere": 0,
+   "attente_vague": 0,
+   "temps_collecte": 0,
+   "temps_chargement": 0,
+   "temps_traitement": 0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  },
+  "paint": {
+   "poste": "Paint Line",
+   "type": "resource",
+   "admin": false,
+   "temps_total": 0,
+   "temps_ouverture": 0,
+   "arrets_programmes": 0,
+   "temps_requis": 0,
+   "pannes": 0,
+   "nb_pannes": 0,
+   "mtbf": "",
+   "mttr": "",
+   "gel": 0.0,
+   "mise_en_route": 0.0,
+   "nb_mises_en_route": 0,
+   "temps_fonctionnement": 0.0,
+   "taux_de_charge": "",
+   "disponibilite": "",
+   "performance": "",
+   "qualite": "",
+   "trs": "",
+   "trg": "",
+   "tre": "",
+   "pieces_produites": 0,
+   "pieces_bonnes": 0,
+   "pieces_rebutees": 0,
+   "nb_lancements": 0,
+   "taille_lot_moyenne": "",
+   "cycle_moyen": "",
+   "cycle_p90": "",
+   "cycle_max": "",
+   "debit_pieces_j": "",
+   "flux_entrant_j": "",
+   "flux_sortant_j": "",
+   "attente_pieces": 0,
+   "attente_place": 0,
+   "attente_operateurs": 0,
+   "attente_matiere": 0,
+   "attente_vague": 0,
+   "temps_collecte": 0,
+   "temps_chargement": 0,
+   "temps_traitement": 0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  }
+ },
+ "admin_summary": {
+  "indicateurs": [
+   "nb_taches",
+   "temps_fonctionnement",
+   "cycle_total",
+   "heures_machine",
+   "heures_main_oeuvre"
+  ],
+  "administratives": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  },
+  "productives": {
+   "nb_taches": 2.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  },
+  "total": {
+   "nb_taches": 2.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  },
+  "part_administratives": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": "",
+   "cycle_total": "",
+   "heures_machine": "",
+   "heures_main_oeuvre": ""
+  },
+  "part_productives": {
+   "nb_taches": 1.0,
+   "temps_fonctionnement": "",
+   "cycle_total": "",
+   "heures_machine": "",
+   "heures_main_oeuvre": ""
+  },
+  "ratio_admin_sur_productif": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": "",
+   "cycle_total": "",
+   "heures_machine": "",
+   "heures_main_oeuvre": ""
+  }
+ },
+ "tasks_models": {},
+ "buffers": {
+  "buf_raw": {
+   "buffer": "Raw Bodies",
+   "type": "PASSAGE",
+   "longueur_moyenne": NaN,
+   "longueur_max": 0,
+   "longueur_ecart_type": NaN,
+   "longueur_finale": 0,
+   "sejour_moyen": "",
+   "sejour_max": "",
+   "entrees": 0,
+   "sorties": 0,
+   "flux_entrant_j": "",
+   "flux_sortant_j": "",
+   "temps_moyen_entre_arrivees": ""
+  },
+  "buf_ok": {
+   "buffer": "Passed QC",
+   "type": "EXIT",
+   "longueur_moyenne": NaN,
+   "longueur_max": 0,
+   "longueur_ecart_type": NaN,
+   "longueur_finale": 0,
+   "sejour_moyen": "",
+   "sejour_max": "",
+   "entrees": 0,
+   "sorties": 0,
+   "flux_entrant_j": "",
+   "flux_sortant_j": "",
+   "temps_moyen_entre_arrivees": ""
+  },
+  "buf_scrap": {
+   "buffer": "Scrap",
+   "type": "SCRAP",
+   "longueur_moyenne": NaN,
+   "longueur_max": 0,
+   "longueur_ecart_type": NaN,
+   "longueur_finale": 0,
+   "sejour_moyen": "",
+   "sejour_max": "",
+   "entrees": 0,
+   "sorties": 0,
+   "flux_entrant_j": "",
+   "flux_sortant_j": "",
+   "temps_moyen_entre_arrivees": ""
+  }
+ },
+ "operators": {
+  "o_welders": {
+   "groupe": "welders",
+   "effectif": 3,
+   "temps_poste": 0,
+   "occupation_moyenne": NaN,
+   "heures_en_poste": 0.0,
+   "heures_hors_poste": 0.0,
+   "occupation_max": 0.0,
+   "taux_occupation": ""
+  },
+  "o_helpers": {
+   "groupe": "helpers",
+   "effectif": 2,
+   "temps_poste": 0,
+   "occupation_moyenne": NaN,
+   "heures_en_poste": 0.0,
+   "heures_hors_poste": 0.0,
+   "occupation_max": 0.0,
+   "taux_occupation": ""
+  }
+ },
+ "resources": {
+  "r_steel": {
+   "ressource": "steel",
+   "capacite": 500.0,
+   "stock_moyen": NaN,
+   "stock_min": 0.0,
+   "stock_max": 0.0,
+   "stock_final": 0.0,
+   "consommation_totale": 0.0,
+   "entrees_totales": 0.0,
+   "consommation_j": "",
+   "nb_ruptures": 0,
+   "temps_rupture": 0.0
+  },
+  "r_primer": {
+   "ressource": "primer",
+   "capacite": 100.0,
+   "stock_moyen": NaN,
+   "stock_min": 0.0,
+   "stock_max": 0.0,
+   "stock_final": 0.0,
+   "consommation_totale": 0.0,
+   "entrees_totales": 0.0,
+   "consommation_j": "",
+   "nb_ruptures": 0,
+   "temps_rupture": 0.0
+  },
+  "r_painted": {
+   "ressource": "painted_body",
+   "capacite": 1000.0,
+   "stock_moyen": NaN,
+   "stock_min": 0.0,
+   "stock_max": 0.0,
+   "stock_final": 0.0,
+   "consommation_totale": 0.0,
+   "entrees_totales": 0.0,
+   "consommation_j": "",
+   "nb_ruptures": 0,
+   "temps_rupture": 0.0
+  }
+ },
+ "flux": {
+  "duree_simulee": 0,
+  "sorties": 0,
+  "rebuts": 0,
+  "taux_rebut": "",
+  "debit_sorties_j": "",
+  "traversee_moyenne": "",
+  "traversee_mediane": "",
+  "traversee_p90": "",
+  "traversee_max": "",
+  "encours_moyen": NaN,
+  "encours_max": 0,
+  "encours_final": 0
+ },
+ "flux_modeles": [
+  {
+   "modele": "WidgetA",
+   "objectif": 120,
+   "genere": 0,
+   "sorties": 0,
+   "rebuts": 0,
+   "taux_rebut": "",
+   "atteinte": 0.0,
+   "traversee_moyenne": "",
+   "traversee_mediane": "",
+   "traversee_p90": "",
+   "traversee_max": ""
+  },
+  {
+   "modele": "WidgetB",
+   "objectif": 80,
+   "genere": 0,
+   "sorties": 0,
+   "rebuts": 0,
+   "taux_rebut": "",
+   "atteinte": 0.0,
+   "traversee_moyenne": "",
+   "traversee_mediane": "",
+   "traversee_p90": "",
+   "traversee_max": ""
+  }
+ ],
+ "graphs": {
+  "tasks": {
+   "weld": "graphes/png/postes/occupation_Weld_Assemble.png",
+   "paint": "graphes/png/postes/occupation_Paint_Line.png"
+  },
+  "buffers": {
+   "buf_raw": "graphes/png/buffers/longueur_Raw_Bodies.png",
+   "buf_ok": "graphes/png/buffers/longueur_Passed_QC.png",
+   "buf_scrap": "graphes/png/buffers/longueur_Scrap.png"
+  },
+  "operators": {
+   "o_welders": "graphes/png/operateurs/disponibles_welders.png",
+   "o_helpers": "graphes/png/operateurs/disponibles_helpers.png"
+  },
+  "resources": {
+   "r_steel": "graphes/png/ressources/stock_steel.png",
+   "r_primer": "graphes/png/ressources/stock_primer.png",
+   "r_painted": "graphes/png/ressources/stock_painted_body.png"
+  },
+  "models": {},
+  "production": "graphes/png/modeles/production.png",
+  "encours": "graphes/png/ligne/encours.png",
+  "attente": "graphes/png/ligne/pieces_en_attente.png"
+ }
+}

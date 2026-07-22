@@ -75,6 +75,11 @@ jobs:
         run: |
           ./flow_sim-${{ matrix.name }} flow_designer/sample_flow_rate.json | grep -q '^@@DONE'
 
+      - name: Regression pin (run1.json must produce exactly 9924 pieces)
+        if: matrix.name == 'linux-x86_64'
+        run: |
+          ./flow_sim-${{ matrix.name }} "Test runs/run1.json" | tail -1 | grep -F '"pieces":9924'
+
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
         shell: cmd
@@ -120,5 +125,10 @@ jobs:
             echo "engines/ unchanged — nothing to commit"
           else
             git commit -m "ci: rebuild native engines [skip ci]"
-            git push origin HEAD:claude/latest-commit-check-tl51wu
+            for attempt in 1 2 3 4; do
+              if git push origin HEAD:claude/latest-commit-check-tl51wu; then
+                break
+              fi
+              git pull --rebase -X theirs origin claude/latest-commit-check-tl51wu
+            done
           fi

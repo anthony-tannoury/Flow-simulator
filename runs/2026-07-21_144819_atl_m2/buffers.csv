@@ -1,0 +1,28 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+Prep noyaux / Injection manuelle,PASSAGE,0.052,16.0,0.526,0,10m 43s,10h 1m,5053,5053,6.922,6.922,3h 28m
+Injection cire / Attente 4h,PASSAGE,1.331,11.0,2.922,0,2h 7m,2j 11h 42m,11040,11040,15.123,15.123,1h 35m
+Injection cire noyaux / Prison 1,PASSAGE,0.0,1.0,0.004,0,5s,5m 52s,216,216,0.296,0.296,3j 9h 7m
+Rebuts après panne 5,SCRAP,5.753,8.0,3.52,8,,,8,0,0.011,0.0,91j 6h 0m
+Rebuts après panne 1,SCRAP,41.856,57.0,21.17,57,,,57,0,0.078,0.0,12j 19h 22m
+Rebuts 2,SCRAP,64.696,90.0,33.144,90,,,90,0,0.123,0.0,8j 2h 40m
+Marquage laser / Contrôle US,PASSAGE,4.443,70.0,6.534,0,15h 44m,4j 19h 14m,4946,4946,6.775,6.775,3h 33m
+Marquage laser / Stockage,PASSAGE,1.825,52.0,4.219,0,5h 6m,2j 15h 48m,6278,6278,8.6,8.6,2h 47m
+Rebuts après panne 3,SCRAP,25.59,33.0,11.848,33,,,33,0,0.045,0.0,22j 2h 55m
+Rebuts après panne 4,SCRAP,21.471,29.0,11.434,29,,,29,0,0.04,0.0,25j 4h 8m
+Prison 1 / Rework,PASSAGE,0.001,1.0,0.023,0,4m 29s,8h 10m,128,128,0.175,0.175,5j 16h 53m
+Rebuts après panne 2,SCRAP,23.913,33.0,13.266,33,,,33,0,0.045,0.0,22j 2h 55m
+Attente 4h / Marquage laser,PASSAGE,1.322,67.0,6.144,0,2h 9m,2j 8h 14m,10781,10781,14.768,14.768,1h 38m
+Sorties,EXIT,7385.387,9932.0,3452.754,9932,,,9932,0,13.605,0.0,1h 46m
+Contrôle US / Prison 2,PASSAGE,25.934,38.0,14.811,38,9j 20h 28m,24j 4h 54m,507,469,0.695,0.642,1j 10h 33m
+Contrôle RX / Expertise cire,PASSAGE,0.369,41.0,2.104,0,1h 29m,2j 17h 47m,4364,4364,5.978,5.978,4h 1m
+Entrée M88 ET Retouche / Prep noyaux,PASSAGE,1.853,50.0,6.476,0,6h 46m,3j 7h 5m,4802,4802,6.578,6.578,3h 39m
+Entrée LEAP / Injection cire moule,PASSAGE,2.341,65.0,9.107,0,6h 41m,2j 6h 19m,6143,6143,8.415,8.415,2h 51m
+Contrôle US / Contrôle RX,PASSAGE,2.538,28.0,2.929,2,6h 8m,5j 1h 8m,4334,4332,5.937,5.934,4h 3m
+Prison 3 / Rework 3,PASSAGE,0.0,0.0,0.0,0,0s,0s,227,227,0.311,0.311,3j 5h 11m
+Rebuts après panne 6,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Expertise cire / Prison 3,PASSAGE,18.231,29.0,11.719,28,6j 6h 10m,19j 4h 31m,480,452,0.658,0.619,1j 12h 30m
+Prison 3 / Rework 2,PASSAGE,0.0,0.0,0.0,0,0s,0s,217,217,0.297,0.297,3j 8h 44m
+Expertise cire / Stockage,PASSAGE,0.443,25.0,2.573,0,1h 57m,1j 21h 28m,3986,3986,5.46,5.46,4h 24m
+Rebuts 4,SCRAP,65.618,91.0,33.716,91,,,91,0,0.125,0.0,8j 0h 32m
+Rebuts 3,SCRAP,75.679,104.0,38.56,104,,,104,0,0.142,0.0,7j 0h 28m
+Rebuts 1,SCRAP,77.077,103.0,35.266,103,,,103,0,0.141,0.0,7j 2h 6m

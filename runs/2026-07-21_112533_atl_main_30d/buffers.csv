@@ -1,0 +1,28 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+Entrée M88 ET Retouche / Prep noyaux,PASSAGE,0.994,10,1.402,1,55m 53s,2j 8h 13m,767,766,25.567,25.533,56m 19s
+Prep noyaux / Injection manuelle,PASSAGE,0.327,2,0.469,1,17m 56s,2j 8h 7m,782,781,26.067,26.033,55m 15s
+Entrée LEAP / Injection cire moule,PASSAGE,0.298,14,1.156,0,11m 41s,4h 0m,1104,1104,36.8,36.8,39m 8s
+Injection cire noyaux / Prison 1,PASSAGE,9.396,13,2.771,13,5j 20h 37m,9j 15h 25m,55,42,1.833,1.4,13h 5m
+Injection cire / Attente 4h,PASSAGE,12.582,26,11.021,22,5h 2m,2j 12h 5m,1802,1780,60.067,59.333,23m 58s
+Attente 4h / Marquage laser,PASSAGE,469.166,1065,319.414,1065,7j 20h 54m,17j 23h 28m,1769,704,58.967,23.467,24m 25s
+Marquage laser / Stockage,PASSAGE,8.778,21,6.783,14,11h 58m,2j 16h 0m,536,522,17.867,17.4,1h 21m
+Marquage laser / Contrôle US,PASSAGE,3.912,10,3.309,6,12h 56m,3j 8h 58m,222,216,7.4,7.2,3h 15m
+Contrôle US / Contrôle RX,PASSAGE,0.124,5,0.487,0,36m 3s,22h 44m,149,149,4.967,4.967,4h 50m
+Contrôle RX / Expertise cire,PASSAGE,0.578,6,1.18,0,2h 39m,2j 16h 3m,157,157,5.233,5.233,4h 35m
+Expertise cire / Prison 3,PASSAGE,0.431,2,0.737,0,18h 14m,2j 23h 48m,17,17,0.567,0.567,1j 18h 21m
+Expertise cire / Stockage,PASSAGE,0.022,1,0.147,0,6m 43s,16h 0m,143,143,4.767,4.767,5h 2m
+Prison 1 / Rework,PASSAGE,0.0,0,0.0,0,0s,0s,12,12,0.4,0.4,2j 12h 0m
+Sorties,EXIT,272.862,639,190.16,639,,,639,0,21.3,0.0,1h 8m
+Prison 3 / Rework 3,PASSAGE,0.0,0,0.0,0,0s,0s,7,7,0.233,0.233,4j 6h 51m
+Prison 3 / Rework 2,PASSAGE,0.0,0,0.0,0,0s,0s,8,8,0.267,0.267,3j 18h 0m
+Contrôle US / Prison 2,PASSAGE,0.124,1,0.329,0,5h 56m,13h 42m,15,15,0.5,0.5,2j 0h 0m
+Rebuts 1,SCRAP,6.725,11,3.247,11,,,11,0,0.367,0.0,2j 17h 27m
+Rebuts 2,SCRAP,4.319,9,2.662,9,,,9,0,0.3,0.0,3j 8h 0m
+Rebuts 4,SCRAP,0.108,1,0.31,1,,,1,0,0.033,0.0,30j 0h 0m
+Rebuts 3,SCRAP,1.218,3,1.114,3,,,3,0,0.1,0.0,10j 0h 0m
+Rebuts après panne 1,SCRAP,1.601,2,0.768,2,,,2,0,0.067,0.0,15j 0h 0m
+Rebuts après panne 2,SCRAP,1.793,4,1.178,4,,,4,0,0.133,0.0,7j 12h 0m
+Rebuts après panne 3,SCRAP,2.575,7,2.512,7,,,7,0,0.233,0.0,4j 6h 51m
+Rebuts après panne 4,SCRAP,2.608,8,2.971,8,,,8,0,0.267,0.0,3j 18h 0m
+Rebuts après panne 5,SCRAP,0.0,0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 6,SCRAP,0.0,0,0.0,0,,,0,0,0.0,0.0,

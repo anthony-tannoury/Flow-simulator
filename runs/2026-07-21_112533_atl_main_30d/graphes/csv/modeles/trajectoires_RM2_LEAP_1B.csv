@@ -1,0 +1,115 @@
+﻿modele,trajectoire,n_pieces,part,ordre,etape,type,duree_moyenne_min,duree_moyenne
+RM2 LEAP 1B,1,52,44.1%,1,Entrée LEAP / Injection cire moule,attente,8.86,8m 51s
+RM2 LEAP 1B,1,52,44.1%,2,PRSINJLEAP_01,poste,10.78,10m 47s
+RM2 LEAP 1B,1,52,44.1%,3,Injection cire / Attente 4h,attente,445.93,7h 26m
+RM2 LEAP 1B,1,52,44.1%,4,Attente de 4h,poste,269.31,4h 29m
+RM2 LEAP 1B,1,52,44.1%,5,Attente 4h / Marquage laser,attente,11346.7,7j 21h 7m
+RM2 LEAP 1B,1,52,44.1%,6,MACHINEMARQUAGELASER,poste,29.9,29m 54s
+RM2 LEAP 1B,1,52,44.1%,7,Marquage laser / Stockage,attente,534.43,8h 54m
+RM2 LEAP 1B,1,52,44.1%,8,Stockage,poste,520.58,8h 41m
+RM2 LEAP 1B,2,52,44.1%,1,Entrée LEAP / Injection cire moule,attente,14.34,14m 20s
+RM2 LEAP 1B,2,52,44.1%,2,PRSINJLEAP_02,poste,15.28,15m 17s
+RM2 LEAP 1B,2,52,44.1%,3,Injection cire / Attente 4h,attente,260.61,4h 21m
+RM2 LEAP 1B,2,52,44.1%,4,Attente de 4h,poste,260.97,4h 21m
+RM2 LEAP 1B,2,52,44.1%,5,Attente 4h / Marquage laser,attente,12233.67,8j 11h 54m
+RM2 LEAP 1B,2,52,44.1%,6,MACHINEMARQUAGELASER,poste,28.68,28m 41s
+RM2 LEAP 1B,2,52,44.1%,7,Marquage laser / Stockage,attente,622.61,10h 23m
+RM2 LEAP 1B,2,52,44.1%,8,Stockage,poste,525.38,8h 45m
+RM2 LEAP 1B,3,3,2.5%,1,Entrée LEAP / Injection cire moule,attente,37.57,37m 34s
+RM2 LEAP 1B,3,3,2.5%,2,(interrompu),poste,15.32,15m 19s
+RM2 LEAP 1B,4,2,1.7%,1,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,4,2,1.7%,2,PRSINJLEAP_01,poste,7.18,7m 11s
+RM2 LEAP 1B,4,2,1.7%,3,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,4,2,1.7%,4,Attente de 4h,poste,245.88,4h 6m
+RM2 LEAP 1B,4,2,1.7%,5,Attente 4h / Marquage laser,attente,11130.8,7j 17h 31m
+RM2 LEAP 1B,4,2,1.7%,6,MACHINEMARQUAGELASER,poste,27.04,27m 2s
+RM2 LEAP 1B,4,2,1.7%,7,Marquage laser / Stockage,attente,0.0,0s
+RM2 LEAP 1B,4,2,1.7%,8,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,4,2,1.7%,9,Marquage laser / Stockage,attente,951.53,15h 52m
+RM2 LEAP 1B,4,2,1.7%,10,Stockage,poste,513.9,8h 34m
+RM2 LEAP 1B,5,2,1.7%,1,Entrée LEAP / Injection cire moule,attente,2.91,2m 55s
+RM2 LEAP 1B,5,2,1.7%,2,PRSINJLEAP_02,poste,16.59,16m 35s
+RM2 LEAP 1B,5,2,1.7%,3,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,5,2,1.7%,4,Attente de 4h,poste,260.77,4h 21m
+RM2 LEAP 1B,5,2,1.7%,5,Attente 4h / Marquage laser,attente,14355.35,9j 23h 15m
+RM2 LEAP 1B,5,2,1.7%,6,MACHINEMARQUAGELASER,poste,25.91,25m 55s
+RM2 LEAP 1B,5,2,1.7%,7,Marquage laser / Stockage,attente,0.0,0s
+RM2 LEAP 1B,5,2,1.7%,8,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,5,2,1.7%,9,Marquage laser / Stockage,attente,951.62,15h 52m
+RM2 LEAP 1B,5,2,1.7%,10,Stockage,poste,505.77,8h 26m
+RM2 LEAP 1B,6,1,0.8%,1,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,6,1,0.8%,2,(interrompu),poste,2.0,2m
+RM2 LEAP 1B,6,1,0.8%,3,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,6,1,0.8%,4,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,6,1,0.8%,5,Entrée LEAP / Injection cire moule,attente,2.16,2m 10s
+RM2 LEAP 1B,6,1,0.8%,6,PRSINJLEAP_01,poste,7.18,7m 11s
+RM2 LEAP 1B,6,1,0.8%,7,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,6,1,0.8%,8,Attente de 4h,poste,245.88,4h 6m
+RM2 LEAP 1B,6,1,0.8%,9,Attente 4h / Marquage laser,attente,3733.65,2j 14h 14m
+RM2 LEAP 1B,6,1,0.8%,10,MACHINEMARQUAGELASER,poste,38.24,38m 14s
+RM2 LEAP 1B,6,1,0.8%,11,Marquage laser / Stockage,attente,0.0,0s
+RM2 LEAP 1B,6,1,0.8%,12,Stockage,poste,496.01,8h 16m
+RM2 LEAP 1B,7,1,0.8%,1,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,7,1,0.8%,2,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,7,1,0.8%,3,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,7,1,0.8%,4,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,7,1,0.8%,5,Entrée LEAP / Injection cire moule,attente,4.16,4m 10s
+RM2 LEAP 1B,7,1,0.8%,6,PRSINJLEAP_01,poste,7.18,7m 11s
+RM2 LEAP 1B,7,1,0.8%,7,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,7,1,0.8%,8,Attente de 4h,poste,245.88,4h 6m
+RM2 LEAP 1B,7,1,0.8%,9,Attente 4h / Marquage laser,attente,3087.1,2j 3h 27m
+RM2 LEAP 1B,7,1,0.8%,10,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,7,1,0.8%,11,Attente 4h / Marquage laser,attente,9939.64,6j 21h 40m
+RM2 LEAP 1B,7,1,0.8%,12,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+RM2 LEAP 1B,7,1,0.8%,13,Marquage laser / Stockage,attente,616.31,10h 16m
+RM2 LEAP 1B,7,1,0.8%,14,Stockage,poste,556.76,9h 17m
+RM2 LEAP 1B,8,1,0.8%,1,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,8,1,0.8%,2,PRSINJLEAP_01,poste,8.63,8m 38s
+RM2 LEAP 1B,8,1,0.8%,3,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,8,1,0.8%,4,Attente de 4h,poste,245.88,4h 6m
+RM2 LEAP 1B,8,1,0.8%,5,Attente 4h / Marquage laser,attente,3109.2,2j 3h 49m
+RM2 LEAP 1B,8,1,0.8%,6,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,8,1,0.8%,7,Attente 4h / Marquage laser,attente,14902.58,10j 8h 23m
+RM2 LEAP 1B,8,1,0.8%,8,MACHINEMARQUAGELASER,poste,40.83,40m 50s
+RM2 LEAP 1B,8,1,0.8%,9,Marquage laser / Stockage,attente,0.0,0s
+RM2 LEAP 1B,8,1,0.8%,10,Stockage,poste,560.93,9h 21m
+RM2 LEAP 1B,9,1,0.8%,1,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,9,1,0.8%,2,PRSINJLEAP_01,poste,7.18,7m 11s
+RM2 LEAP 1B,9,1,0.8%,3,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,9,1,0.8%,4,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,9,1,0.8%,5,Injection cire / Attente 4h,attente,724.59,12h 5m
+RM2 LEAP 1B,9,1,0.8%,6,Attente de 4h,poste,257.94,4h 18m
+RM2 LEAP 1B,9,1,0.8%,7,Attente 4h / Marquage laser,attente,14182.89,9j 20h 23m
+RM2 LEAP 1B,9,1,0.8%,8,MACHINEMARQUAGELASER,poste,100.59,1h 41m
+RM2 LEAP 1B,9,1,0.8%,9,Marquage laser / Stockage,attente,0.0,0s
+RM2 LEAP 1B,9,1,0.8%,10,Stockage,poste,507.4,8h 27m
+RM2 LEAP 1B,10,1,0.8%,1,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,10,1,0.8%,2,PRSINJLEAP_02,poste,7.18,7m 11s
+RM2 LEAP 1B,10,1,0.8%,3,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,10,1,0.8%,4,Attente de 4h,poste,245.88,4h 6m
+RM2 LEAP 1B,10,1,0.8%,5,Attente 4h / Marquage laser,attente,8708.99,6j 1h 9m
+RM2 LEAP 1B,10,1,0.8%,6,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,10,1,0.8%,7,Attente 4h / Marquage laser,attente,18688.13,12j 23h 28m
+RM2 LEAP 1B,10,1,0.8%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+RM2 LEAP 1B,10,1,0.8%,9,Marquage laser / Stockage,attente,506.24,8h 26m
+RM2 LEAP 1B,10,1,0.8%,10,Stockage,poste,563.42,9h 23m
+RM2 LEAP 1B,11,1,0.8%,1,Entrée LEAP / Injection cire moule,attente,2.33,2m 20s
+RM2 LEAP 1B,11,1,0.8%,2,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,11,1,0.8%,3,Entrée LEAP / Injection cire moule,attente,1.83,1m 50s
+RM2 LEAP 1B,11,1,0.8%,4,PRSINJLEAP_01,poste,7.18,7m 11s
+RM2 LEAP 1B,11,1,0.8%,5,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,11,1,0.8%,6,Attente de 4h,poste,245.88,4h 6m
+RM2 LEAP 1B,11,1,0.8%,7,Attente 4h / Marquage laser,attente,18430.0,12j 19h 10m
+RM2 LEAP 1B,11,1,0.8%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+RM2 LEAP 1B,11,1,0.8%,9,Marquage laser / Stockage,attente,0.0,0s
+RM2 LEAP 1B,11,1,0.8%,10,Stockage,poste,485.88,8h 6m
+RM2 LEAP 1B,12,1,0.8%,1,Entrée LEAP / Injection cire moule,attente,0.0,0s
+RM2 LEAP 1B,12,1,0.8%,2,PRSINJLEAP_02,poste,7.18,7m 11s
+RM2 LEAP 1B,12,1,0.8%,3,Injection cire / Attente 4h,attente,0.0,0s
+RM2 LEAP 1B,12,1,0.8%,4,(interrompu),poste,0.0,0s
+RM2 LEAP 1B,12,1,0.8%,5,Injection cire / Attente 4h,attente,724.59,12h 5m
+RM2 LEAP 1B,12,1,0.8%,6,Attente de 4h,poste,257.94,4h 18m
+RM2 LEAP 1B,12,1,0.8%,7,Attente 4h / Marquage laser,attente,17588.24,12j 5h 8m
+RM2 LEAP 1B,12,1,0.8%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+RM2 LEAP 1B,12,1,0.8%,9,Marquage laser / Stockage,attente,849.93,14h 10m
+RM2 LEAP 1B,12,1,0.8%,10,Stockage,poste,548.49,9h 8m

@@ -1,0 +1,4 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+Passed QC,EXIT,13.98,14.0,0.436,14,,,14,0,0.019,0.0,52j 3h 26m
+Raw Bodies,PASSAGE,1.017,5.0,0.263,1,4h 37m,2j 17h 30m,214,213,0.293,0.292,3j 9h 52m
+Scrap,SCRAP,170.43,174.0,20.541,174,,,174,0,0.238,0.0,4j 4h 41m

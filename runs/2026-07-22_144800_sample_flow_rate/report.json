@@ -1,0 +1,355 @@
+{
+ "format": "flow-simulator-report",
+ "version": 1,
+ "run": {
+  "engine": "cpp",
+  "source_file": "/home/user/Flow-simulator/flow_designer/sample_flow_rate.json",
+  "flow_snapshot": "flow.json",
+  "sim_end_minutes": 14400.0,
+  "graine": 0,
+  "criterion": {
+   "gap": {
+    "kind": "linear",
+    "x1": 0.0,
+    "x2": 10000.0,
+    "y1": 8.0,
+    "y2": 3.0
+   },
+   "models_probs": [
+    {
+     "model": "m_widgetA",
+     "probability": {
+      "kind": "constant",
+      "value": 0.4
+     }
+    },
+    {
+     "model": "m_widgetB",
+     "probability": null
+    }
+   ],
+   "time": "15-01-2026 00:00",
+   "type": "ByTime"
+  },
+  "critere_arret": "ByTime",
+  "pieces_sorties": 87,
+  "objectif_total": null,
+  "objectif_atteint": null
+ },
+ "tasks": {
+  "weld": {
+   "poste": "Weld & Assemble",
+   "type": "piece",
+   "admin": false,
+   "temps_total": 14400.0,
+   "temps_ouverture": 4320.0,
+   "arrets_programmes": 60.0,
+   "temps_requis": 4260.0,
+   "pannes": 4717.284,
+   "nb_pannes": 99,
+   "mtbf": 144.451,
+   "mttr": 47.649,
+   "gel": 30.435,
+   "mise_en_route": 450.0,
+   "nb_mises_en_route": 30,
+   "temps_fonctionnement": 2177.663,
+   "taux_de_charge": 0.9861,
+   "disponibilite": 0.5112,
+   "performance": 0.8151,
+   "qualite": 0.956,
+   "trs": 0.3983,
+   "trg": 0.3928,
+   "tre": 0.1178,
+   "pieces_produites": 91.0,
+   "pieces_bonnes": 87.0,
+   "pieces_rebutees": 4.0,
+   "nb_lancements": 83,
+   "taille_lot_moyenne": 1.096,
+   "cycle_moyen": 10.064,
+   "cycle_p90": 15.479,
+   "cycle_max": 18.17,
+   "debit_pieces_j": 30.761,
+   "flux_entrant_j": 14.9,
+   "flux_sortant_j": 9.1,
+   "attente_pieces": 133.429,
+   "attente_place": 0.0,
+   "attente_operateurs": 55.843,
+   "attente_matiere": 3432.356,
+   "attente_vague": 245.574,
+   "temps_collecte": 133.429,
+   "temps_chargement": 140.0,
+   "temps_traitement": 492.472,
+   "heures_machine": 392.385,
+   "heures_main_oeuvre": 1102.114
+  },
+  "paint": {
+   "poste": "Paint Line",
+   "type": "resource",
+   "admin": false,
+   "temps_total": 14400.0,
+   "temps_ouverture": 6480.0,
+   "arrets_programmes": 320.0,
+   "temps_requis": 6160.0,
+   "pannes": 30.0,
+   "nb_pannes": 1,
+   "mtbf": "",
+   "mttr": 30.0,
+   "gel": 410.879,
+   "mise_en_route": 160.0,
+   "nb_mises_en_route": 32,
+   "temps_fonctionnement": 5817.721,
+   "taux_de_charge": 0.9506,
+   "disponibilite": 0.9444,
+   "performance": 1.0,
+   "qualite": 1.0,
+   "trs": 0.9444,
+   "trg": 0.8978,
+   "tre": 0.404,
+   "pieces_produites": 518.0,
+   "pieces_bonnes": 518.0,
+   "pieces_rebutees": 0.0,
+   "nb_lancements": 259,
+   "taille_lot_moyenne": 2.0,
+   "cycle_moyen": 3.438,
+   "cycle_p90": 3.0,
+   "cycle_max": 24.82,
+   "debit_pieces_j": 121.091,
+   "flux_entrant_j": "",
+   "flux_sortant_j": 51.8,
+   "attente_pieces": 0.0,
+   "attente_place": 0.0,
+   "attente_operateurs": 142.411,
+   "attente_matiere": 4898.311,
+   "attente_vague": 0.0,
+   "temps_collecte": 89.946,
+   "temps_chargement": 0.0,
+   "temps_traitement": 777.0,
+   "heures_machine": 777.0,
+   "heures_main_oeuvre": 777.0
+  }
+ },
+ "admin_summary": {
+  "indicateurs": [
+   "nb_taches",
+   "temps_fonctionnement",
+   "cycle_total",
+   "heures_machine",
+   "heures_main_oeuvre"
+  ],
+  "administratives": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  },
+  "productives": {
+   "nb_taches": 2.0,
+   "temps_fonctionnement": 7995.384,
+   "cycle_total": 1725.754,
+   "heures_machine": 1169.385,
+   "heures_main_oeuvre": 1879.114
+  },
+  "total": {
+   "nb_taches": 2.0,
+   "temps_fonctionnement": 7995.384,
+   "cycle_total": 1725.754,
+   "heures_machine": 1169.385,
+   "heures_main_oeuvre": 1879.114
+  },
+  "part_administratives": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  },
+  "part_productives": {
+   "nb_taches": 1.0,
+   "temps_fonctionnement": 1.0,
+   "cycle_total": 1.0,
+   "heures_machine": 1.0,
+   "heures_main_oeuvre": 1.0
+  },
+  "ratio_admin_sur_productif": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  }
+ },
+ "tasks_models": {
+  "weld": [
+   {
+    "poste": "Weld & Assemble",
+    "modele": "WidgetA",
+    "tc_ideal": 2.5,
+    "produites": 27,
+    "bonnes": 25,
+    "rebutees": 2
+   },
+   {
+    "poste": "Weld & Assemble",
+    "modele": "WidgetB",
+    "tc_ideal": 7.0,
+    "produites": 64,
+    "bonnes": 62,
+    "rebutees": 2
+   }
+  ]
+ },
+ "buffers": {
+  "buf_ok": {
+   "buffer": "Passed QC",
+   "type": "EXIT",
+   "longueur_moyenne": 79.758,
+   "longueur_max": 87.0,
+   "longueur_ecart_type": 20.658,
+   "longueur_finale": 87,
+   "sejour_moyen": "",
+   "sejour_max": "",
+   "entrees": 87,
+   "sorties": 0,
+   "flux_entrant_j": 8.7,
+   "flux_sortant_j": 0.0,
+   "temps_moyen_entre_arrivees": 165.517
+  },
+  "buf_raw": {
+   "buffer": "Raw Bodies",
+   "type": "PASSAGE",
+   "longueur_moyenne": 334.633,
+   "longueur_max": 1278.0,
+   "longueur_ecart_type": 311.969,
+   "longueur_finale": 1278,
+   "sejour_moyen": 2035.731,
+   "sejour_max": 10335.765,
+   "entrees": 1427,
+   "sorties": 149,
+   "flux_entrant_j": 142.7,
+   "flux_sortant_j": 14.9,
+   "temps_moyen_entre_arrivees": 10.091
+  },
+  "buf_scrap": {
+   "buffer": "Scrap",
+   "type": "SCRAP",
+   "longueur_moyenne": 24.822,
+   "longueur_max": 52.0,
+   "longueur_ecart_type": 12.849,
+   "longueur_finale": 52,
+   "sejour_moyen": "",
+   "sejour_max": "",
+   "entrees": 52,
+   "sorties": 0,
+   "flux_entrant_j": 5.2,
+   "flux_sortant_j": 0.0,
+   "temps_moyen_entre_arrivees": 276.923
+  }
+ },
+ "operators": {
+  "o_helpers": {
+   "groupe": "helpers",
+   "effectif": 2.0,
+   "temps_poste": 6480.0,
+   "occupation_moyenne": 0.559,
+   "heures_en_poste": 8043.99,
+   "heures_hors_poste": 0.0,
+   "occupation_max": 2.0,
+   "taux_occupation": 0.6207
+  },
+  "o_welders": {
+   "groupe": "welders",
+   "effectif": 3.0,
+   "temps_poste": 4320.0,
+   "occupation_moyenne": 0.39,
+   "heures_en_poste": 5620.976,
+   "heures_hors_poste": 0.0,
+   "occupation_max": 3.0,
+   "taux_occupation": 0.4337
+  }
+ },
+ "resources": {
+  "r_painted": {
+   "ressource": "painted_body",
+   "capacite": 1000.0,
+   "stock_moyen": 477.191,
+   "stock_min": 0.0,
+   "stock_max": 518.0,
+   "stock_final": 518.0,
+   "consommation_totale": 0.0,
+   "entrees_totales": 518.0,
+   "consommation_j": 0.0,
+   "nb_ruptures": 0,
+   "temps_rupture": 488.0
+  },
+  "r_primer": {
+   "ressource": "primer",
+   "capacite": 100.0,
+   "stock_moyen": 72.191,
+   "stock_min": 0.0,
+   "stock_max": 100.0,
+   "stock_final": 74.0,
+   "consommation_totale": 564.0,
+   "entrees_totales": 538.0,
+   "consommation_j": 56.4,
+   "nb_ruptures": 5,
+   "temps_rupture": 104.946
+  },
+  "r_steel": {
+   "ressource": "steel",
+   "capacite": 500.0,
+   "stock_moyen": 40.186,
+   "stock_min": 0.0,
+   "stock_max": 500.0,
+   "stock_final": 0.0,
+   "consommation_totale": 500.0,
+   "entrees_totales": 0.0,
+   "consommation_j": 50.0,
+   "nb_ruptures": 1,
+   "temps_rupture": 12283.84
+  }
+ },
+ "flux": {
+  "duree_simulee": 14400.0,
+  "sorties": 87,
+  "rebuts": 52,
+  "taux_rebut": 0.3741,
+  "debit_sorties_j": 8.7,
+  "traversee_moyenne": 78.677,
+  "traversee_mediane": 23.817,
+  "traversee_p90": 148.794,
+  "traversee_max": 935.326,
+  "encours_moyen": 334.94,
+  "encours_max": 1278.0,
+  "encours_final": 1278
+ },
+ "flux_modeles": [
+  {
+   "modele": "WidgetA",
+   "objectif": "",
+   "genere": 592,
+   "sorties": 25,
+   "rebuts": 4,
+   "taux_rebut": 0.1379,
+   "atteinte": "",
+   "traversee_moyenne": 71.543,
+   "traversee_mediane": 14.585,
+   "traversee_p90": 247.27,
+   "traversee_max": 269.947
+  },
+  {
+   "modele": "WidgetB",
+   "objectif": "",
+   "genere": 825,
+   "sorties": 62,
+   "rebuts": 48,
+   "taux_rebut": 0.4364,
+   "atteinte": "",
+   "traversee_moyenne": 81.554,
+   "traversee_mediane": 36.198,
+   "traversee_p90": 130.327,
+   "traversee_max": 935.326
+  }
+ ],
+ "graphs": {}
+}

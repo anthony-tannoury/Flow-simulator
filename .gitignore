@@ -128,4 +128,4 @@ dmypy.json
 
 .idea
 
-runs/
+runs/.DS_Store

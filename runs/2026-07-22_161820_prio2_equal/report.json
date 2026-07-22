@@ -1,0 +1,298 @@
+{
+ "format": "flow-simulator-report",
+ "version": 1,
+ "run": {
+  "engine": "cpp",
+  "source_file": "/tmp/claude-0/-home-user-Flow-simulator/c7ddd8a7-8e8f-5a49-b9b8-cd3927fcd704/scratchpad/prio2_equal.json",
+  "flow_snapshot": "flow.json",
+  "sim_end_minutes": 43200.0,
+  "graine": 0,
+  "criterion": {
+   "grace_period": 0.0,
+   "models_goals": [
+    {
+     "goal": 200,
+     "model": "m1"
+    },
+    {
+     "goal": 200,
+     "model": "m2"
+    }
+   ],
+   "timeout": 43200.0,
+   "type": "ByPiecesProduced"
+  },
+  "critere_arret": "ByPiecesProduced",
+  "pieces_sorties": 203,
+  "objectif_total": 400,
+  "objectif_atteint": false
+ },
+ "tasks": {
+  "thigh": {
+   "poste": "HIGH",
+   "type": "piece",
+   "admin": false,
+   "temps_total": 43200.0,
+   "temps_ouverture": 43200.0,
+   "arrets_programmes": 0.0,
+   "temps_requis": 43200.0,
+   "pannes": 0.0,
+   "nb_pannes": 0,
+   "mtbf": "",
+   "mttr": "",
+   "gel": 0.0,
+   "mise_en_route": 0.0,
+   "nb_mises_en_route": 1,
+   "temps_fonctionnement": 1485.0,
+   "taux_de_charge": 1.0,
+   "disponibilite": 0.0344,
+   "performance": 1.0,
+   "qualite": 1.0,
+   "trs": 0.0344,
+   "trg": 0.0344,
+   "tre": 0.0344,
+   "pieces_produites": 99.0,
+   "pieces_bonnes": 99.0,
+   "pieces_rebutees": 0.0,
+   "nb_lancements": 99,
+   "taille_lot_moyenne": 1.0,
+   "cycle_moyen": 450.527,
+   "cycle_p90": 652.2,
+   "cycle_max": 1501.8,
+   "debit_pieces_j": 3.3,
+   "flux_entrant_j": 3.3,
+   "flux_sortant_j": 3.3,
+   "attente_pieces": 41715.0,
+   "attente_place": 1485.0,
+   "attente_operateurs": 0.0,
+   "attente_matiere": 0.0,
+   "attente_vague": 0.0,
+   "temps_collecte": 43200.0,
+   "temps_chargement": 495.0,
+   "temps_traitement": 990.0,
+   "heures_machine": 1485.0,
+   "heures_main_oeuvre": 1485.0
+  },
+  "tlow": {
+   "poste": "LOW",
+   "type": "piece",
+   "admin": false,
+   "temps_total": 43200.0,
+   "temps_ouverture": 43200.0,
+   "arrets_programmes": 0.0,
+   "temps_requis": 43200.0,
+   "pannes": 0.0,
+   "nb_pannes": 0,
+   "mtbf": "",
+   "mttr": "",
+   "gel": 0.0,
+   "mise_en_route": 0.0,
+   "nb_mises_en_route": 1,
+   "temps_fonctionnement": 1560.0,
+   "taux_de_charge": 1.0,
+   "disponibilite": 0.0361,
+   "performance": 1.0,
+   "qualite": 1.0,
+   "trs": 0.0361,
+   "trg": 0.0361,
+   "tre": 0.0361,
+   "pieces_produites": 104.0,
+   "pieces_bonnes": 104.0,
+   "pieces_rebutees": 0.0,
+   "nb_lancements": 104,
+   "taille_lot_moyenne": 1.0,
+   "cycle_moyen": 427.546,
+   "cycle_p90": 864.6,
+   "cycle_max": 1501.8,
+   "debit_pieces_j": 3.467,
+   "flux_entrant_j": 3.467,
+   "flux_sortant_j": 3.467,
+   "attente_pieces": 41640.0,
+   "attente_place": 1560.0,
+   "attente_operateurs": 0.0,
+   "attente_matiere": 0.0,
+   "attente_vague": 0.0,
+   "temps_collecte": 43200.0,
+   "temps_chargement": 520.0,
+   "temps_traitement": 1040.0,
+   "heures_machine": 1560.0,
+   "heures_main_oeuvre": 1560.0
+  }
+ },
+ "admin_summary": {
+  "indicateurs": [
+   "nb_taches",
+   "temps_fonctionnement",
+   "cycle_total",
+   "heures_machine",
+   "heures_main_oeuvre"
+  ],
+  "administratives": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  },
+  "productives": {
+   "nb_taches": 2.0,
+   "temps_fonctionnement": 3045.0,
+   "cycle_total": 89066.957,
+   "heures_machine": 3045.0,
+   "heures_main_oeuvre": 3045.0
+  },
+  "total": {
+   "nb_taches": 2.0,
+   "temps_fonctionnement": 3045.0,
+   "cycle_total": 89066.957,
+   "heures_machine": 3045.0,
+   "heures_main_oeuvre": 3045.0
+  },
+  "part_administratives": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  },
+  "part_productives": {
+   "nb_taches": 1.0,
+   "temps_fonctionnement": 1.0,
+   "cycle_total": 1.0,
+   "heures_machine": 1.0,
+   "heures_main_oeuvre": 1.0
+  },
+  "ratio_admin_sur_productif": {
+   "nb_taches": 0.0,
+   "temps_fonctionnement": 0.0,
+   "cycle_total": 0.0,
+   "heures_machine": 0.0,
+   "heures_main_oeuvre": 0.0
+  }
+ },
+ "tasks_models": {
+  "thigh": [
+   {
+    "poste": "HIGH",
+    "modele": "M1",
+    "tc_ideal": 15.0,
+    "produites": 99,
+    "bonnes": 99,
+    "rebutees": 0
+   }
+  ],
+  "tlow": [
+   {
+    "poste": "LOW",
+    "modele": "M2",
+    "tc_ideal": 15.0,
+    "produites": 104,
+    "bonnes": 104,
+    "rebutees": 0
+   }
+  ]
+ },
+ "buffers": {
+  "binA": {
+   "buffer": "InA",
+   "type": "PASSAGE",
+   "longueur_moyenne": 0.0,
+   "longueur_max": 0.0,
+   "longueur_ecart_type": 0.0,
+   "longueur_finale": 0,
+   "sejour_moyen": 0.0,
+   "sejour_max": 0.0,
+   "entrees": 99,
+   "sorties": 99,
+   "flux_entrant_j": 3.3,
+   "flux_sortant_j": 3.3,
+   "temps_moyen_entre_arrivees": 436.364
+  },
+  "binB": {
+   "buffer": "InB",
+   "type": "PASSAGE",
+   "longueur_moyenne": 0.0,
+   "longueur_max": 0.0,
+   "longueur_ecart_type": 0.0,
+   "longueur_finale": 0,
+   "sejour_moyen": 0.0,
+   "sejour_max": 0.0,
+   "entrees": 104,
+   "sorties": 104,
+   "flux_entrant_j": 3.467,
+   "flux_sortant_j": 3.467,
+   "temps_moyen_entre_arrivees": 415.385
+  },
+  "bout": {
+   "buffer": "Out",
+   "type": "EXIT",
+   "longueur_moyenne": 101.125,
+   "longueur_max": 203.0,
+   "longueur_ecart_type": 58.713,
+   "longueur_finale": 203,
+   "sejour_moyen": "",
+   "sejour_max": "",
+   "entrees": 203,
+   "sorties": 0,
+   "flux_entrant_j": 6.767,
+   "flux_sortant_j": 0.0,
+   "temps_moyen_entre_arrivees": 212.808
+  }
+ },
+ "operators": {
+  "op1": {
+   "groupe": "POOL",
+   "effectif": 1.0,
+   "temps_poste": 43200.0,
+   "occupation_moyenne": 0.07,
+   "heures_en_poste": 3045.0,
+   "heures_hors_poste": 0.0,
+   "occupation_max": 1.0,
+   "taux_occupation": 0.0705
+  }
+ },
+ "resources": {},
+ "flux": {
+  "duree_simulee": 43200.0,
+  "sorties": 203,
+  "rebuts": 0,
+  "taux_rebut": 0.0,
+  "debit_sorties_j": 6.767,
+  "traversee_moyenne": 15.0,
+  "traversee_mediane": 15.0,
+  "traversee_p90": 15.0,
+  "traversee_max": 15.0,
+  "encours_moyen": 0.07,
+  "encours_max": 1.0,
+  "encours_final": 0
+ },
+ "flux_modeles": [
+  {
+   "modele": "M1",
+   "objectif": 200,
+   "genere": 99,
+   "sorties": 99,
+   "rebuts": 0,
+   "taux_rebut": 0.0,
+   "atteinte": 0.495,
+   "traversee_moyenne": 15.0,
+   "traversee_mediane": 15.0,
+   "traversee_p90": 15.0,
+   "traversee_max": 15.0
+  },
+  {
+   "modele": "M2",
+   "objectif": 200,
+   "genere": 104,
+   "sorties": 104,
+   "rebuts": 0,
+   "taux_rebut": 0.0,
+   "atteinte": 0.52,
+   "traversee_moyenne": 15.0,
+   "traversee_mediane": 15.0,
+   "traversee_p90": 15.0,
+   "traversee_max": 15.0
+  }
+ ],
+ "graphs": {}
+}

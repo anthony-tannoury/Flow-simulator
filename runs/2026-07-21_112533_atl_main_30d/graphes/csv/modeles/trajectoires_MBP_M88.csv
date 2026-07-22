@@ -1,0 +1,241 @@
+﻿modele,trajectoire,n_pieces,part,ordre,etape,type,duree_moyenne_min,duree_moyenne
+MBP M88,1,4,17.4%,1,Entrée M88 ET Retouche / Prep noyaux,attente,201.21,3h 21m
+MBP M88,1,4,17.4%,2,PREP_NOY_02,poste,37.37,37m 22s
+MBP M88,1,4,17.4%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,1,4,17.4%,4,PRSINJM88_01,poste,10.74,10m 44s
+MBP M88,1,4,17.4%,5,Injection cire / Attente 4h,attente,1709.59,1j 4h 30m
+MBP M88,1,4,17.4%,6,Attente de 4h,poste,296.32,4h 56m
+MBP M88,1,4,17.4%,7,Attente 4h / Marquage laser,attente,5128.3,3j 13h 28m
+MBP M88,1,4,17.4%,8,MACHINEMARQUAGELASER,poste,49.4,49m 24s
+MBP M88,1,4,17.4%,9,Marquage laser / Contrôle US,attente,64.19,1h 4m
+MBP M88,1,4,17.4%,10,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+MBP M88,1,4,17.4%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,1,4,17.4%,12,EQUIPEMENTCABINERX,poste,11.83,11m 50s
+MBP M88,1,4,17.4%,13,Contrôle RX / Expertise cire,attente,2.94,2m 56s
+MBP M88,1,4,17.4%,14,PCEXPCIRE_01,poste,13.23,13m 14s
+MBP M88,1,4,17.4%,15,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,1,4,17.4%,16,Stockage,poste,489.32,8h 9m
+MBP M88,2,3,13%,1,Entrée M88 ET Retouche / Prep noyaux,attente,167.49,2h 47m
+MBP M88,2,3,13%,2,(interrompu),poste,5.27,5m 16s
+MBP M88,3,2,8.7%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.77,46s
+MBP M88,3,2,8.7%,2,PREP_NOY_01,poste,15.88,15m 53s
+MBP M88,3,2,8.7%,3,Prep noyaux / Injection manuelle,attente,0.88,53s
+MBP M88,3,2,8.7%,4,PRSINJM88_02,poste,14.12,14m 7s
+MBP M88,3,2,8.7%,5,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,3,2,8.7%,6,Attente de 4h,poste,250.45,4h 10m
+MBP M88,3,2,8.7%,7,Attente 4h / Marquage laser,attente,2978.6,2j 1h 39m
+MBP M88,3,2,8.7%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+MBP M88,3,2,8.7%,9,Marquage laser / Contrôle US,attente,786.43,13h 6m
+MBP M88,3,2,8.7%,10,EQUIPEMENTCABINEUS,poste,36.36,36m 22s
+MBP M88,3,2,8.7%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,3,2,8.7%,12,EQUIPEMENTCABINERX,poste,86.47,1h 26m
+MBP M88,3,2,8.7%,13,Contrôle RX / Expertise cire,attente,11.76,11m 46s
+MBP M88,3,2,8.7%,14,PCEXPCIRE_01,poste,30.24,30m 14s
+MBP M88,3,2,8.7%,15,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,3,2,8.7%,16,Stockage,poste,506.82,8h 27m
+MBP M88,4,2,8.7%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+MBP M88,4,2,8.7%,2,PREP_NOY_02,poste,35.79,35m 47s
+MBP M88,4,2,8.7%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,4,2,8.7%,4,PRSINJM88_01,poste,18.53,18m 32s
+MBP M88,4,2,8.7%,5,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,4,2,8.7%,6,Attente de 4h,poste,252.35,4h 12m
+MBP M88,4,2,8.7%,7,Attente 4h / Marquage laser,attente,3426.72,2j 9h 7m
+MBP M88,4,2,8.7%,8,MACHINEMARQUAGELASER,poste,24.31,24m 19s
+MBP M88,4,2,8.7%,9,Marquage laser / Contrôle US,attente,110.97,1h 51m
+MBP M88,4,2,8.7%,10,(interrompu),poste,325.18,5h 25m
+MBP M88,4,2,8.7%,11,Marquage laser / Contrôle US,attente,486.5,8h 6m
+MBP M88,4,2,8.7%,12,EQUIPEMENTCABINEUS,poste,36.6,36m 36s
+MBP M88,4,2,8.7%,13,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,4,2,8.7%,14,EQUIPEMENTCABINERX,poste,86.23,1h 26m
+MBP M88,4,2,8.7%,15,Contrôle RX / Expertise cire,attente,42.83,42m 50s
+MBP M88,4,2,8.7%,16,PCEXPCIRE_01,poste,30.31,30m 19s
+MBP M88,4,2,8.7%,17,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,4,2,8.7%,18,Stockage,poste,498.86,8h 19m
+MBP M88,5,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+MBP M88,5,1,4.3%,2,PREP_NOY_02,poste,11.76,11m 46s
+MBP M88,5,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,5,1,4.3%,4,PRSINJM88_01,poste,8.82,8m 49s
+MBP M88,5,1,4.3%,5,Injection cire noyaux / Prison 1,attente,0.0,0s
+MBP M88,5,1,4.3%,6,Prison 1,poste,485.88,8h 6m
+MBP M88,5,1,4.3%,7,Prison 1 / Rework,attente,0.0,0s
+MBP M88,5,1,4.3%,8,Rework 1,poste,30.57,30m 34s
+MBP M88,5,1,4.3%,9,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,5,1,4.3%,10,PRSINJM88_01,poste,8.82,8m 49s
+MBP M88,5,1,4.3%,11,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,5,1,4.3%,12,Attente de 4h,poste,249.86,4h 10m
+MBP M88,5,1,4.3%,13,Attente 4h / Marquage laser,attente,5136.83,3j 13h 37m
+MBP M88,5,1,4.3%,14,MACHINEMARQUAGELASER,poste,32.94,32m 56s
+MBP M88,5,1,4.3%,15,Marquage laser / Contrôle US,attente,283.97,4h 44m
+MBP M88,5,1,4.3%,16,(interrompu),poste,408.7,6h 49m
+MBP M88,5,1,4.3%,17,Marquage laser / Contrôle US,attente,522.16,8h 42m
+MBP M88,5,1,4.3%,18,EQUIPEMENTCABINEUS,poste,79.41,1h 19m
+MBP M88,5,1,4.3%,19,Contrôle US / Contrôle RX,attente,1.88,1m 53s
+MBP M88,5,1,4.3%,20,EQUIPEMENTCABINERX,poste,30.48,30m 29s
+MBP M88,5,1,4.3%,21,Contrôle RX / Expertise cire,attente,58.93,58m 56s
+MBP M88,5,1,4.3%,22,PCEXPCIRE_01,poste,36.36,36m 22s
+MBP M88,5,1,4.3%,23,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,5,1,4.3%,24,Stockage,poste,506.58,8h 27m
+MBP M88,6,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+MBP M88,6,1,4.3%,2,PREP_NOY_02,poste,11.76,11m 46s
+MBP M88,6,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,6,1,4.3%,4,(interrompu),poste,5.88,5m 53s
+MBP M88,6,1,4.3%,5,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,6,1,4.3%,6,(interrompu),poste,0.0,0s
+MBP M88,6,1,4.3%,7,Prep noyaux / Injection manuelle,attente,3361.74,2j 8h 2m
+MBP M88,6,1,4.3%,8,PRSINJM88_02,poste,46.47,46m 28s
+MBP M88,6,1,4.3%,9,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,6,1,4.3%,10,Attente de 4h,poste,335.29,5h 35m
+MBP M88,6,1,4.3%,11,Attente 4h / Marquage laser,attente,2832.95,1j 23h 13m
+MBP M88,6,1,4.3%,12,MACHINEMARQUAGELASER,poste,24.42,24m 25s
+MBP M88,6,1,4.3%,13,Marquage laser / Contrôle US,attente,175.03,2h 55m
+MBP M88,6,1,4.3%,14,(interrompu),poste,419.34,6h 59m
+MBP M88,6,1,4.3%,15,Marquage laser / Contrôle US,attente,486.5,8h 6m
+MBP M88,6,1,4.3%,16,EQUIPEMENTCABINEUS,poste,36.36,36m 22s
+MBP M88,6,1,4.3%,17,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,6,1,4.3%,18,EQUIPEMENTCABINERX,poste,86.47,1h 26m
+MBP M88,6,1,4.3%,19,Contrôle RX / Expertise cire,attente,28.12,28m 7s
+MBP M88,6,1,4.3%,20,PCEXPCIRE_02,poste,37.76,37m 45s
+MBP M88,6,1,4.3%,21,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,6,1,4.3%,22,Stockage,poste,503.53,8h 24m
+MBP M88,7,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.7,42s
+MBP M88,7,1,4.3%,2,PREP_NOY_02,poste,11.76,11m 46s
+MBP M88,7,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,7,1,4.3%,4,PRSINJM88_02,poste,8.82,8m 49s
+MBP M88,7,1,4.3%,5,Injection cire / Attente 4h,attente,644.09,10h 44m
+MBP M88,7,1,4.3%,6,Attente de 4h,poste,298.12,4h 58m
+MBP M88,7,1,4.3%,7,Attente 4h / Marquage laser,attente,3399.88,2j 8h 40m
+MBP M88,7,1,4.3%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+MBP M88,7,1,4.3%,9,Marquage laser / Contrôle US,attente,598.11,9h 58m
+MBP M88,7,1,4.3%,10,EQUIPEMENTCABINEUS,poste,36.84,36m 50s
+MBP M88,7,1,4.3%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,7,1,4.3%,12,EQUIPEMENTCABINERX,poste,85.99,1h 26m
+MBP M88,7,1,4.3%,13,Contrôle RX / Expertise cire,attente,0.0,0s
+MBP M88,7,1,4.3%,14,PCEXPCIRE_01,poste,25.18,25m 11s
+MBP M88,7,1,4.3%,15,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,7,1,4.3%,16,Stockage,poste,500.59,8h 21m
+MBP M88,8,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+MBP M88,8,1,4.3%,2,PREP_NOY_01,poste,7.96,7m 58s
+MBP M88,8,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,8,1,4.3%,4,PRSINJM88_02,poste,8.82,8m 49s
+MBP M88,8,1,4.3%,5,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,8,1,4.3%,6,Attente de 4h,poste,245.88,4h 6m
+MBP M88,8,1,4.3%,7,Attente 4h / Marquage laser,attente,4204.94,2j 22h 5m
+MBP M88,8,1,4.3%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+MBP M88,8,1,4.3%,9,Marquage laser / Contrôle US,attente,119.41,1h 59m
+MBP M88,8,1,4.3%,10,(interrompu),poste,231.02,3h 51m
+MBP M88,8,1,4.3%,11,Marquage laser / Contrôle US,attente,486.5,8h 6m
+MBP M88,8,1,4.3%,12,EQUIPEMENTCABINEUS,poste,36.84,36m 50s
+MBP M88,8,1,4.3%,13,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,8,1,4.3%,14,EQUIPEMENTCABINERX,poste,85.99,1h 26m
+MBP M88,8,1,4.3%,15,Contrôle RX / Expertise cire,attente,0.0,0s
+MBP M88,8,1,4.3%,16,PCEXPCIRE_02,poste,26.47,26m 28s
+MBP M88,8,1,4.3%,17,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,8,1,4.3%,18,Stockage,poste,503.53,8h 24m
+MBP M88,9,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,89.08,1h 29m
+MBP M88,9,1,4.3%,2,PREP_NOY_01,poste,16.43,16m 26s
+MBP M88,9,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,9,1,4.3%,4,PRSINJM88_01,poste,27.76,27m 45s
+MBP M88,9,1,4.3%,5,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,9,1,4.3%,6,Attente de 4h,poste,260.0,4h 20m
+MBP M88,9,1,4.3%,7,Attente 4h / Marquage laser,attente,4292.53,2j 23h 33m
+MBP M88,9,1,4.3%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+MBP M88,9,1,4.3%,9,Marquage laser / Contrôle US,attente,23.88,23m 53s
+MBP M88,9,1,4.3%,10,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+MBP M88,9,1,4.3%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,9,1,4.3%,12,EQUIPEMENTCABINERX,poste,11.76,11m 46s
+MBP M88,9,1,4.3%,13,Contrôle RX / Expertise cire,attente,0.0,0s
+MBP M88,9,1,4.3%,14,(interrompu),poste,0.0,0s
+MBP M88,9,1,4.3%,15,Contrôle RX / Expertise cire,attente,3842.76,2j 16h 3m
+MBP M88,9,1,4.3%,16,PCEXPCIRE_01,poste,23.82,23m 49s
+MBP M88,9,1,4.3%,17,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,9,1,4.3%,18,Stockage,poste,562.35,9h 22m
+MBP M88,10,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,73.02,1h 13m
+MBP M88,10,1,4.3%,2,PREP_NOY_02,poste,29.41,29m 25s
+MBP M88,10,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,10,1,4.3%,4,PRSINJM88_02,poste,27.76,27m 45s
+MBP M88,10,1,4.3%,5,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,10,1,4.3%,6,Attente de 4h,poste,257.54,4h 18m
+MBP M88,10,1,4.3%,7,Attente 4h / Marquage laser,attente,4277.7,2j 23h 18m
+MBP M88,10,1,4.3%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+MBP M88,10,1,4.3%,9,Marquage laser / Contrôle US,attente,0.0,0s
+MBP M88,10,1,4.3%,10,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+MBP M88,10,1,4.3%,11,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,10,1,4.3%,12,EQUIPEMENTCABINERX,poste,11.76,11m 46s
+MBP M88,10,1,4.3%,13,Contrôle RX / Expertise cire,attente,2.76,2m 45s
+MBP M88,10,1,4.3%,14,(interrompu),poste,470.0,7h 50m
+MBP M88,10,1,4.3%,15,Contrôle RX / Expertise cire,attente,3370.0,2j 8h 10m
+MBP M88,10,1,4.3%,16,PCEXPCIRE_02,poste,29.41,29m 25s
+MBP M88,10,1,4.3%,17,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,10,1,4.3%,18,Stockage,poste,563.53,9h 24m
+MBP M88,11,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+MBP M88,11,1,4.3%,2,(interrompu),poste,433.9,7h 14m
+MBP M88,11,1,4.3%,3,Entrée M88 ET Retouche / Prep noyaux,attente,602.95,10h 3m
+MBP M88,11,1,4.3%,4,PREP_NOY_02,poste,19.89,19m 53s
+MBP M88,11,1,4.3%,5,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,11,1,4.3%,6,PRSINJM88_02,poste,18.35,18m 21s
+MBP M88,11,1,4.3%,7,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,11,1,4.3%,8,Attente de 4h,poste,264.01,4h 24m
+MBP M88,11,1,4.3%,9,Attente 4h / Marquage laser,attente,4284.75,2j 23h 25m
+MBP M88,11,1,4.3%,10,MACHINEMARQUAGELASER,poste,26.13,26m 8s
+MBP M88,11,1,4.3%,11,Marquage laser / Contrôle US,attente,47.76,47m 46s
+MBP M88,11,1,4.3%,12,EQUIPEMENTCABINEUS,poste,7.65,7m 39s
+MBP M88,11,1,4.3%,13,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,11,1,4.3%,14,EQUIPEMENTCABINERX,poste,11.76,11m 46s
+MBP M88,11,1,4.3%,15,Contrôle RX / Expertise cire,attente,0.0,0s
+MBP M88,11,1,4.3%,16,(interrompu),poste,0.0,0s
+MBP M88,11,1,4.3%,17,Contrôle RX / Expertise cire,attente,2.76,2m 45s
+MBP M88,11,1,4.3%,18,(interrompu),poste,470.0,7h 50m
+MBP M88,11,1,4.3%,19,Contrôle RX / Expertise cire,attente,3393.82,2j 8h 34m
+MBP M88,11,1,4.3%,20,PCEXPCIRE_01,poste,92.65,1h 33m
+MBP M88,11,1,4.3%,21,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,11,1,4.3%,22,Stockage,poste,502.06,8h 22m
+MBP M88,12,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,15.26,15m 16s
+MBP M88,12,1,4.3%,2,PREP_NOY_01,poste,15.18,15m 11s
+MBP M88,12,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,12,1,4.3%,4,PRSINJM88_02,poste,15.4,15m 24s
+MBP M88,12,1,4.3%,5,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,12,1,4.3%,6,Attente de 4h,poste,250.59,4h 11m
+MBP M88,12,1,4.3%,7,Attente 4h / Marquage laser,attente,4501.42,3j 3h 1m
+MBP M88,12,1,4.3%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+MBP M88,12,1,4.3%,9,Marquage laser / Contrôle US,attente,0.0,0s
+MBP M88,12,1,4.3%,10,(interrompu),poste,208.3,3h 28m
+MBP M88,12,1,4.3%,11,Marquage laser / Contrôle US,attente,3366.5,2j 8h 6m
+MBP M88,12,1,4.3%,12,EQUIPEMENTCABINEUS,poste,25.29,25m 18s
+MBP M88,12,1,4.3%,13,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,12,1,4.3%,14,EQUIPEMENTCABINERX,poste,92.65,1h 33m
+MBP M88,12,1,4.3%,15,Contrôle RX / Expertise cire,attente,31.47,31m 28s
+MBP M88,12,1,4.3%,16,PCEXPCIRE_01,poste,35.88,35m 53s
+MBP M88,12,1,4.3%,17,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,12,1,4.3%,18,Stockage,poste,503.53,8h 24m
+MBP M88,13,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,3.63,3m 38s
+MBP M88,13,1,4.3%,2,PREP_NOY_02,poste,11.76,11m 46s
+MBP M88,13,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,13,1,4.3%,4,PRSINJM88_02,poste,8.82,8m 49s
+MBP M88,13,1,4.3%,5,Injection cire / Attente 4h,attente,0.0,0s
+MBP M88,13,1,4.3%,6,Attente de 4h,poste,245.88,4h 6m
+MBP M88,13,1,4.3%,7,Attente 4h / Marquage laser,attente,22620.89,15j 17h 1m
+MBP M88,13,1,4.3%,8,MACHINEMARQUAGELASER,poste,23.88,23m 53s
+MBP M88,13,1,4.3%,9,Marquage laser / Contrôle US,attente,23.88,23m 53s
+MBP M88,13,1,4.3%,10,(interrompu),poste,401.85,6h 42m
+MBP M88,13,1,4.3%,11,Marquage laser / Contrôle US,attente,524.04,8h 44m
+MBP M88,13,1,4.3%,12,EQUIPEMENTCABINEUS,poste,76.47,1h 16m
+MBP M88,13,1,4.3%,13,Contrôle US / Contrôle RX,attente,0.0,0s
+MBP M88,13,1,4.3%,14,EQUIPEMENTCABINERX,poste,30.59,30m 35s
+MBP M88,13,1,4.3%,15,Contrôle RX / Expertise cire,attente,57.06,57m 4s
+MBP M88,13,1,4.3%,16,PCEXPCIRE_01,poste,23.53,23m 32s
+MBP M88,13,1,4.3%,17,Expertise cire / Stockage,attente,0.0,0s
+MBP M88,13,1,4.3%,18,Stockage,poste,491.76,8h 12m
+MBP M88,14,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,1.4,1m 24s
+MBP M88,14,1,4.3%,2,PREP_NOY_02,poste,11.76,11m 46s
+MBP M88,14,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,14,1,4.3%,4,PRSINJM88_02,poste,8.82,8m 49s
+MBP M88,15,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,0.0,0s
+MBP M88,15,1,4.3%,2,PREP_NOY_02,poste,11.76,11m 46s
+MBP M88,15,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,15,1,4.3%,4,PRSINJM88_01,poste,8.82,8m 49s
+MBP M88,16,1,4.3%,1,Entrée M88 ET Retouche / Prep noyaux,attente,4.86,4m 52s
+MBP M88,16,1,4.3%,2,PREP_NOY_02,poste,11.76,11m 46s
+MBP M88,16,1,4.3%,3,Prep noyaux / Injection manuelle,attente,0.0,0s
+MBP M88,16,1,4.3%,4,PRSINJM88_02,poste,8.82,8m 49s
+MBP M88,16,1,4.3%,5,Injection cire noyaux / Prison 1,attente,5247.65,3j 15h 28m
+MBP M88,16,1,4.3%,6,Prison 1,poste,508.71,8h 29m

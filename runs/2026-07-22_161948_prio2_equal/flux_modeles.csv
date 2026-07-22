@@ -1,0 +1,3 @@
+﻿modele,objectif,genere,sorties,rebuts,taux_rebut,atteinte,traversee_moyenne,traversee_mediane,traversee_p90,traversee_max
+M1,5000,5000,1439,0,0%,28.8%,13j 23h 55m,14j 0h 4m,25j 4h 47m,27j 23h 23m
+M2,5000,5000,1440,0,0%,28.8%,14j 0h 32m,14j 0h 53m,25j 5h 47m,28j 0h 2m

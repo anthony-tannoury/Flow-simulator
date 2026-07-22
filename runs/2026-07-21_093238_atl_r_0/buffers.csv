@@ -1,0 +1,28 @@
+﻿buffer,type,longueur_moyenne,longueur_max,longueur_ecart_type,longueur_finale,sejour_moyen,sejour_max,entrees,sorties,flux_entrant_j,flux_sortant_j,temps_moyen_entre_arrivees
+Prep noyaux / Injection manuelle,PASSAGE,0.0,1.0,0.009,0,3s,3m 42s,128,128,2.133,2.133,11h 15m
+Injection cire / Attente 4h,PASSAGE,1.075,3.0,1.02,2,3h 55m,2j 10h 58m,370,368,6.167,6.133,3h 54m
+Injection cire noyaux / Prison 1,PASSAGE,0.096,1.0,0.294,0,13h 45m,2j 15h 48m,10,10,0.167,0.167,6j 0h 0m
+Rebuts après panne 5,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 1,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts 2,SCRAP,1.649,3.0,0.856,3,,,3,0,0.05,0.0,20j 0h 0m
+Marquage laser / Contrôle US,PASSAGE,1.205,30.0,3.808,1,19h 15m,5j 14h 53m,74,73,1.233,1.217,19h 28m
+Marquage laser / Stockage,PASSAGE,0.916,43.0,5.571,0,11h 47m,15h 36m,112,112,1.867,1.867,12h 51m
+Rebuts après panne 3,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Rebuts après panne 4,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Prison 1 / Rework,PASSAGE,0.0,0.0,0.0,0,0s,0s,4,4,0.067,0.067,15j 0h 0m
+Rebuts après panne 2,SCRAP,1.121,2.0,0.72,2,,,2,0,0.033,0.0,30j 0h 0m
+Attente 4h / Marquage laser,PASSAGE,85.5,154.0,41.82,154,14j 8h 17m,37j 20h 29m,355,201,5.917,3.35,4h 3m
+Sorties,EXIT,63.252,158.0,69.748,158,,,158,0,2.633,0.0,9h 7m
+Contrôle US / Prison 2,PASSAGE,0.733,6.0,1.638,0,2j 14h 4m,5j 6h 9m,17,17,0.283,0.283,3j 12h 42m
+Contrôle RX / Expertise cire,PASSAGE,0.415,12.0,1.663,0,9h 29m,2j 16h 59m,63,63,1.05,1.05,22h 51m
+Entrée M88 ET Retouche / Prep noyaux,PASSAGE,0.326,2.0,0.556,0,3h 3m,2j 8h 11m,154,154,2.567,2.567,9h 21m
+Entrée LEAP / Injection cire moule,PASSAGE,0.013,1.0,0.114,0,5m 21s,9h 20m,212,212,3.533,3.533,6h 48m
+Contrôle US / Contrôle RX,PASSAGE,0.02,5.0,0.249,0,28m 9s,8h 10m,61,61,1.017,1.017,23h 36m
+Prison 3 / Rework 3,PASSAGE,0.0,0.0,0.0,0,0s,0s,3,3,0.05,0.05,20j 0h 0m
+Rebuts après panne 6,SCRAP,0.0,0.0,0.0,0,,,0,0,0.0,0.0,
+Expertise cire / Prison 3,PASSAGE,0.303,4.0,0.786,0,1j 9h 32m,3j 4h 18m,13,13,0.217,0.217,4j 14h 46m
+Prison 3 / Rework 2,PASSAGE,0.0,0.0,0.0,0,0s,0s,5,5,0.083,0.083,12j 0h 0m
+Expertise cire / Stockage,PASSAGE,0.0,0.0,0.0,0,0s,0s,49,49,0.817,0.817,1j 5h 23m
+Rebuts 4,SCRAP,0.844,3.0,1.259,3,,,3,0,0.05,0.0,20j 0h 0m
+Rebuts 3,SCRAP,0.725,3.0,1.176,3,,,3,0,0.05,0.0,20j 0h 0m
+Rebuts 1,SCRAP,0.941,2.0,0.448,2,,,2,0,0.033,0.0,30j 0h 0m

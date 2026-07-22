@@ -1,0 +1,6 @@
+﻿cle,valeur
+duree_simulee,30j 0h 0m
+graine,0
+fichier,/tmp/claude-0/-home-user-Flow-simulator/c7ddd8a7-8e8f-5a49-b9b8-cd3927fcd704/scratchpad/prio_skew.json
+debut,01-01-2026 00:00
+critere_arret,ByPiecesProduced

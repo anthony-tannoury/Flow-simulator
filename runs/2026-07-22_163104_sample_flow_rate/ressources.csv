@@ -1,0 +1,4 @@
+﻿ressource,capacite,stock_moyen,stock_min,stock_max,stock_final,consommation_totale,entrees_totales,consommation_j,nb_ruptures,temps_rupture
+steel,500.0,37.296,0.0,500.0,0.0,500.0,0.0,50.0,1,8j 13h 25m
+primer,100.0,69.856,0.0,100.0,72.0,574.0,546.0,57.4,4,1h 24m
+painted_body,1000.0,480.492,0.0,520.0,520.0,0.0,520.0,0.0,0,8h 8m

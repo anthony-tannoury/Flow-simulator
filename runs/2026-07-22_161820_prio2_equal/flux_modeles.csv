@@ -1,0 +1,3 @@
+﻿modele,objectif,genere,sorties,rebuts,taux_rebut,atteinte,traversee_moyenne,traversee_mediane,traversee_p90,traversee_max
+M1,200,99,99,0,0%,49.5%,15m,15m,15m,15m
+M2,200,104,104,0,0%,52%,15m,15m,15m,15m
