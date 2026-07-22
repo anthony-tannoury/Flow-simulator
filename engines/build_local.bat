@@ -16,8 +16,8 @@ if errorlevel 1 (
 set "out=engines\flow_sim-windows-x86_64.exe"
 echo ==^> Building Windows x64 with MSVC
 cl /std:c++20 /O2 /EHsc /MT /nologo ^
-  /I salabim++ /I simulation++ /I engine /I engine\third_party ^
-  engine\main.cpp /Fe:%out%
+  /I cpp\salabim++ /I cpp\simulation++ /I cpp\engine /I cpp\third_party ^
+  cpp\engine\main.cpp /Fe:%out%
 if errorlevel 1 ( echo BUILD FAILED 1>&2 & popd & exit /b 1 )
 del main.obj 2>nul
 

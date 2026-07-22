@@ -22,7 +22,8 @@ add_executable(flow_sim
 target_include_directories(flow_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/salabim++
     ${CMAKE_CURRENT_SOURCE_DIR}/simulation++
-    ${CMAKE_CURRENT_SOURCE_DIR}/engine/third_party
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
 # Portable, dependency-free binaries so a user can run the file directly.

@@ -8,7 +8,7 @@ name: build-engines
 on:
   workflow_dispatch:
   push:
-    branches: [claude/cpp-engine]
+    branches: [claude/latest-commit-check-tl51wu]
     paths:
       # Match by extension: GitHub path filters reject any '+' in the pattern
       # (extglob), so 'salabim++/**' / 'simulation++/**' can't be written — but
@@ -46,16 +46,16 @@ jobs:
         run: |
           clang++ --version
           clang++ -std=c++20 -O2 -static-libgcc -static-libstdc++ \
-            -Isalabim++ -Isimulation++ -Iengine -Iengine/third_party \
-            engine/main.cpp -o flow_sim-${{ matrix.name }}
+            -Icpp/salabim++ -Icpp/simulation++ -Icpp/engine -Icpp/third_party \
+            cpp/engine/main.cpp -o flow_sim-${{ matrix.name }}
 
       - name: Build (macOS universal)
         if: matrix.name == 'macos-universal'
         run: |
           clang++ --version
           clang++ -std=c++20 -O2 -arch arm64 -arch x86_64 \
-            -Isalabim++ -Isimulation++ -Iengine -Iengine/third_party \
-            engine/main.cpp -o flow_sim-${{ matrix.name }}
+            -Icpp/salabim++ -Icpp/simulation++ -Icpp/engine -Icpp/third_party \
+            cpp/engine/main.cpp -o flow_sim-${{ matrix.name }}
 
       - name: Build (Windows MSVC)
         if: matrix.name == 'windows-x86_64'
@@ -66,8 +66,8 @@ jobs:
           for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%i"
           call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat"
           cl /std:c++20 /O2 /EHsc /MT /nologo ^
-            /I salabim++ /I simulation++ /I engine /I engine\third_party ^
-            engine\main.cpp /Fe:flow_sim-${{ matrix.name }}.exe
+            /I cpp\salabim++ /I cpp\simulation++ /I cpp\engine /I cpp\third_party ^
+            cpp\engine\main.cpp /Fe:flow_sim-${{ matrix.name }}.exe
           del main.obj 2>nul
 
       - name: Smoke test (Unix)
@@ -94,7 +94,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: claude/cpp-engine
+          ref: claude/latest-commit-check-tl51wu
 
       - uses: actions/download-artifact@v4
         with:
@@ -120,5 +120,5 @@ jobs:
             echo "engines/ unchanged — nothing to commit"
           else
             git commit -m "ci: rebuild native engines [skip ci]"
-            git push origin HEAD:claude/cpp-engine
+            git push origin HEAD:claude/latest-commit-check-tl51wu
           fi

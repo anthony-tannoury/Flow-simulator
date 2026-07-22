@@ -18,16 +18,16 @@ case "$os" in
     echo "==> Building macOS universal (arm64 + x86_64)"
     clang++ --version | head -1
     clang++ -std=c++20 -O2 -arch arm64 -arch x86_64 \
-      -Isalabim++ -Isimulation++ -Iengine -Iengine/third_party \
-      engine/main.cpp -o "$out"
+      -Icpp/salabim++ -Icpp/simulation++ -Icpp/engine -Icpp/third_party \
+      cpp/engine/main.cpp -o "$out"
     ;;
   Linux)
     out="engines/flow_sim-linux-x86_64"
     echo "==> Building Linux x86_64 (clang, static libstdc++)"
     clang++ --version | head -1
     clang++ -std=c++20 -O2 -static-libgcc -static-libstdc++ \
-      -Isalabim++ -Isimulation++ -Iengine -Iengine/third_party \
-      engine/main.cpp -o "$out"
+      -Icpp/salabim++ -Icpp/simulation++ -Icpp/engine -Icpp/third_party \
+      cpp/engine/main.cpp -o "$out"
     ;;
   *)
     echo "Unsupported OS '$os'. On Windows run engines\\build_local.bat instead." >&2
