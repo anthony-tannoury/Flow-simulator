@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -675,8 +676,14 @@ inline void write_report(const fs::path& dir, const std::vector<Task*>& tasks,
     fs::create_directories(dir);
 
     ojson run;
-    run["duree_simulee"] = fmt_duree(env->now());
+    {
+        std::time_t now_t = std::time(nullptr);
+        char iso[32];
+        std::strftime(iso, sizeof iso, "%Y-%m-%dT%H:%M:%S", std::localtime(&now_t));
+        run["genere_le"] = iso;
+    }
     run["graine"] = simulation::SEED;
+    run["duree_simulee"] = fmt_duree(env->now());
     for (auto& [k, v] : run_info.items()) run[k] = v;
     write_kv_csv(dir / "run.csv", run, sim_start);
 

@@ -33,6 +33,69 @@ double wall_seconds(std::chrono::steady_clock::time_point t0) {
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 }
 
+std::string fmt_g(double v) {
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%g", v);
+    return buf;
+}
+
+std::string describe_fn(const json& fn) {
+    if (fn.is_string()) return fn.get<std::string>();
+    if (fn.is_number()) return fmt_g(fn.get<double>());
+    if (!fn.is_object()) return fn.dump();
+    std::string kind = fn.value("kind", "constant");
+    if (parser::canon_name(kind) == "constant") return fmt_g(fn.value("value", 0.0));
+    std::string params;
+    for (auto& [k, v] : fn.items()) {
+        if (k == "kind") continue;
+        if (!params.empty()) params += ", ";
+        params += k + "=" + (v.is_number() ? fmt_g(v.get<double>()) : v.dump());
+    }
+    return kind + "(" + params + ")";
+}
+
+std::string describe_criterion(const parser::Parser& p) {
+    const json& criterion = p.data.at("stopping_criterion");
+    std::vector<std::string> parts;
+    for (auto& [key, value] : criterion.items()) {
+        if (key == "type") continue;
+        if (key == "models_goals") {
+            std::string s = "models_goals: ";
+            bool first = true;
+            for (const auto& mg : value) {
+                if (!first) s += ", ";
+                first = false;
+                s += p.models.at(mg.at("model").get<std::string>())->name + " = "
+                     + std::to_string(mg.at("goal").get<int>());
+            }
+            parts.push_back(s);
+        } else if (key == "models_probs") {
+            std::string s = "models_probs: ";
+            bool first = true;
+            for (const auto& mp : value) {
+                if (!first) s += ", ";
+                first = false;
+                s += p.models.at(mp.at("model").get<std::string>())->name + " = "
+                     + (mp.at("probability").is_null() ? "reste" : describe_fn(mp.at("probability")));
+            }
+            parts.push_back(s);
+        } else if (key == "gap") {
+            parts.push_back("gap = " + describe_fn(value));
+        } else if ((key == "timeout" || key == "grace_period") && value.is_number()
+                   && !std::isinf(value.get<double>())) {
+            parts.push_back(key + " = " + kpis::fmt_duree(value.get<double>()));
+        } else {
+            parts.push_back(key + " = " + describe_fn(value));
+        }
+    }
+    std::string out;
+    for (const auto& part : parts) {
+        if (!out.empty()) out += "; ";
+        out += part;
+    }
+    return out;
+}
+
 }
 
 int main(int argc, char** argv) {
@@ -117,6 +180,7 @@ int main(int argc, char** argv) {
             if (wall_seconds(slice_started) < 0.005) stride = std::min(stride * 2, 1440.0);
         }
         emit("PROGRESS", snapshot());
+        emit("PHASE", {{"phase", "outputs"}});
 
 
         fs::path out_dir =
@@ -139,7 +203,10 @@ int main(int argc, char** argv) {
         kpis::ojson run_info;
         run_info["fichier"] = json_path.string();
         run_info["debut"] = p.data.value("start_date", "");
+        run_info["fin"] = kpis::fmt_instant(e.now(), p.sim_start);
+        run_info["temps_calcul"] = kpis::fmt_duree(wall_seconds(t0) / 60.0);
         run_info["critere_arret"] = crit.value("type", "");
+        run_info["critere_details"] = describe_criterion(p);
         kpis::write_report(out_dir, tasks_ordered, buffers, p.piece_generator, op_groups, run_info,
                            p.sim_start, resources_list);
 

@@ -85,6 +85,7 @@ def main(argv: list) -> int:
                 stride = min(stride * 2, 1440.0)
 
         emit("PROGRESS", snapshot())
+        emit("PHASE", {"phase": "outputs"})
         report_dir = parser.report()
         emit("DONE", {"report_dir": os.path.abspath(report_dir), **snapshot()})
         return 0

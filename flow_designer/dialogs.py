@@ -1092,7 +1092,9 @@ class RunSimulationDialog(QtWidgets.QDialog):
         file_lbl.setStyleSheet("font-weight: bold;")
         lay.addWidget(file_lbl)
 
-        form = QtWidgets.QFormLayout()
+        self._form_host = QtWidgets.QWidget()
+        form = QtWidgets.QFormLayout(self._form_host)
+        form.setContentsMargins(0, 0, 0, 0)
         self.elapsed_lbl = QtWidgets.QLabel("0:00:00")
         form.addRow("Elapsed time", self.elapsed_lbl)
         self.sim_time_lbl = QtWidgets.QLabel("-")
@@ -1106,9 +1108,10 @@ class RunSimulationDialog(QtWidgets.QDialog):
         self.gap_lbl = QtWidgets.QLabel("-")
         self._gap_row = form.rowCount()
         form.addRow("Piece gap", self.gap_lbl)
-        lay.addLayout(form)
+        lay.addWidget(self._form_host)
         self._form = form
         self._last_progress = {}
+        self._outputs_phase = False
         self._set_form_row_visible(self._pieces_row, self.pieces_lbl, False)
         self._set_form_row_visible(self._timeout_row, self.timeout_lbl, False)
         self._set_form_row_visible(self._gap_row, self.gap_lbl, False)
@@ -1215,11 +1218,33 @@ class RunSimulationDialog(QtWidgets.QDialog):
             self.status_lbl.setText("Simulation running...")
         elif tag == "PROGRESS":
             self._show_progress(info)
+        elif tag == "PHASE":
+            if info.get("phase") == "outputs":
+                self._enter_outputs_phase()
         elif tag == "DONE":
             self._report_dir = info.get("report_dir")
             self._show_progress(info)
         elif tag == "ERROR":
             self._error_message = info.get("message")
+
+    def _enter_outputs_phase(self):
+        if self._outputs_phase:
+            return
+        self._outputs_phase = True
+        self._form_host.setVisible(False)
+        self.caption_lbl.setText("Generating outputs")
+        self.bar.setRange(0, 0)
+        self.status_lbl.setText("Writing report, tables and graphs...")
+
+    def _exit_outputs_phase(self):
+        if not self._outputs_phase:
+            return
+        self._outputs_phase = False
+        self._form_host.setVisible(True)
+        self.bar.setRange(0, self.BAR_STEPS)
+        self.bar.setValue(self.BAR_STEPS)
+        self.caption_lbl.setText("")
+        self._show_progress(self._last_progress)
 
     def _show_progress(self, info: dict):
         sim_now = info.get("sim_now")
@@ -1269,16 +1294,20 @@ class RunSimulationDialog(QtWidgets.QDialog):
         self.cancel_btn.setText("Close")
         if exit_code == 0 and self._report_dir:
             self._render_cpp_graphs_if_needed()
+            self._exit_outputs_phase()
             self.status_lbl.setText(f"{self._outcome_line()}\nReport written to:\n{self._report_dir}")
             self.open_report_btn.setVisible(True)
             self.view_results_btn.setVisible(
                 os.path.isfile(os.path.join(self._report_dir, "report.json")))
         elif self._error_message:
+            self._exit_outputs_phase()
             self.status_lbl.setText(f"Simulation failed: {self._error_message}")
         elif exit_code != 0:
+            self._exit_outputs_phase()
             tail = "\n".join(self._stderr_tail[-8:])
             self.status_lbl.setText(f"Simulation failed (exit code {exit_code}).\n{tail}")
         else:
+            self._exit_outputs_phase()
             self.status_lbl.setText(self._outcome_line())
 
     def _render_cpp_graphs_if_needed(self):
@@ -1286,7 +1315,7 @@ class RunSimulationDialog(QtWidgets.QDialog):
             return
         if not os.path.isfile(os.path.join(self._report_dir, "graph_data.json")):
             return
-        self.status_lbl.setText("Generating graphs...")
+        self._enter_outputs_phase()
         QtWidgets.QApplication.processEvents()
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         proc = QtCore.QProcess(self)
