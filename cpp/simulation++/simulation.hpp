@@ -1119,7 +1119,7 @@ class Alternative {
 
 
     sim::Process request(Component* demander, std::optional<OpsList>* out, double fail_at = sim::inf,
-                         std::optional<bool> cap_now = std::nullopt, double request_priority = 0) {
+                         std::optional<bool> cap_now = std::nullopt) {
         if (alternatives.empty()) {
             *out = OpsList{};
             co_return;
@@ -1128,8 +1128,7 @@ class Alternative {
         if (alternatives.size() == 1) {
             co_await demander->call(demander->request(
                 reqspecs_(alternatives[0]),
-                {.fail_at = fail_at, .mode = "wait_operators",
-                 .request_priority = request_priority, .cap_now = cap_now}));
+                {.fail_at = fail_at, .mode = "wait_operators", .cap_now = cap_now}));
             *out = demander->failed() ? std::nullopt : std::optional<OpsList>(alternatives[0]);
             co_return;
         }
@@ -1137,8 +1136,7 @@ class Alternative {
         while (true) {
             for (const auto& alt : alternatives) {
                 co_await demander->call(
-                    demander->request(reqspecs_(alt), {.fail_delay = 0, .mode = "wait_operators",
-                                                       .request_priority = request_priority}));
+                    demander->request(reqspecs_(alt), {.fail_delay = 0, .mode = "wait_operators"}));
                 if (!demander->failed()) {
                     *out = alt;
                     co_return;
@@ -1148,8 +1146,7 @@ class Alternative {
             std::vector<sim::WaitSpec> specs;
             for (auto* t : triggers) specs.push_back(sim::WaitSpec(*t));
             co_await demander->sim::Component::wait(
-                std::move(specs), {.fail_at = fail_at, .mode = "wait_operators",
-                                   .request_priority = request_priority, .cap_now = cap_now});
+                std::move(specs), {.fail_at = fail_at, .mode = "wait_operators", .cap_now = cap_now});
             if (demander->failed()) {
                 *out = std::nullopt;
                 co_return;
@@ -1598,7 +1595,7 @@ inline sim::Process TaskStarter::process() {
 
     double deadline = task->get_earliest_deadline();
     std::optional<Alternative::OpsList> got;
-    co_await call(task->config->startup_operators.request(this, &got, deadline - duration, std::nullopt, task->request_priority));
+    co_await call(task->config->startup_operators.request(this, &got, deadline - duration));
     if (failed()) {
         task->is_frozen.set(true);
         done.set(true);
@@ -1661,7 +1658,7 @@ inline sim::Process Task::request_task_operators() {
     double deadline =
         std::min(non_flexible_shutdowns->get_deadline(), flexible_shutdowns->get_deadline());
     std::optional<Alternative::OpsList> got;
-    co_await call(config->operators.request(this, &got, deadline, std::nullopt, request_priority));
+    co_await call(config->operators.request(this, &got, deadline));
     task_operators = got.value_or(Alternative::OpsList{});
     set_mode("");
 
@@ -1808,7 +1805,7 @@ inline sim::Process Carrier::handle_batch_operators(Alternative& operators, doub
                                                     double ideal_duration, double fail_before,
                                                     bool do_restock, const char* work_mode) {
     std::optional<Alternative::OpsList> recuperated;
-    co_await call(operators.request(this, &recuperated, earliest_deadline - fail_before, true, task->request_priority));
+    co_await call(operators.request(this, &recuperated, earliest_deadline - fail_before, true));
     co_await call(freeze_abort_if(failed()));
     assert(recuperated.has_value());
 

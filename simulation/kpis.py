@@ -566,6 +566,8 @@ def write_report(directory: str, tasks: list, buffers: list, piece_generator=Non
                [resource_kpis(r) for r in (resources or [])], sim_start)
 
     flux, par_modele = flow_kpis(buffers, piece_generator)
+    flux['heures_machine_totales'] = round(sum(r['heures_machine'] for r in task_rows), 3)
+    flux['heures_main_oeuvre_totales'] = round(sum(r['heures_main_oeuvre'] for r in task_rows), 3)
     _write_csv(os.path.join(directory, 'flux.csv'),
                [{'cle': k, 'valeur': v} for k, v in _format_row(flux, sim_start).items()])
     _write_csv(os.path.join(directory, 'flux_modeles.csv'), par_modele, sim_start)

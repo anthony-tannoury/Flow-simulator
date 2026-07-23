@@ -66,7 +66,7 @@ class Alternative:
 
         self.triggers = [r.trigger for alt in alternatives for r, _ in alt]
 
-    def request(self, demander: sim.Component, request_priority: float = 0,
+    def request(self, demander: sim.Component,
                 **kwargs) -> list[tuple[OperatorGroup, int]] | None:
         if not self.alternatives:
             return []
@@ -82,20 +82,19 @@ class Alternative:
 
         if len(self.alternatives) == 1:
             demander.request(*self.alternatives[0], fail_at=fail_at, cap_now=cap_now,
-                             request_priority=request_priority, mode="wait_operators")
+                             mode="wait_operators")
             if not demander.failed():
                 return self.alternatives[0]
             return None
 
         while True:
             for alt in self.alternatives:
-                demander.request(*alt, fail_delay=0, request_priority=request_priority,
-                                 mode="wait_operators")
+                demander.request(*alt, fail_delay=0, mode="wait_operators")
                 if not demander.failed():
                     return alt
 
             demander.wait(*self.triggers, fail_at=fail_at, cap_now=cap_now,
-                          request_priority=request_priority, mode="wait_operators")
+                          mode="wait_operators")
             if demander.failed():
                 return None
 

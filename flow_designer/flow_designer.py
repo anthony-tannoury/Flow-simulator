@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, List, Tuple
 
 from Qt import QtCore, QtGui, QtWidgets
-from NodeGraphQt import BaseNode, NodeGraph, PropertiesBinWidget
+from NodeGraphQt import BaseNode, NodeGraph
 
 try:
     from . import results_mode
@@ -90,13 +90,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         ])
 
         self.setCentralWidget(self.graph.widget)
-
-        self.properties_bin = PropertiesBinWidget(node_graph=self.graph)
-        self.properties_dock = QtWidgets.QDockWidget("Properties", self)
-        self.properties_dock.setWidget(self.properties_bin)
-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.properties_dock)
-
-        self.properties_dock.hide()
 
         self._build_menus()
         self._install_context_menus()
@@ -190,8 +183,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         tools_menu = self.menuBar().addMenu("Tools")
         tools_menu.addAction("Validate graph").triggered.connect(self.validate_graph_dialog)
         tools_menu.addAction("Frame all").triggered.connect(self.frame_all)
-        tools_menu.addSeparator()
-        tools_menu.addAction(self.properties_dock.toggleViewAction())
 
         create_menu = self.menuBar().addMenu("Create")
         for label, cls_name in [
@@ -425,8 +416,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
         self._results_dock = results_mode.ResultsDock(self, results)
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self._results_dock)
         self._apply_results_tooltips(True)
-        self._props_dock_was_visible = self.properties_dock.isVisible()
-        self.properties_dock.setVisible(False)
         self._update_title()
         self.statusBar().showMessage(
             "Results mode: cards are locked; double-click one for its stats.")
@@ -445,7 +434,6 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
             self.removeDockWidget(self._results_dock)
             self._results_dock.deleteLater()
             self._results_dock = None
-        self.properties_dock.setVisible(getattr(self, "_props_dock_was_visible", False))
         self.results = None
         self._update_title()
         self.statusBar().showMessage("Left results mode.")
@@ -461,6 +449,11 @@ class FlowEditorWindow(QtWidgets.QMainWindow):
                 node.view.setFlag(flag, not lock)
             except Exception:
                 pass
+            for port in list(node.input_ports()) + list(node.output_ports()):
+                try:
+                    port.set_locked(lock, connected_ports=False, push_undo=False)
+                except Exception:
+                    pass
 
     def _build_results_toolbar(self):
         bar = QtWidgets.QToolBar("Results")

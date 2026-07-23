@@ -16,13 +16,13 @@ The workflow is: build, configure, run, analyze.
 
 ## 2. Canvas navigation
 
-- **Pan:** drag the canvas background.
+- **Pan:** drag the canvas background with the mouse-wheel button, or hold Alt and drag an empty area.
 - **Zoom:** mouse wheel.
-- **Select:** click a card; drag a rectangle or use modifier-click for multiple selection.
+- **Select:** click a card; drag a rectangle, or Shift-click for multiple selection.
 - **Move:** drag selected cards. Card placement is purely visual; only the wiring affects the simulation.
 - **Frame all** (Tools menu): fits the entire model in the view.
 
-A **Properties** panel displaying a card's raw fields is available from the Tools menu. It is hidden by default; card configuration is normally done through the settings dialogs described in section 6.
+Card configuration is done through the settings dialogs described in section 6.
 
 ---
 
@@ -32,8 +32,8 @@ The **Create** menu inserts a new card at the center of the current view. Each e
 
 | Menu entry | Component |
 |---|---|
-| Piece generator | The source of pieces. Exactly one per model. |
-| Buffer | A queue: passage, exit, or scrap. |
+| Piece generator | The configurable source of pieces. |
+| Buffer | A queue: passage between two tasks, exit, or scrap. |
 | Router | A probabilistic fork, typically for quality sorting. |
 | Piece task | A station processing pieces. |
 | Resource task | A station transforming materials. |
@@ -52,9 +52,9 @@ The designer enforces connection validity: only meaningful combinations can be w
 
 Typical connections:
 
-- Generator to buffer: where new pieces arrive.
-- Buffer to task: a station's input.
-- Task to buffer or router: a station's output.
+- Generator to buffer(s): where new pieces arrive.
+- Buffer(s) to task: a station's input.
+- Task to buffer(s) or router(s): a station's output.
 - Router to buffers: the branches of the fork.
 - Shutdowns to task and breakdown to task: attachment of interruptions.
 
@@ -64,13 +64,17 @@ flowchart LR
     B1 --> T[Piece task]
     T --> R{Router}
     R --> B2[Buffer: accepted]
+    R --> B3[Buffer: rework]
     R --> SC[Buffer: scrap]
-    B2 --> EX[Buffer: exit]
+    B2 --> T2[Downstream task]
+    T2 --> EX[Buffer: exit]
     SD[Shutdowns] -.attached.-> T
     BD[Breakdown] -.attached.-> T
 ```
 
-To remove a wire, select it and delete it.
+Two buffers never connect directly; a task always sits between them. A router may feed more than two buffers.
+
+To remove a wire, grab its head (the arrow end) and release it in empty space: the wire disappears. Wires cannot be selected.
 
 ---
 
@@ -82,9 +86,13 @@ Shared definitions are managed in the **Registries** menu. Cards reference regis
 
 **Registries, Edit models.** The product models and their hierarchy. Each entry has a name and an optional parent. All model selectors in card dialogs draw from this registry.
 
+> **Note.** A parent must be declared before its children. In a child's Parent field, enter the parent's name verbatim; that name establishes the link.
+
 ### Resources
 
 **Registries, Edit resources.** Materials: capacity, initial amount, lifespan, and for restockable resources the threshold, order duration, and delivery duration.
+
+> **Note.** The Flow Designer imposes no units. Every quantity of a resource (registry capacity and initial amount, quantities requested by tasks, quantities produced) is a plain number, interpreted in the unit chosen by the user. Consistency is the user's responsibility: for a given resource, use the same unit everywhere. Report values are expressed in that same unit. Recording the chosen units is recommended.
 
 ### Operators
 
@@ -96,8 +104,21 @@ Shared definitions are managed in the **Registries** menu. Cards reference regis
 
 The shift editor provides two productivity features:
 
-- **Translate:** create a new shift as a time-shifted copy of an existing one, for staggered teams working the same pattern.
+- **Translate:** create a new shift as a time-shifted copy of an existing one.
 - **Repeat:** duplicate a shift forward a specified number of times with a calendar translation (years, months, weeks, days). A yearly pattern is defined once and repeated across the horizon; leap years are handled, and each copy carries its days off shifted to the corresponding period.
+
+> **Note.** There is therefore no need to create days off for the later years of a repeated shift. Defining the holidays of a single year (for example 2026) is enough: the repetition derives the holidays of the following years automatically, shifted to the corresponding period.
+
+#### Shifts that cross midnight
+
+A weekly shift whose hours spill into the next day, for example Monday 22:00 to Tuesday 06:00, is created in one of two ways depending on the behavior wanted at holidays. The end hour may exceed 24: `30:00` means 06:00 the next morning.
+
+| Method (weekly mode) | Entry | Behavior when the next day is a holiday |
+|---|---|---|
+| Single interval | Monday `22:00 -> 30:00` | The Monday night stays **whole** (through Tuesday 06:00). A Tuesday holiday removes only the Tuesday night. |
+| Split at midnight | Monday `22:00 -> 24:00` **and** Tuesday `00:00 -> 06:00` | The Monday night is **cut at midnight** (the Tuesday piece, placed on the holiday, is removed). |
+
+Use the single interval when the crew should finish its night despite a holiday the next day; use the split at midnight when no activity should occur on the holiday.
 
 ### Closing days
 
@@ -131,10 +152,10 @@ The emitted models and their goals or rates are not configured on the card; they
 - **Task durations:** startup and loading.
 - **Operators:** alternatives for startup, loading, and processing; operator scope.
 - **Carrier settings:** max capacity, minimum carriers, contiguous, independent.
-- **Collector type** and the focus-model rule.
+- **Collector type** and the focus-model rule. The focus-model rule has an effect only when the collector is discriminating.
 - **Timeout, priority, admin flag.**
-- **Policies:** the protocol selections (shift constraints, pending-carrier handling before stops, operator self-consciousness, piece exit order). Defaults are appropriate for most stations.
-- **Task shifts:** the station's operating schedule.
+- **Protocols:** the protocol selections (shift constraints, pending-carrier handling before stops, operator self-consciousness, piece exit order). Defaults are appropriate for most stations. In the dialog this tab is labeled **Protocols**.
+- **Task shifts:** the station's operating schedule, that is, its opening time.
 
 For a first pass, the model configs, the operators, and the task shifts are usually the only settings that require attention.
 
@@ -163,7 +184,10 @@ For a first pass, the model configs, the operators, and the task shifts are usua
 **Simulation, Settings** holds the run-level configuration:
 
 - **Start date:** the calendar anchor.
-- **Seed:** the random seed. A given seed and model reproduce the same run exactly.
+- **Seed:** the random seed. A given seed and model reproduce the same run exactly on a given engine.
+
+  > **Note.** The same seed does not produce the same result on the two engines. The random-number generators of Python and C++ differ; the two engines' results are statistically comparable but not identical.
+
 - **Stopping criterion**, which also defines the generator's emission:
   - **By pieces produced (goal mode):** a target per leaf model, a manual gap or a grace period for the automatic gap, and a timeout.
   - **By time (rate mode):** a probability per model (one may be the freeloader), a gap, and the end date.
@@ -209,9 +233,11 @@ Validation also runs automatically before every run, with the option to proceed 
 **Simulation, Engine** selects the execution engine:
 
 - **Python:** the reference engine.
-- **C++ (native):** a substantially faster engine producing identical results. A prebuilt binary is bundled per platform; a custom executable can be designated through **Select C++ executable**.
+- **C++ (native):** a substantially faster engine. A prebuilt binary is bundled per platform; a custom executable can be designated through **Select C++ executable**.
 
-Both engines produce the same output files with the same structure. Engine choice affects only execution speed.
+Both engines produce the same output files with the same structure.
+
+> **Note.** At an equal seed, the two engines do not produce identical values: their random generators differ. The results remain statistically comparable. Engine choice affects execution speed and, marginally, the random realization obtained.
 
 ### Progress window
 
@@ -225,8 +251,8 @@ On completion, the window shows the outcome (goal reached, end date reached, tim
 
 **View results** after a run, or **Results, Open run results** for a previous run, switches the designer to results mode:
 
-- The canvas is locked against editing.
-- Double-clicking a card opens its metrics: production and waits for a task, queue statistics for a buffer, occupation for an operator group.
+- The canvas is locked against editing: neither cards nor wiring can be changed.
+- Double-clicking a card opens its metrics: production and waits for a task, queue statistics for a buffer, occupation for an operator group. Double-clicking the **Piece generator** card opens the line metrics: overall flow, production per model (goal, generated, exits, scrap, attainment), and trajectories.
 - A bottom panel presents the run-wide tables.
 - A heat-map control colors the cards by a selected metric, providing an immediate overview of load distribution and bottlenecks.
 - **Exit results mode** returns to editing.
@@ -244,27 +270,4 @@ Each run writes a folder under `runs/`, named by date and model file name, conta
 - A `graphes/` folder of charts, each provided as a PNG and as the underlying CSV data.
 - A copy of the executed model and a run identity file (source, dates, seed, compute time, stopping criterion), making every run reproducible and self-contained.
 
-All CSV files open directly in Excel. The complete description of every file and metric, including measurement conventions and interpretation guidance, is in the **[KPI reference](kpis.en.md)**.
-
----
-
-## 14. Building a first model
-
-The minimal workflow:
-
-1. **Registries:** one model, one operator group, one shift.
-2. **Cards:** a piece generator, an input buffer, a piece task, an exit buffer.
-3. **Wiring:** generator to buffer, buffer to task, task to exit buffer.
-4. **Configuration:** buffer types and valid models; the task's processing duration, operators, and shift.
-5. **Simulation settings:** goal mode, a target for the model, a start date.
-6. **Validate**, resolve any findings.
-7. **Run**, then **View results**.
-
-Extensions follow the same pattern: create a card, wire it, configure it. Typical next steps are a router with a scrap buffer for quality sorting, additional stations, and breakdowns or shutdowns on critical equipment.
-
----
-
-## Related documents
-
-- Concepts and settings semantics: [simulation reference](simulation.en.md).
-- Output interpretation: [KPI reference](kpis.en.md).
+All CSV files open directly in Excel. The complete description of every file, every metric, and the measurement conventions is in the **[KPI reference](kpis.en.md)**.

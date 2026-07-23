@@ -94,7 +94,7 @@ def test_equal_priorities_share_the_pool(fresh_parser, tmp_path):
     assert abs(exits["M1"] - exits["M2"]) <= 5
 
 
-def test_higher_priority_takes_every_operator(fresh_parser, tmp_path):
+def test_priority_does_not_affect_operator_claims(fresh_parser, tmp_path):
     exits = run_exits(fresh_parser, contention_flow(tmp_path, 0))
-    assert exits["M1"] == 2879
-    assert exits["M2"] == 0
+    assert exits["M1"] + exits["M2"] == 2879
+    assert abs(exits["M1"] - exits["M2"]) <= 5

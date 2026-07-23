@@ -16,13 +16,13 @@ Le flux de travail est : construire, configurer, exécuter, analyser.
 
 ## 2. Navigation sur le canevas
 
-- **Déplacement :** glisser le fond du canevas (NON EN FAIT. ON GLISEE AVEC LA MOLETTE OU BIEN EN APPUYANT SUR ALT + GLISSER SUR FOND VIDE).
+- **Déplacement de la vue :** glisser le fond du canevas avec le bouton de la molette, ou en maintenant Alt et en glissant sur une zone vide.
 - **Zoom :** molette de la souris.
-- **Sélection :** cliquer une carte ; tracer un rectangle ou utiliser le clic avec modificateur pour une sélection multiple (C'EST SHIFT CLICK POUR SELECTION MULTIPLE).
+- **Sélection :** cliquer une carte ; tracer un rectangle, ou Maj + clic (Shift + clic) pour une sélection multiple.
 - **Déplacement de cartes :** glisser la sélection. Le placement des cartes est purement visuel ; seul le câblage affecte la simulation.
 - **Frame all** (menu Tools) : ajuste la vue à l'ensemble du modèle.
 
-Un panneau **Properties** affichant les champs bruts d'une carte est disponible depuis le menu Tools. Il est masqué par défaut ; la configuration des cartes s'effectue normalement par les boîtes de réglages décrites en section 6 (PEUT ETRE ENLEVER CETTE PHRASE CAR 'PROPERTIES' EST INUTILE. AUSSI ENLEVER LE PANNEAU DU FLOW DESIGNER LUI MEME).
+La configuration des cartes s'effectue par les boîtes de réglages décrites en section 6.
 
 ---
 
@@ -64,14 +64,17 @@ flowchart LR
     B1 --> T[Poste à pièces]
     T --> R{Routeur}
     R --> B2[Buffer : accepté]
+    R --> B3[Buffer : retouche]
     R --> SC[Buffer : rebut]
-    B2 --> EX[Buffer : sortie]
+    B2 --> T2[Poste aval]
+    T2 --> EX[Buffer : sortie]
     SD[Shutdowns] -.rattaché.-> T
     BD[Breakdown] -.rattaché.-> T
 ```
-(ICI DANS LA MERMAID CHART, ON RELIE DEUX BUFFER DE SUITE CE QUI N'EST PAS POSSIBLE. AJOUTE UNE TACHE ENTRE EUX. ET PEUT-ETRE AJOUT PLUS QUE DEUX BUFFERS A UN ROUTER POUR MONTRER QUE C'EST POSSIBLE D'EN AVOIR PLUSIEURS)
 
-Pour retirer un fil, le sélectionner et le supprimer. (EN FAIT SUPPRIMER UN FIL CA NE MARCHE PAS COMME CA. IL FAUT TENIR LA FLECHE ET REPLACER SA TETE DANS LE VIDE POUR QU'ELLE DISPARAISSE. ON NE PEUT PAS SELECTIONNER DES FLECHES)
+Deux buffers ne se relient jamais directement ; une tâche s'intercale toujours entre eux. Un routeur peut alimenter plus de deux buffers.
+
+Pour retirer un fil, saisir sa tête (l'extrémité fléchée) et la relâcher dans le vide : le fil disparaît. Les fils ne se sélectionnent pas.
 
 ---
 
@@ -81,11 +84,15 @@ Les définitions partagées se gèrent dans le menu **Registries**. Les cartes r
 
 ### Les modèles
 
-**Registries, Edit models.** Les modèles produits et leur hiérarchie. Chaque entrée a un nom et un parent optionnel. Tous les sélecteurs de modèles des boîtes de cartes puisent dans ce registre. (AJOUTE QUE LES PARENTS DOIVENT ETRE DECLARES AVANT LES FILS, ET DANS LA CASE 'PARENT' POUR UN FILS, IL FAUT METTRE LE NOM DU PARENT VERBATIM)
+**Registries, Edit models.** Les modèles produits et leur hiérarchie. Chaque entrée a un nom et un parent optionnel. Tous les sélecteurs de modèles des boîtes de cartes puisent dans ce registre.
+
+> **Note.** Un parent doit être déclaré avant ses enfants. Dans le champ Parent d'un enfant, saisir le nom du parent tel quel (verbatim) ; c'est ce nom qui établit le lien.
 
 ### Les ressources
 
-**Registries, Edit resources.** Les matières : capacité, quantité initiale, durée de vie, et pour les ressources réapprovisionnables le seuil, la durée de commande et la durée de livraison. (AJOUTE ATTENTION QU'IL EST POSSIBLE QUE CHAQUE RESSOURCE AIT UNE UNITE: LES UNITES DANS LE FLOW DESIGNER N'EXISTE PAS DONC C'EST A L'UTILISATEUR DE CHOISIR LES UNITES QU'IL VEUT ET DE S'ASSURER QUE POUR UNE RESSOURCE, UTILISER LES MEMES UNITES PARTOUT : DANS LES REGISTRES, LES QUANTITES DEMANDEES PAR LES TACHES, ETC... ET DONC LE NOMBRE DANS LES OUTPUTS C'EST DANS L'UNITE QUE L'UTILISATEUR A CHOISI. DONC CONSEILLE DE LAISSER UNE NOTE DES UNITES QU'ILS UTILISENT).
+**Registries, Edit resources.** Les matières : capacité, quantité initiale, durée de vie, et pour les ressources réapprovisionnables le seuil, la durée de commande et la durée de livraison.
+
+> **Note.** Le Flow Designer n'impose aucune unité. Toutes les quantités d'une ressource (capacité et quantité initiale du registre, quantités demandées par les tâches, quantités produites) sont des nombres purs, interprétés dans l'unité choisie par l'utilisateur. La cohérence est à sa charge : pour une même ressource, employer la même unité partout. Les valeurs des rapports sont exprimées dans cette même unité. Il est recommandé de consigner les unités retenues.
 
 ### Les opérateurs
 
@@ -98,9 +105,20 @@ Les définitions partagées se gèrent dans le menu **Registries**. Les cartes r
 L'éditeur de shifts fournit deux fonctions de productivité :
 
 - **Translation :** créer un nouveau shift comme copie décalée dans le temps d'un shift existant.
-- **Répétition :** dupliquer un shift vers l'avant un nombre spécifié de fois avec une translation calendaire (années, mois, semaines, jours). Un motif annuel se définit une fois et se répète sur l'horizon ; les années bissextiles sont gérées, et chaque copie porte ses jours de fermeture décalés à la période correspondante. (DONC FAUT PAS SE SOUCIER DE CREER DES JOUR FERIES POUR DES DATES ULTERIEURES POUR DES SHIFTS REPETITIFS. PAR EXEMPLE SI JE DEFINIT MES SHIFT SUR 2026, IL SUFFIT DE METTRE LES JOUR FERIES SUR 2026 ET EN REPETANT, LES JOURS FERIES POUR LES ANNEES SUIVANT SONT AUTOMATIQUEMENT DEDUITS)
+- **Répétition :** dupliquer un shift vers l'avant un nombre spécifié de fois avec une translation calendaire (années, mois, semaines, jours). Un motif annuel se définit une fois et se répète sur l'horizon ; les années bissextiles sont gérées, et chaque copie porte ses jours de fermeture décalés à la période correspondante.
 
-(EXPLIQUE QUE SI PAR EXEMPLE ON A UN SHIFT HEBDOMADAIRE DE LUNDI 22H A MARDI 6H, ON PEUT LE CREER DE 2 FACONS SELON LE COMPORTEMENT QU'ON VEUT: SOIT DANS LE SHIFT EDITOR WEEKLY MODE ON MET LUNDI 22H -> 24H ET MARDI MINUIT -> 6H SI ON VEUT QUE LES JOUR FERIES FONT EN SORTE QUE CETTE SHIFT DEVIENT JUSTE 22H -> 24H SI ON A UN JOUR FERIE, OU BIEN ON MET JUSTE LUNDI 22H -> 30H (EQUIVAUT A MARDI 6H) SI ON VEUT QUE LA SHIFT CONTINUE DANS LES JOURS FERIES. PEUT ETRE DONNE UN EXEMPLE AVEC UN TABLEAU AVEC DIFFERENT CAS ET LEURS COMPORTEMENTS)
+> **Note.** Il est donc inutile de créer des jours de fermeture pour les années ultérieures d'un shift répété. Définir les fériés d'une seule année (par exemple 2026) suffit : la répétition en déduit automatiquement les fériés des années suivantes, décalés à la période correspondante.
+
+#### Les shifts qui franchissent minuit
+
+Un shift hebdomadaire dont l'horaire déborde sur le lendemain, par exemple lundi 22h à mardi 6h, se crée de deux façons selon le comportement souhaité face aux jours fériés. L'heure de fin peut dépasser 24 : `30:00` signifie 6h le lendemain matin.
+
+| Méthode (mode hebdomadaire) | Saisie | Comportement si le lendemain est férié |
+|---|---|---|
+| Intervalle unique | Lundi `22:00 -> 30:00` | La nuit du lundi reste **complète** (jusqu'à mardi 6h). Le férié du mardi retire seulement la nuit du mardi. |
+| Découpage à minuit | Lundi `22:00 -> 24:00` **et** mardi `00:00 -> 06:00` | La nuit du lundi est **coupée à minuit** (le morceau du mardi, posé sur le jour férié, est retiré). |
+
+Retenir l'intervalle unique lorsque l'équipe doit terminer sa nuit malgré un férié le lendemain ; retenir le découpage à minuit lorsqu'aucune activité ne doit avoir lieu le jour férié.
 
 ### Les jours de fermeture
 
@@ -134,10 +152,10 @@ Les modèles émis et leurs objectifs ou débits ne se configurent pas sur la ca
 - **Durées du poste :** mise en route et chargement.
 - **Opérateurs :** alternatives pour la mise en route, le chargement et le traitement ; scope opérateur.
 - **Réglages de carriers :** capacité max, carriers minimum, contigus, indépendants.
-- **Type de collecteur** et règle de modèle focus (LE MODELE FOCUS N'A DE SENS QUE SI LE COLLECTEUR EST DISCRIMINANT).
+- **Type de collecteur** et règle de modèle focus. La règle de modèle focus n'a d'effet que si le collecteur est discriminant.
 - **Timeout, priorité, drapeau admin.**
-- **Politiques (RENOMMER 'PROTOCOLES') :** les sélections de protocoles (contraintes de shift, traitement des carriers en attente avant un arrêt, conscience de soi des opérateurs, ordre de sortie des pièces). Les valeurs par défaut conviennent à la plupart des stations.
-- **Shifts du poste :** le planning d'exploitation de la station (AKA TEMPS OUVERTURE).
+- **Protocoles :** les sélections de protocoles (contraintes de shift, traitement des carriers en attente avant un arrêt, conscience de soi des opérateurs, ordre de sortie des pièces). Les valeurs par défaut conviennent à la plupart des stations. Dans la boîte, cet onglet est intitulé **Protocols**.
+- **Shifts du poste :** le planning d'exploitation de la station, c'est-à-dire son temps d'ouverture.
 
 Pour une première passe, les configs de modèles, les opérateurs et les shifts du poste sont généralement les seuls réglages qui demandent attention.
 
@@ -166,7 +184,10 @@ Pour une première passe, les configs de modèles, les opérateurs et les shifts
 **Simulation, Settings** contient la configuration au niveau de l'exécution :
 
 - **Date de début :** l'ancre calendaire.
-- **Graine (seed) :** la graine aléatoire. Une graine et un modèle donnés reproduisent exactement la même exécution (UNE MEME GRAINE AVEC DEUX MOTEURS DIFFERENTS (PYTHON ET C++) NE DONNERA PAS LE MEME RESULTAT).
+- **Graine (seed) :** la graine aléatoire. Une graine et un modèle donnés reproduisent exactement la même exécution sur un moteur donné.
+
+  > **Note.** Une même graine ne produit pas le même résultat sur les deux moteurs. Les générateurs de nombres aléatoires de Python et de C++ diffèrent ; les résultats des deux moteurs sont statistiquement comparables mais pas identiques.
+
 - **Critère d'arrêt**, qui définit également l'émission du générateur :
   - **Par pièces produites (mode objectifs) :** un objectif par modèle feuille, un gap manuel ou une période de grâce pour le gap automatique, et un timeout.
   - **Par le temps (mode débit) :** une probabilité par modèle (l'une peut être le freeloader), un gap, et la date de fin.
@@ -212,9 +233,11 @@ La validation s'exécute aussi automatiquement avant chaque exécution, avec la 
 **Simulation, Engine** sélectionne le moteur d'exécution :
 
 - **Python :** le moteur de référence.
-- **C++ (native) :** un moteur nettement plus rapide produisant des résultats identiques. Un binaire préconstruit est fourni par plateforme ; un exécutable personnalisé peut être désigné via **Select C++ executable**.
+- **C++ (native) :** un moteur nettement plus rapide. Un binaire préconstruit est fourni par plateforme ; un exécutable personnalisé peut être désigné via **Select C++ executable**.
 
-Les deux moteurs produisent les mêmes fichiers de sortie avec la même structure. Le choix du moteur n'affecte que la vitesse d'exécution. (NON EN FAIT. MEME AVEC LA MEME GRAINE, C++ ET PYTHON PRODUISENT DES RESULTATS DIFFERENTS MAIS STATISTIQUEMENT SIMILAIRES)
+Les deux moteurs produisent les mêmes fichiers de sortie avec la même structure.
+
+> **Note.** À graine égale, les deux moteurs ne produisent pas des valeurs identiques : leurs générateurs aléatoires diffèrent. Les résultats restent statistiquement comparables. Le choix du moteur affecte la vitesse d'exécution et, à la marge, la réalisation aléatoire obtenue.
 
 ### La fenêtre de progression
 
@@ -228,8 +251,8 @@ Pendant l'exécution, la fenêtre affiche la date simulée courante, le compte d
 
 **View results** après une exécution, ou **Results, Open run results** pour une exécution antérieure, bascule le designer en mode résultats :
 
-- Le canevas est verrouillé contre l'édition (ICI EN FAIT MEME EN RESULTS MODE J'AI TOUJOURS LA POSSIBILITE DE DEPLACER DES FLECHES. DONC LAISSE CETTE PHRASE MAIS METS A JOUR LE FLOW DESIGNER STP POUR QUE JE NE PUISSE PLUS CHANGER LES CABLAGES EN RESULTS MODE).
-- Le double-clic sur une carte ouvre ses indicateurs : production et attentes pour un poste, statistiques de file pour un buffer, occupation pour un groupe d'opérateurs. (AJOUTE LES STATISTIQUES DISPO EN CLIQUANT SUR LA CARTE PIECE GENERATOR)
+- Le canevas est verrouillé contre l'édition : ni les cartes ni les câblages ne peuvent être modifiés.
+- Le double-clic sur une carte ouvre ses indicateurs : production et attentes pour un poste, statistiques de file pour un buffer, occupation pour un groupe d'opérateurs. Le double-clic sur la carte **Piece generator** ouvre les indicateurs de la ligne : flux global, production par modèle (objectif, généré, sorties, rebut, atteinte) et trajectoires.
 - Un panneau inférieur présente les tableaux couvrant toute l'exécution.
 - Un contrôle de carte de chaleur colore les cartes selon un indicateur sélectionné, fournissant une vue immédiate de la répartition de charge et des goulots.
 - **Exit results mode** revient à l'édition.

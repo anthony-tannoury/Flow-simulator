@@ -594,7 +594,7 @@ inline const std::set<std::string>& duree_cols() {
         "heures_main_oeuvre", "heures_en_poste", "heures_hors_poste", "sejour_moyen", "sejour_max",
         "temps_moyen_entre_arrivees", "temps_poste", "traversee_moyenne", "traversee_mediane",
         "traversee_p90", "traversee_max", "temps_traversee", "tc_ideal", "duree_simulee",
-        "temps_rupture"};
+        "temps_rupture", "heures_machine_totales", "heures_main_oeuvre_totales"};
     return s;
 }
 inline const std::set<std::string>& pct_cols() {
@@ -712,6 +712,13 @@ inline void write_report(const fs::path& dir, const std::vector<Task*>& tasks,
     write_csv(dir / "ressources.csv", res_rows, sim_start);
 
     auto [flux, flux_modeles] = flow_kpis(buffers, gen);
+    double hm_total = 0.0, hmo_total = 0.0;
+    for (const ojson& r : task_rows) {
+        hm_total += cell_num(r.value("heures_machine", ojson(0)));
+        hmo_total += cell_num(r.value("heures_main_oeuvre", ojson(0)));
+    }
+    flux["heures_machine_totales"] = roundn(hm_total, 3);
+    flux["heures_main_oeuvre_totales"] = roundn(hmo_total, 3);
     write_kv_csv(dir / "flux.csv", flux, sim_start);
     write_csv(dir / "flux_modeles.csv", flux_modeles, sim_start);
     write_csv(dir / "temps_traversee.csv", lead_time_rows(buffers), sim_start);
