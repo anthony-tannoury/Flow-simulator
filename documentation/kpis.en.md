@@ -42,6 +42,8 @@ Since configured durations are distributions, the reference uses their mean (eva
 
 The `admin` column (yes/no) reflects the task's admin flag. It has no effect on the simulation; it determines the grouping in `synthese_admin.csv`.
 
+> **Note (aggregation mode).** The durations in this file follow one of two modes. As a **union** (clock time, measured on the station's single timeline): simultaneous batches count once. This applies to `temps_total`, `temps_ouverture`, `temps_requis`, `temps_fonctionnement`, `arrets_programmes`, `pannes`, `gel`, and `heures_machine`. In **parallel** (summed over batches): each batch counts its time separately, so concurrent batches add up and can exceed the running time. This applies to `temps_chargement`, `temps_traitement`, `temps_collecte`, the `attente_*` columns, value-added time, and `heures_main_oeuvre`. `mise_en_route` is a sum of sequential durations (never simultaneous). Counts, rates, throughputs, per-batch cycles, and instants are not concerned.
+
 ### Time columns (`temps_*`, `arrets_programmes`, `pannes`, `gel`, `mise_en_route`)
 
 - `temps_total`: the full simulated span.
@@ -64,11 +66,11 @@ The `admin` column (yes/no) reflects the task's admin flag. It has no effect on 
 - `qualite` = good / produced. A station's good pieces are those its immediate downstream router did not send to scrap; without a scrap route, quality equals 1.
 - `trs` = availability x performance x quality: the OEE, within [0, 100%].
 
-  > **Note.** Classic OEE is also written useful time / required time, where useful time is the net time of the good pieces alone (ideal cycle x good pieces). Expanding the product: (TF / TR) x (TN / value-added time) x (good / produced). Since TN = ideal cycle x produced, the last two factors reduce to useful time / value-added time. The identity OEE = useful time / required time therefore holds exactly when value-added time coincides with running time (single-batch station); performance divides by value-added time so it stays correct when batches run in parallel.
+  > **Note.** Reference OEE is written useful time / required time, where useful time is the net time of the good pieces alone (ideal cycle x good pieces). This tool computes it as availability x performance x quality = (TF / TR) x (TN / value-added time) x (good / produced). Since TN = ideal cycle x produced, this groups into (useful time / required time) x (TF / value-added time). The factor TF / value-added time is not 1 in general: running time is a clock time (union) that includes an engaged batch's waits, whereas value-added time is the sum of loading and processing over batches. The two coincide, and the computed OEE equals useful time / required time exactly, only when engaged batches wait for neither operators nor materials and do not overlap. Performance divides by value-added time, not by TF, precisely so it stays bounded when batches run in parallel.
 
 - `trg` = OEE x taux_de_charge: scheduled stops counted as losses.
 
-  > **Note.** Substituting OEE = useful time / required time and taux_de_charge = TR / TO gives TRG = useful time / opening time.
+  > **Note.** Under the same condition (value-added time = running time), substituting OEE = useful time / required time and taux_de_charge = TR / TO gives TRG = useful time / opening time.
 
 - `tre` = OEE x (TR / TT): the full calendar counted, including closed periods.
 

@@ -42,6 +42,8 @@ Les durées configurées étant des distributions, la référence utilise leur m
 
 La colonne `admin` (oui/non) reflète le marqueur admin de la tâche. Elle n'a aucun effet sur la simulation ; elle détermine le regroupement dans `synthese_admin.csv`.
 
+> **Note (mode d'agrégation).** Les durées de ce fichier suivent l'un de deux modes. En **union** (temps horloge, mesuré sur l'unique chronologie du poste) : des lots simultanés ne comptent qu'une fois. C'est le cas de `temps_total`, `temps_ouverture`, `temps_requis`, `temps_fonctionnement`, `arrets_programmes`, `pannes`, `gel` et `heures_machine`. En **parallèle** (sommé sur les lots) : chaque lot compte son temps séparément, si bien que des lots concurrents s'additionnent et peuvent dépasser le temps de fonctionnement. C'est le cas de `temps_chargement`, `temps_traitement`, `temps_collecte`, des colonnes `attente_*`, du temps à valeur ajoutée et de `heures_main_oeuvre`. `mise_en_route` est une somme de durées séquentielles (jamais simultanées). Les comptes, taux, débits, cycles par lot et instants ne sont pas concernés.
+
 ### Colonnes de temps (`temps_*`, `arrets_programmes`, `pannes`, `gel`, `mise_en_route`)
 
 - `temps_total` : toute la durée simulée.
@@ -64,11 +66,11 @@ La colonne `admin` (oui/non) reflète le marqueur admin de la tâche. Elle n'a a
 - `qualite` = bonnes / produites. Les bonnes pièces d'un poste sont celles que son router aval immédiat n'a pas envoyées au rebut ; sans route de rebut, la qualité vaut 1.
 - `trs` = disponibilité x performance x qualité : le TRS, dans [0, 100%].
 
-  > **Note.** Le TRS classique s'écrit aussi temps utile / temps requis, où le temps utile est le temps net des seules bonnes pièces (cycle idéal x pièces bonnes). En développant le produit : (TF / TR) x (TN / temps à valeur ajoutée) x (bonnes / produites). Comme TN = cycle idéal x produites, les deux derniers facteurs se réduisent à temps utile / temps à valeur ajoutée. L'égalité TRS = temps utile / temps requis est donc exacte lorsque le temps à valeur ajoutée coïncide avec le temps de fonctionnement (poste à lot unique) ; la performance divise par le temps à valeur ajoutée pour rester correcte quand des lots tournent en parallèle.
+  > **Note.** Le TRS de référence s'écrit temps utile / temps requis, où le temps utile est le temps net des seules bonnes pièces (cycle idéal x pièces bonnes). Ce logiciel le calcule comme disponibilité x performance x qualité = (TF / TR) x (TN / temps à valeur ajoutée) x (bonnes / produites). Comme TN = cycle idéal x produites, cela se regroupe en (temps utile / temps requis) x (TF / temps à valeur ajoutée). Le facteur TF / temps à valeur ajoutée n'est pas 1 en général : le temps de fonctionnement est un temps horloge (union) qui inclut les attentes d'un lot engagé, tandis que le temps à valeur ajoutée est la somme des chargements et traitements sur les lots. Les deux ne coïncident, et le TRS calculé n'égale exactement temps utile / temps requis, que lorsque les lots engagés n'attendent ni opérateurs ni matière et ne se recouvrent pas. La performance divise par le temps à valeur ajoutée, et non par TF, précisément pour rester bornée quand des lots tournent en parallèle.
 
 - `trg` = TRS x taux_de_charge : les arrêts programmés comptés comme pertes.
 
-  > **Note.** En injectant TRS = temps utile / temps requis et taux_de_charge = TR / TO, on obtient TRG = temps utile / temps d'ouverture.
+  > **Note.** Sous la même condition (temps à valeur ajoutée = temps de fonctionnement), en injectant TRS = temps utile / temps requis et taux_de_charge = TR / TO, on obtient TRG = temps utile / temps d'ouverture.
 
 - `tre` = TRS x (TR / TT) : tout le calendrier compté, périodes fermées incluses.
 
