@@ -17,14 +17,16 @@ Propriétés générales des rapports :
 temps total (TT)                        toute la durée simulée
 └─ temps d'ouverture (TO)               les shifts du poste
    └─ temps requis (TR)                 TO moins les arrêts programmés
-      └─ temps de fonctionnement (TF)   au moins un lot actif sur le poste
-         └─ temps à valeur ajoutée      chargement et traitement effectifs
-            └─ temps net (TN)           reconstruit : cycle idéal x pièces produites
+      └─ temps de fonctionnement (TF)   TR moins les pannes
+         └─ temps net (TN)              cycle idéal x pièces produites
+            └─ temps utile (TU)         cycle idéal x pièces bonnes
 ```
 
-Deux définitions demandent de l'attention.
+C'est la décomposition classique du TRS : chaque taux fait descendre d'un cran, et le TRS est le rapport des deux extrémités, temps utile / temps requis.
 
-**Le temps net est reconstruit, pas mesuré.** TN est le temps qu'aurait pris la production réelle du poste à la cadence nominale. Comparé au temps à valeur ajoutée effectif, il donne le taux de performance ; l'écart représente les pertes de cadence (cycles lents, lots partiels).
+**Le temps de fonctionnement est le temps requis moins les pannes.** Seules les pannes survenues en temps requis comptent (une panne hors horaire ou pendant un arrêt programmé n'entre pas dans TF).
+
+**Le temps net et le temps utile sont reconstruits, pas mesurés.** TN = cycle idéal x pièces produites ; TU = cycle idéal x pièces bonnes. Le temps utile est le temps net des seules bonnes pièces.
 
 **Le temps de cycle idéal** est le temps théorique de production d'une pièce dans des conditions parfaites : lot plein, cadence nominale, aucune attente. Exemple, un four :
 
@@ -42,7 +44,7 @@ Les durées configurées étant des distributions, la référence utilise leur m
 
 La colonne `admin` (oui/non) reflète le marqueur admin de la tâche. Elle n'a aucun effet sur la simulation ; elle détermine le regroupement dans `synthese_admin.csv`.
 
-> **Note (mode d'agrégation).** Les durées de ce fichier suivent l'un de deux modes. En **union** (temps horloge, mesuré sur l'unique chronologie du poste) : des lots simultanés ne comptent qu'une fois. C'est le cas de `temps_total`, `temps_ouverture`, `temps_requis`, `temps_fonctionnement`, `arrets_programmes`, `pannes`, `gel` et `heures_machine`. En **parallèle** (sommé sur les lots) : chaque lot compte son temps séparément, si bien que des lots concurrents s'additionnent et peuvent dépasser le temps de fonctionnement. C'est le cas de `temps_chargement`, `temps_traitement`, `temps_collecte`, des colonnes `attente_*`, du temps à valeur ajoutée et de `heures_main_oeuvre`. `mise_en_route` est une somme de durées séquentielles (jamais simultanées). Les comptes, taux, débits, cycles par lot et instants ne sont pas concernés.
+> **Note (mode d'agrégation).** Les durées de ce fichier suivent l'un de deux modes. En **union** (temps horloge, mesuré sur l'unique chronologie du poste) : des lots simultanés ne comptent qu'une fois. C'est le cas de `temps_total`, `temps_ouverture`, `temps_requis`, `temps_fonctionnement`, `arrets_programmes`, `pannes`, `gel` et `heures_machine`. En **parallèle** (sommé sur les lots) : chaque lot compte son temps séparément, si bien que des lots concurrents s'additionnent et peuvent dépasser le temps de fonctionnement. C'est le cas de `temps_chargement`, `temps_traitement`, `temps_collecte`, des colonnes `attente_*` et de `heures_main_oeuvre`. `mise_en_route` est une somme de durées séquentielles (jamais simultanées). Les comptes, taux, débits, cycles par lot et instants ne sont pas concernés.
 
 ### Colonnes de temps (`temps_*`, `arrets_programmes`, `pannes`, `gel`, `mise_en_route`)
 
@@ -56,23 +58,20 @@ La colonne `admin` (oui/non) reflète le marqueur admin de la tâche. Elle n'a a
 
 - `gel` : temps gelé **pendant les heures d'ouverture**. C'est le temps où le poste pourrait théoriquement fonctionner mais s'en abstient parce qu'il anticipe un arrêt imminent qu'il ne pourrait pas dépasser : la fin de son propre shift, la fin du shift de ses opérateurs, ou un arrêt programmé. Ne pouvant terminer un lot avant cet arrêt, il ne le commence pas. Le poste reprend au retour de l'équipe concernée, pas seulement à son propre shift suivant, ce qui borne le temps gelé. La fermeture (nuits, week-ends) n'est pas comptée comme temps gelé.
 - `mise_en_route`, `nb_mises_en_route` : temps total de mise en route et nombre de mises en route. Le poste redémarre après chaque interruption et à chaque nouveau shift. Il s'agit de la durée de mise en route configurée elle-même ; l'attente de l'équipe de mise en route est une perte de disponibilité au sein du temps de fonctionnement, pas une composante de cette colonne.
-- `temps_fonctionnement` : temps pendant lequel au moins un lot est engagé, c'est-à-dire déjà collecté et chargé, puis dispatché dans le pipeline chargement puis traitement. Un lot engagé compte même durant ses attentes d'opérateurs de chargement ou de matière. En revanche, les attentes de collecte (`attente_pieces`, `attente_place`) et l'attente de vague, qui précèdent l'engagement, n'en font pas partie. C'est le TF de la cascade.
+- `temps_fonctionnement` : le temps requis moins les pannes survenues en temps requis. C'est le TF de la cascade : le temps où le poste est requis et non en panne.
 
 ### Colonnes de taux (`taux_de_charge` à `tre`)
 
 - `taux_de_charge` = TR / TO : la part engagée du temps d'ouverture.
-- `disponibilite` = TF / TR : la disponibilité. Pertes : pannes, mises en route, attente de l'équipe de mise en route, temps gelé, et famine (aucune pièce disponible). Une disponibilité basse sur un poste affamé reflète la réalité, pas une erreur de mesure.
-- `performance` = TN / (temps de chargement + temps de traitement) : l'efficacité de cadence en fonctionnement. Pertes : cycles plus lents que le nominal, productivité des équipes, lots partiels. Le temps à valeur ajoutée est sommé sur tous les lots plutôt que divisé par TF parce qu'un poste peut traiter des lots en parallèle ; la sommation maintient la performance dans [0, 100%].
+- `disponibilite` = TF / TR : la part du temps requis où le poste n'est pas en panne. Seules les pannes sont comptées ici ; tout le reste (famine, mises en route, temps gelé, lots partiels) se reporte sur la performance.
+- `performance` = TN / TF : la cadence obtenue rapportée au temps de fonctionnement. Pertes : cycles plus lents que le nominal, famine (pièces ou matière manquantes), mises en route, attentes, temps gelé, lots partiels.
+
+  > **Note.** Le cycle idéal est une référence par pièce en marche sérielle. Sur un poste faisant tourner de nombreux lots en parallèle (stockage, séchage, attente), TN peut dépasser TF, et la performance, donc le TRS, dépasser 100%. Sur un poste sériel (une machine, un lot à la fois), performance et TRS restent dans [0, 100%].
+
 - `qualite` = bonnes / produites. Les bonnes pièces d'un poste sont celles que son router aval immédiat n'a pas envoyées au rebut ; sans route de rebut, la qualité vaut 1.
-- `trs` = disponibilité x performance x qualité : le TRS, dans [0, 100%].
-
-  > **Note.** Le TRS de référence s'écrit temps utile / temps requis, où le temps utile est le temps net des seules bonnes pièces (cycle idéal x pièces bonnes). Ce logiciel le calcule comme disponibilité x performance x qualité = (TF / TR) x (TN / temps à valeur ajoutée) x (bonnes / produites). Comme TN = cycle idéal x produites, cela se regroupe en (temps utile / temps requis) x (TF / temps à valeur ajoutée). Le facteur TF / temps à valeur ajoutée n'est pas 1 en général : le temps de fonctionnement est un temps horloge (union) qui inclut les attentes d'un lot engagé, tandis que le temps à valeur ajoutée est la somme des chargements et traitements sur les lots. Les deux ne coïncident, et le TRS calculé n'égale exactement temps utile / temps requis, que lorsque les lots engagés n'attendent ni opérateurs ni matière et ne se recouvrent pas. La performance divise par le temps à valeur ajoutée, et non par TF, précisément pour rester bornée quand des lots tournent en parallèle.
-
-- `trg` = TRS x taux_de_charge : les arrêts programmés comptés comme pertes.
-
-  > **Note.** Sous la même condition (temps à valeur ajoutée = temps de fonctionnement), en injectant TRS = temps utile / temps requis et taux_de_charge = TR / TO, on obtient TRG = temps utile / temps d'ouverture.
-
-- `tre` = TRS x (TR / TT) : tout le calendrier compté, périodes fermées incluses.
+- `trs` = disponibilité x performance x qualité = **temps utile / temps requis**. La cascade télescope exactement : (TF / TR) x (TN / TF) x (bonnes / produites) = (cycle idéal x bonnes) / TR = temps utile / temps requis.
+- `trg` = TRS x taux_de_charge = temps utile / temps d'ouverture : les arrêts programmés comptés comme pertes.
+- `tre` = TRS x (TR / TT) = temps utile / temps total : tout le calendrier compté, périodes fermées incluses.
 
 ### Colonnes de production (`pieces_*`, `nb_lancements`, `taille_lot_moyenne`, `cycle_*`, `debit_pieces_j`, `flux_*`)
 
@@ -101,7 +100,7 @@ Chaque lot étiquette son activité courante ; les étiquettes sont cumulées :
 
 Deux colonnes comptables aux règles d'agrégation délibérément différentes :
 
-- `heures_machine` : temps horloge pendant lequel la machine charge ou traite, agrégé en **union** sur les lots. Un poste est une machine physique : trois lots parallèles pendant 40 minutes contribuent 40 minutes machine. `heures_machine` diffère de TF : TF inclut les attentes d'un lot engagé, les heures machine non ; les heures machine sont donc au plus égales à TF, et l'écart vaut les attentes des lots engagés. Le temps de mise en route est exclu et rapporté dans `mise_en_route`.
+- `heures_machine` : temps horloge pendant lequel la machine charge ou traite, agrégé en **union** sur les lots. Un poste est une machine physique : trois lots parallèles pendant 40 minutes contribuent 40 minutes machine. Les heures machine sont au plus égales au temps de fonctionnement ; l'écart est le temps requis, non en panne, où la machine reste pourtant à l'arrêt (famine, attentes, inter-lots). Le temps de mise en route est exclu et rapporté dans `mise_en_route`.
 - `heures_main_oeuvre` : minutes opérateur réservées pour le poste par toutes ses équipes, agrégées en **somme** (opérateurs x durée). Le compte couvre les équipes de chargement et de traitement par lot pendant leurs jobs, l'équipe de mise en route pendant la mise en route, et les équipes par tâche sur toute leur affectation, intervalles d'inactivité inclus. Le ratio `heures_main_oeuvre / heures_machine` exprime l'effectif moyen par heure machine.
 
 > **Note.** Les cumuls de ces deux colonnes sur l'ensemble des postes figurent dans `flux.csv` (`heures_machine_totales`, `heures_main_oeuvre_totales`).

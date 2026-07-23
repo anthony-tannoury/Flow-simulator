@@ -168,6 +168,31 @@ inline double overlap_duration(const sim::Monitor& a, double va, const sim::Moni
 }
 
 
+inline double operating_time(const std::vector<std::pair<const sim::Monitor*, double>>& conds) {
+    std::set<double> tset;
+    std::vector<const std::vector<double>*> xs, ts;
+    for (auto& [m, v] : conds) {
+        xs.push_back(&m->x_raw());
+        ts.push_back(&m->t_raw());
+        tset.insert(m->t_raw().begin(), m->t_raw().end());
+    }
+    tset.insert(env->now());
+    std::vector<double> T(tset.begin(), tset.end());
+    std::vector<std::size_t> idx(conds.size(), 0);
+    double total = 0.0;
+    for (std::size_t k = 1; k < T.size(); ++k) {
+        double t0 = T[k - 1], t1 = T[k];
+        bool ok = true;
+        for (std::size_t j = 0; j < conds.size(); ++j) {
+            while (idx[j] + 1 < ts[j]->size() && (*ts[j])[idx[j] + 1] <= t0) ++idx[j];
+            if (xs[j]->empty() || (*xs[j])[idx[j]] != conds[j].second) { ok = false; break; }
+        }
+        if (ok) total += t1 - t0;
+    }
+    return total;
+}
+
+
 inline const Model* config_key(const PieceTaskConfig& cfg, const Model* model) {
     const Model* m = model;
     while (m != nullptr) {
@@ -223,21 +248,29 @@ inline ojson task_kpis(Task* task) {
     }
     double gel = overlap_duration(task->is_frozen.value_monitor(), 1.0,
                                   task->is_in_downtime.value_monitor(), 0.0);
-    double tf = tt - task->active_carriers.num_carriers.value_monitor().value_duration(0.0);
+    double tf = operating_time({{&task->is_in_downtime.value_monitor(), 0.0},
+                                {&task->is_in_shutdown.value_monitor(), 0.0},
+                                {&task->is_in_breakdown.value_monitor(), 0.0}});
 
     bool is_piece = dynamic_cast<PieceTask*>(task) != nullptr;
     auto tc = ideal_cycle_times(task);
-    double produites = 0, rebutees = 0, tn = 0;
+    double produites = 0, rebutees = 0, tn = 0, tu = 0;
     if (is_piece) {
         auto* pt = static_cast<PieceTask*>(task);
         auto* cfg = pt->pconfig().get();
         for (auto& [m, n] : pt->deposited) produites += n;
         for (auto& [m, n] : pt->scrapped) rebutees += n;
-        for (auto& [m, n] : pt->deposited) tn += tc[config_key(*cfg, m)] * n;
+        for (auto& [m, n] : pt->deposited) {
+            double t = tc[config_key(*cfg, m)];
+            int reb = pt->scrapped.count(m) ? pt->scrapped.at(m) : 0;
+            tn += t * n;
+            tu += t * (n - reb);
+        }
     } else {
         long long n = task->batch_sizes.number_of_entries();
         produites = n ? roundn(task->batch_sizes.mean() * n, 3) : 0;
         tn = produites * tc[nullptr];
+        tu = tn;
     }
     double bonnes = produites - rebutees;
 
@@ -247,12 +280,11 @@ inline ojson task_kpis(Task* task) {
 
     double t_loading = mode_total(carriers, "loading");
     double t_processing = mode_total(carriers, "processing");
-    double value_add = t_loading + t_processing;
     std::optional<double> do_val = tr ? std::optional<double>(tf / tr) : std::nullopt;
-    std::optional<double> tp_val = value_add ? std::optional<double>(tn / value_add) : std::nullopt;
+    std::optional<double> tp_val = tf ? std::optional<double>(tn / tf) : std::nullopt;
     std::optional<double> tq_val = produites ? std::optional<double>(bonnes / produites) : std::nullopt;
     std::optional<double> trs_val, trg_val, tre_val;
-    if (do_val && tp_val && tq_val) trs_val = *do_val * *tp_val * *tq_val;
+    if (tr) trs_val = tu / tr;
     if (trs_val && to) trg_val = *trs_val * (tr / to);
     if (trs_val && tt) tre_val = *trs_val * (tr / tt);
 

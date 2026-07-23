@@ -17,14 +17,16 @@ General properties of the reports:
 total time (TT)              the full simulated span
 └─ opening time (TO)         the station's shifts
    └─ required time (TR)     TO minus scheduled stops
-      └─ running time (TF)   at least one batch active on the station
-         └─ value-added time   actual loading plus processing
-            └─ net time (TN)   reconstructed: ideal cycle x pieces produced
+      └─ running time (TF)   TR minus breakdowns
+         └─ net time (TN)    ideal cycle x pieces produced
+            └─ useful time (TU)   ideal cycle x good pieces
 ```
 
-Two definitions require attention.
+This is the classic OEE decomposition: each rate steps down one level, and OEE is the ratio of the two ends, useful time / required time.
 
-**Net time is reconstructed, not measured.** TN is the time that producing the station's actual output would have taken at nominal pace. Compared against actual value-added time, it yields the performance rate; the difference represents pace losses (slow cycles, partial batches).
+**Running time is required time minus breakdowns.** Only breakdowns occurring within required time count (a breakdown off-schedule or during a scheduled stop is not part of TF).
+
+**Net time and useful time are reconstructed, not measured.** TN = ideal cycle x pieces produced; TU = ideal cycle x good pieces. Useful time is the net time of the good pieces alone.
 
 **The ideal cycle time** is the theoretical time to produce one piece under perfect conditions: full batch, nominal pace, no waiting. Example, an oven:
 
@@ -42,7 +44,7 @@ Since configured durations are distributions, the reference uses their mean (eva
 
 The `admin` column (yes/no) reflects the task's admin flag. It has no effect on the simulation; it determines the grouping in `synthese_admin.csv`.
 
-> **Note (aggregation mode).** The durations in this file follow one of two modes. As a **union** (clock time, measured on the station's single timeline): simultaneous batches count once. This applies to `temps_total`, `temps_ouverture`, `temps_requis`, `temps_fonctionnement`, `arrets_programmes`, `pannes`, `gel`, and `heures_machine`. In **parallel** (summed over batches): each batch counts its time separately, so concurrent batches add up and can exceed the running time. This applies to `temps_chargement`, `temps_traitement`, `temps_collecte`, the `attente_*` columns, value-added time, and `heures_main_oeuvre`. `mise_en_route` is a sum of sequential durations (never simultaneous). Counts, rates, throughputs, per-batch cycles, and instants are not concerned.
+> **Note (aggregation mode).** The durations in this file follow one of two modes. As a **union** (clock time, measured on the station's single timeline): simultaneous batches count once. This applies to `temps_total`, `temps_ouverture`, `temps_requis`, `temps_fonctionnement`, `arrets_programmes`, `pannes`, `gel`, and `heures_machine`. In **parallel** (summed over batches): each batch counts its time separately, so concurrent batches add up and can exceed the running time. This applies to `temps_chargement`, `temps_traitement`, `temps_collecte`, the `attente_*` columns, and `heures_main_oeuvre`. `mise_en_route` is a sum of sequential durations (never simultaneous). Counts, rates, throughputs, per-batch cycles, and instants are not concerned.
 
 ### Time columns (`temps_*`, `arrets_programmes`, `pannes`, `gel`, `mise_en_route`)
 
@@ -56,23 +58,20 @@ The `admin` column (yes/no) reflects the task's admin flag. It has no effect on 
 
 - `gel`: frozen time **within opening hours**. It is the time during which the station could theoretically run but refrains, because it anticipates an imminent stop it could not clear: the end of its own shift, the end of its operators' shift, or a scheduled stop. Unable to finish a batch before that stop, it does not start one. The station resumes when the relevant crew returns, not only at its own next shift, which bounds the frozen time. Closure (nights, weekends) is not counted as frozen time.
 - `mise_en_route`, `nb_mises_en_route`: total startup time and startup count. The station restarts after every interruption and at every new shift. This is the configured setup duration itself; waiting for the startup crew is an availability loss within running time, not part of this column.
-- `temps_fonctionnement`: the time during which at least one batch is engaged, that is, already collected and loaded, then dispatched into the loading-then-processing pipeline. An engaged batch counts even during its waits for loading operators or materials. The collection waits (`attente_pieces`, `attente_place`) and the wave wait, which precede engagement, are not part of it. This is the TF of the cascade.
+- `temps_fonctionnement`: required time minus breakdowns occurring within required time. This is the TF of the cascade: the time the station is required and not broken down.
 
 ### Rate columns (`taux_de_charge` through `tre`)
 
 - `taux_de_charge` = TR / TO: the engaged share of opening time.
-- `disponibilite` = TF / TR: availability. Losses: breakdowns, startups, waiting for the startup crew, frozen time, and starvation (no pieces available). Low availability at a starved station reflects reality, not a measurement error.
-- `performance` = TN / (loading time + processing time): pace efficiency while running. Losses: slower-than-nominal cycles, crew productivity, and partial batches. Value-added time is summed over all batches rather than divided by TF because a station may process batches in parallel; the summation keeps performance within [0, 100%].
+- `disponibilite` = TF / TR: the share of required time the station is not broken down. Only breakdowns count here; everything else (starvation, startups, frozen time, partial batches) falls into performance.
+- `performance` = TN / TF: the pace achieved relative to running time. Losses: slower-than-nominal cycles, starvation (missing pieces or materials), startups, waits, frozen time, partial batches.
+
+  > **Note.** The ideal cycle is a per-piece serial reference. On a station running many batches in parallel (storage, drying, waiting), TN can exceed TF, and performance, hence OEE, can exceed 100%. On a serial station (one machine, one batch at a time), performance and OEE stay within [0, 100%].
+
 - `qualite` = good / produced. A station's good pieces are those its immediate downstream router did not send to scrap; without a scrap route, quality equals 1.
-- `trs` = availability x performance x quality: the OEE, within [0, 100%].
-
-  > **Note.** Reference OEE is written useful time / required time, where useful time is the net time of the good pieces alone (ideal cycle x good pieces). This tool computes it as availability x performance x quality = (TF / TR) x (TN / value-added time) x (good / produced). Since TN = ideal cycle x produced, this groups into (useful time / required time) x (TF / value-added time). The factor TF / value-added time is not 1 in general: running time is a clock time (union) that includes an engaged batch's waits, whereas value-added time is the sum of loading and processing over batches. The two coincide, and the computed OEE equals useful time / required time exactly, only when engaged batches wait for neither operators nor materials and do not overlap. Performance divides by value-added time, not by TF, precisely so it stays bounded when batches run in parallel.
-
-- `trg` = OEE x taux_de_charge: scheduled stops counted as losses.
-
-  > **Note.** Under the same condition (value-added time = running time), substituting OEE = useful time / required time and taux_de_charge = TR / TO gives TRG = useful time / opening time.
-
-- `tre` = OEE x (TR / TT): the full calendar counted, including closed periods.
+- `trs` = availability x performance x quality = **useful time / required time**. The cascade telescopes exactly: (TF / TR) x (TN / TF) x (good / produced) = (ideal cycle x good) / TR = useful time / required time.
+- `trg` = OEE x taux_de_charge = useful time / opening time: scheduled stops counted as losses.
+- `tre` = OEE x (TR / TT) = useful time / total time: the full calendar counted, including closed periods.
 
 ### Production columns (`pieces_*`, `nb_lancements`, `taille_lot_moyenne`, `cycle_*`, `debit_pieces_j`, `flux_*`)
 
@@ -101,7 +100,7 @@ Each batch labels its current activity; the labels are accumulated:
 
 Two accounting columns with deliberately different aggregation rules:
 
-- `heures_machine`: clock time during which the machine loads or processes, aggregated as a **union** over batches. A station is one physical machine: three parallel batches during 40 minutes contribute 40 machine minutes. `heures_machine` differs from TF: TF includes an engaged batch's waits, machine hours do not; machine hours are therefore at most TF, and the gap equals the engaged batches' waits. Startup time is excluded and reported in `mise_en_route`.
+- `heures_machine`: clock time during which the machine loads or processes, aggregated as a **union** over batches. A station is one physical machine: three parallel batches during 40 minutes contribute 40 machine minutes. Machine hours are at most the running time; the gap is the required, not-broken time during which the machine is nonetheless idle (starvation, waits, between batches). Startup time is excluded and reported in `mise_en_route`.
 - `heures_main_oeuvre`: operator minutes reserved for the station by all its crews, aggregated as a **sum** (operators x duration). The account covers loading and per-batch processing crews during their jobs, the startup crew during setup, and per-task crews over their full posting, idle intervals included. The ratio `heures_main_oeuvre / heures_machine` expresses average staffing per machine hour.
 
 > **Note.** The totals of these two columns over all stations appear in `flux.csv` (`heures_machine_totales`, `heures_main_oeuvre_totales`).

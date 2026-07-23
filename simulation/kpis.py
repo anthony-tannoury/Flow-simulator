@@ -99,6 +99,30 @@ def level_during(level_monitor, status_monitor, status_value) -> float:
     return total
 
 
+def operating_time(pairs) -> float:
+    now = env.now()
+    series = [(m.xt(force_numeric=False), v) for m, v in pairs]
+    all_times = set()
+    for (_xs, ts), _v in series:
+        all_times.update(ts)
+    all_times.add(now)
+    times = sorted(all_times)
+    total = 0.0
+    idx = [0] * len(series)
+    for k in range(1, len(times)):
+        t0, t1 = times[k - 1], times[k]
+        ok = True
+        for j, ((xs, ts), v) in enumerate(series):
+            while idx[j] + 1 < len(ts) and ts[idx[j] + 1] <= t0:
+                idx[j] += 1
+            if xs[idx[j]] != v:
+                ok = False
+                break
+        if ok:
+            total += t1 - t0
+    return total
+
+
 def overlap_duration(mon_a, val_a, mon_b, val_b) -> float:
     xa, ta = mon_a.xt(force_numeric=False)
     xb, tb = mon_b.xt(force_numeric=False)
@@ -121,15 +145,6 @@ def ratio(num: float, den: float) -> float | str:
 
 def _num(value) -> float | str:
     return round(value, 4) if value is not None else ''
-
-
-def _product(*values):
-    result = 1.0
-    for value in values:
-        if value is None:
-            return None
-        result *= value
-    return result
 
 
 def ideal_cycle_times(task) -> dict:
@@ -157,8 +172,9 @@ def task_kpis(task) -> dict:
 
 
     gel = overlap_duration(task.is_frozen.value, True, task.is_in_downtime.value, False)
-    nc = task.active_carriers.num_carriers.value
-    tf = tt - nc.value_duration(0)
+    tf = operating_time([(task.is_in_downtime.value, False),
+                         (task.is_in_shutdown.value, False),
+                         (task.is_in_breakdown.value, False)])
 
     is_piece_task = isinstance(task, PieceTask)
     tc = ideal_cycle_times(task)
@@ -166,11 +182,14 @@ def task_kpis(task) -> dict:
         produites = sum(task.deposited.values())
         rebutees = sum(task.scrapped.values())
         tn = sum(tc[_config_key(task, m)] * n for m, n in task.deposited.items())
+        tu = sum(tc[_config_key(task, m)] * (n - task.scrapped.get(m, 0))
+                 for m, n in task.deposited.items())
     else:
         n = task.batch_sizes.number_of_entries()
         produites = round(task.batch_sizes.mean() * n, 3) if n else 0
         rebutees = 0
         tn = produites * tc[None]
+        tu = tn
     bonnes = produites - rebutees
 
     carriers = task.all_carriers
@@ -181,11 +200,10 @@ def task_kpis(task) -> dict:
 
     t_loading = mode_total(carriers, 'loading')
     t_processing = mode_total(carriers, 'processing')
-    value_add = t_loading + t_processing
     do_val = tf / tr if tr else None
-    tp_val = tn / value_add if value_add else None
+    tp_val = tn / tf if tf else None
     tq_val = bonnes / produites if produites else None
-    trs_val = _product(do_val, tp_val, tq_val)
+    trs_val = tu / tr if tr else None
     trg_val = trs_val * (tr / to) if trs_val is not None and to else None
     tre_val = trs_val * (tr / tt) if trs_val is not None and tt else None
 
