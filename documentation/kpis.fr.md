@@ -7,10 +7,10 @@ Chaque run produit un dossier de résultats contenant des rapports CSV (lisibles
 Propriétés générales des rapports :
 
 - Tous les indicateurs sont collectés à chaque run, pour chaque composant. Aucune activation n'est nécessaire.
-- Les moteurs Python et C++ produisent des fichiers identiques, de structure identique. Le choix du moteur n'affecte que la vitesse d'exécution.
+- Les moteurs Python et C++ produisent des fichiers identiques, de structure identique. Le choix du moteur n'affecte que la vitesse d'exécution (ET PEUT ETRE LES RESULTATS CAR RANDOM DE C++ EST DIFFERENT DE RANDOM DE PYTHON).
 
 ---
-
+(SECTIONS 'FORMATS' INUTILE - A ENLEVER)
 ## Formats
 
 - **Durées :** `1h 10m`, `3j 5h 20m` (`j` désigne les jours), `3m 20s` en dessous d'une heure. En interne, tous les temps sont des minutes simulées ; seule la présentation varie.
@@ -22,15 +22,13 @@ Propriétés générales des rapports :
 
 ## La cascade des temps
 
-La plupart des indicateurs par poste dérivent d'une décomposition unique du temps, conforme à la norme NF E60-182. En partant du calendrier, les pertes sont retirées couche par couche :
-
 ```
-temps total (TT)                 toute la durée simulée
-└─ temps d'ouverture (TO)        les shifts du poste
-   └─ temps requis (TR)          TO moins les arrêts programmés
+temps total (TT)                        toute la durée simulée
+└─ temps d'ouverture (TO)               les shifts du poste
+   └─ temps requis (TR)                 TO moins les arrêts programmés
       └─ temps de fonctionnement (TF)   au moins un lot actif sur le poste
          └─ temps à valeur ajoutée      chargement et traitement effectifs
-            └─ temps net (TN)    reconstruit : cycle idéal x pièces produites
+            └─ temps net (TN)           reconstruit : cycle idéal x pièces produites
 ```
 
 Deux définitions demandent de l'attention.
@@ -63,9 +61,9 @@ La colonne `admin` (oui/non) reflète le marqueur admin de la tâche. Elle n'a a
 
   > **Note.** Les pannes sont mesurées sur tout l'horizon et peuvent chevaucher des périodes hors horaires ; `pannes` peut donc dépasser ce que la cascade suggère. Le MTBF n'est rapporté qu'à partir de deux pannes observées.
 
-- `gel` : temps gelé **pendant les heures d'ouverture** : le poste n'a pas pu terminer un lot avant un départ d'équipe ou un arrêt. Le poste reprend au retour de l'équipe concernée, pas seulement à son propre shift suivant, ce qui borne le temps gelé. La fermeture (nuits, week-ends) n'est pas comptée comme temps gelé.
+- `gel` : temps gelé **pendant les heures d'ouverture** : le poste n'a pas pu terminer un lot avant un départ d'équipe ou un arrêt. Le poste reprend au retour de l'équipe concernée, pas seulement à son propre shift suivant, ce qui borne le temps gelé. La fermeture (nuits, week-ends) n'est pas comptée comme temps gelé. (ON PEUT EXPLIQUER MIEUX C'EST QUOI LE TEMPS DE GEL: C'EST LE TEMPS OU LA MACHINE PEUT THEORIQUEMENT FONCTIONNER, MAIS NE FONCTIONNE PAR CAR ELLE ANTICIPE SOIT UN ARRET DE SON PROPRE SHIFT, SOIT UN ARRET DE SHIFT DE SES OPERATEURS, SOIT UN ARRET PLANIFIE)
 - `mise_en_route`, `nb_mises_en_route` : temps total de mise en route et nombre de mises en route. Le poste redémarre après chaque interruption et à chaque nouveau shift. Il s'agit de la durée de mise en route configurée elle-même ; l'attente de l'équipe de mise en route est une perte de disponibilité au sein du temps de fonctionnement, pas une composante de cette colonne.
-- `temps_fonctionnement` : temps avec au moins un lot actif. Le TF de la cascade.
+- `temps_fonctionnement` : temps avec au moins un lot actif (ACTIF INCLUS QUOI? LE TEMPS D'ATTENTE DES OPERATEURS ? DES RESSOURCES ? DE PLACES DISPONIBLES AKA VACANT SLOTS? TEMPS DE REAPPRO? OU BIEN ACTIF C.A.D LANCE AKA TOUTES LES CONDITIONS SONT FOURNIES ? DETAILLE UN PEU). Le TF de la cascade.
 
 ### Colonnes de taux (`taux_de_charge` à `tre`)
 
@@ -73,8 +71,8 @@ La colonne `admin` (oui/non) reflète le marqueur admin de la tâche. Elle n'a a
 - `disponibilite` = TF / TR : la disponibilité. Pertes : pannes, mises en route, attente de l'équipe de mise en route, temps gelé, et famine (aucune pièce disponible). Une disponibilité basse sur un poste affamé reflète la réalité, pas une erreur de mesure.
 - `performance` = TN / (temps de chargement + temps de traitement) : l'efficacité de cadence en fonctionnement. Pertes : cycles plus lents que le nominal, productivité des équipes, lots partiels. Le temps à valeur ajoutée est sommé sur tous les lots plutôt que divisé par TF parce qu'un poste peut traiter des lots en parallèle ; la sommation maintient la performance dans [0, 100%].
 - `qualite` = bonnes / produites. Les bonnes pièces d'un poste sont celles que son router aval immédiat n'a pas envoyées au rebut ; sans route de rebut, la qualité vaut 1.
-- `trs` = disponibilité x performance x qualité : le TRS, dans [0, 100%].
-- `trg` = TRS x taux_de_charge : les arrêts programmés comptés comme pertes.
+- `trs` = disponibilité x performance x qualité : le TRS, dans [0, 100%] (EXPLIQUE UN PEU COMMENT C'EST EQUIVALENT A LA FORMULE DE TRS = TEMPS UTILE / TEMPS REQUIS).
+- `trg` = TRS x taux_de_charge : les arrêts programmés comptés comme pertes (EXPLIQUE COMMENT C'EST EQUIVALENT A TRG = TEMPS UTILE / TEMPS OUVERTURE).
 - `tre` = TRS x (TR / TT) : tout le calendrier compté, périodes fermées incluses.
 
 ### Colonnes de production (`pieces_*`, `nb_lancements`, `taille_lot_moyenne`, `cycle_*`, `debit_pieces_j`, `flux_*`)
@@ -94,24 +92,24 @@ Chaque lot étiquette son activité courante ; les étiquettes sont cumulées :
 - `attente_place` : attente de places libres (la capacité maximale du poste lui-même).
 - `attente_operateurs` : attente d'une équipe.
 - `attente_matiere` : attente de matière (délais de réapprovisionnement inclus).
-- `attente_vague` : attente des autres carriers d'une vague (carriers minimum).
+- `attente_vague` : attente des autres carriers d'une vague (carriers minimum) (AJOUTE QUE PERTINENT QUE SI MIN_CARRIERS > 1).
 - `temps_collecte` : temps d'assemblage des lots.
 - `temps_chargement`, `temps_traitement` : chargement et traitement.
 
-> **Note.** Ces colonnes se recouvrent partiellement (`temps_collecte` englobe les attentes de pièces et de place du collecteur) et les lots parallèles attendent simultanément. Elles ne s'additionnent pas vers le temps d'ouverture ; elles sont destinées à la comparaison entre colonnes et entre postes.
+> **Note.** Ces colonnes se recouvrent partiellement (`temps_collecte` englobe les attentes de pièces et de place du collecteur) et les lots parallèles attendent simultanément.
 
 ### Colonnes d'heures (`heures_machine`, `heures_main_oeuvre`)
 
 Deux colonnes comptables aux règles d'agrégation délibérément différentes :
 
-- `heures_machine` : temps horloge pendant lequel la machine charge ou traite, agrégé en **union** sur les lots. Un poste est une machine physique : trois lots parallèles pendant 40 minutes contribuent 40 minutes machine. `heures_machine` diffère de TF : TF inclut les attentes d'un lot engagé, les heures machine non ; les heures machine sont donc au plus égales à TF, et l'écart vaut les attentes des lots engagés. Le temps de mise en route est exclu et rapporté dans `mise_en_route`.
-- `heures_main_oeuvre` : minutes opérateur réservées pour le poste par toutes ses équipes, agrégées en **somme** (opérateurs x durée). Le compte couvre les équipes de chargement et de traitement par lot pendant leurs jobs, l'équipe de mise en route pendant la mise en route, et les équipes par tâche sur toute leur affectation, intervalles d'inactivité inclus. Le ratio `heures_main_oeuvre / heures_machine` exprime l'effectif moyen par heure machine.
+- `heures_machine` : temps horloge pendant lequel la machine charge ou traite, agrégé en **union** sur les lots. Un poste est une machine physique : trois lots parallèles pendant 40 minutes contribuent 40 minutes machine. `heures_machine` diffère de TF : TF inclut les attentes d'un lot engagé, les heures machine non ; les heures machine sont donc au plus égales à TF, et l'écart vaut les attentes des lots engagés. Le temps de mise en route est exclu et rapporté dans `mise_en_route`. (ICI JE NE SAIS PAS SI DANS LES CSV ON AJOUTE UNE CASE 'HEURES MACHINES TOTALES'. SINON, AJOUTE LA DANS 'FLUX.CSV')
+- `heures_main_oeuvre` : minutes opérateur réservées pour le poste par toutes ses équipes, agrégées en **somme** (opérateurs x durée). Le compte couvre les équipes de chargement et de traitement par lot pendant leurs jobs, l'équipe de mise en route pendant la mise en route, et les équipes par tâche sur toute leur affectation, intervalles d'inactivité inclus. (AJOUTE AUSSI HEURES_MAIN_OEUVRE DANS FLUX.CSV SI C'EST PAS DEJA FAIT). Le ratio `heures_main_oeuvre / heures_machine` exprime l'effectif moyen par heure machine.
 
 ---
 
 ## postes_modeles.csv, la production par modèle
 
-Par tâche pièces et par modèle : le temps de cycle idéal (`tc_ideal`) et les comptes produit, bon, rebuté. C'est le détail sous-jacent à TN.
+Par tâche pièces et par modèle : le temps de cycle idéal (`tc_ideal`) (EST CE QUE C'EST LA MOYENNE? SI OUI DIS-LE) et les comptes produit, bon, rebuté. C'est le détail sous-jacent à TN.
 
 ---
 
@@ -131,14 +129,14 @@ Par tâche pièces et par modèle : le temps de cycle idéal (`tc_ideal`) et les
 - `effectif` : la taille du groupe. `temps_poste` : le temps posté total (la somme des shifts du groupe sur le run).
 - `occupation_moyenne` : l'effectif réquisitionné moyen sur toute la durée.
 - `heures_en_poste` / `heures_hors_poste` : minutes opérateur réquisitionnées pendant et hors des shifts du groupe. Colonnes de diagnostic : les équipes par tâche sont libérées en fin de shift et sur abandon de lot, et l'adéquation au shift est revérifiée après les attentes de matière ; `heures_hors_poste` doit donc rester proche de zéro. Les valeurs résiduelles correspondent aux commandes de réapprovisionnement retenant une équipe au-delà de la borne du shift ou, sans contrainte de shift, à des lots se terminant légitimement après elle.
-- `taux_occupation` : temps réquisitionné total / (effectif x temps posté), la part réquisitionnée du temps posté. Les valeurs restent sous 100% par construction, les équipes étant libérées en fin de shift.
+- `taux_occupation` : temps réquisitionné total / (effectif x temps posté), la part réquisitionnée du temps posté. Les valeurs restent sous 100% par construction, les équipes étant libérées en fin de shift (AJOUTE QUE THEORIQUEMENT CA POURRAIT DEPASSER 100% A CAUSE DES NON-CONTRAINTES DE SHIFT).
 - `occupation_max` : le pic de réquisition simultanée.
 
 ---
 
 ## ressources.csv, une ressource par ligne
 
-- `capacite` : la capacité de la ressource.
+- `capacite` : la capacité de la ressource (COMBIEN ON PEUT STOCKER SIMULTANEMENT EN MEME TEMPS).
 - `stock_moyen`, `stock_min`, `stock_max`, `stock_final` : statistiques du niveau de stock (moyenne pondérée par le temps) et niveau final.
 - `consommation_totale`, `entrees_totales` : consommation totale et réapprovisionnement total.
 - `consommation_j` : la consommation par jour calendaire.
@@ -162,7 +160,6 @@ Une synthèse comparant les tâches marquées admin aux autres. Une ligne par in
 
 Les cinq indicateurs : nombre de postes, temps de fonctionnement, temps de cycle total (sommé sur les lots), heures machine, heures de main d'oeuvre.
 
-Lecture typique : des postes d'attente et de stockage marqués admin peuvent représenter la majorité du temps de fonctionnement (longs séjours) tout en ne consommant presque aucune heure de main d'oeuvre (sans surveillance). Le tableau quantifie ce déséquilibre.
 
 ---
 
@@ -197,17 +194,3 @@ graphes/
 ## run.csv, l'identité du run
 
 Fichier source, dates calendaires de début et de fin, durée simulée, graine aléatoire, horodatage de génération, temps de calcul (la durée d'exécution réelle) et le critère d'arrêt avec ses paramètres (`critere_arret`, `critere_details`). Une graine et un fichier de modèle identiques reproduisent des CSV identiques.
-
----
-
-## Ordre de lecture recommandé
-
-Pour investiguer un résultat inattendu :
-
-1. `run.csv` : confirmer comment le run s'est terminé (objectif atteint, date de fin, ou timeout).
-2. `flux.csv` : les totaux globaux : sorties, taux de rebut, en-cours.
-3. `buffers.csv` : localiser le buffer gonflé ; le goulot est le poste immédiatement en aval.
-4. `postes.csv` pour ce poste : lire ses colonnes d'attente. `attente_operateurs` pointe vers l'effectif, `attente_pieces` vers le flux amont, `attente_matiere` vers une ressource, `attente_place` vers la capacité du poste lui-même.
-5. `operateurs.csv` ou `ressources.csv` : confirmer la pénurie identifiée par les attentes.
-
-La plupart des investigations se résolvent le long de cette chaîne.
