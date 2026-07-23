@@ -783,7 +783,8 @@
       "position": [
         270.3322687112232,
         606.0494541137721
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_48f57b5a",
@@ -927,7 +928,8 @@
         "buffer_064a900c"
       ],
       "shutdowns": [
-        "shutdowns_4f73919f"
+        "shutdowns_4f73919f",
+        "shutdowns_6178ccb4"
       ],
       "breakdowns": [
         "breakdown_97702ad0"
@@ -935,7 +937,8 @@
       "position": [
         1128.91984417801,
         -4.842514120099608
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_81433f15",
@@ -959,7 +962,8 @@
       "position": [
         695.8922084287924,
         104.09014868485383
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_bbd053a5",
@@ -1105,7 +1109,8 @@
       "position": [
         1122.1201099989253,
         211.01543542789108
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_064a900c",
@@ -1133,7 +1138,8 @@
       "position": [
         1435.9183038752662,
         104.31410979039958
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_2906f75f",
@@ -1281,7 +1287,8 @@
       "position": [
         1833.6059537242309,
         187.25529907088276
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_1f0df7b4",
@@ -1429,7 +1436,8 @@
       "position": [
         1829.4781516143075,
         -30.7875961215326
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_a2f5ab52",
@@ -1453,7 +1461,8 @@
       "position": [
         710.8308411972221,
         1108.0666597273632
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_1faeac64",
@@ -1605,7 +1614,8 @@
       "position": [
         1123.9538814404384,
         978.1544557917057
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_aedb9dec",
@@ -1757,7 +1767,8 @@
       "position": [
         1119.247010276116,
         1191.2368614018508
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_110b4e16",
@@ -1780,7 +1791,8 @@
       "position": [
         2863.0588115046585,
         -199.27886824248804
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_1f0f9541",
@@ -1880,9 +1892,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -1898,7 +1910,8 @@
       "position": [
         3168.3034496712294,
         -236.86589713995525
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_0f2b0dc8",
@@ -1928,7 +1941,8 @@
       "position": [
         4168.422427172597,
         189.82052188192517
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_f4430071",
@@ -2061,7 +2075,8 @@
       "position": [
         4568.172940143896,
         161.74444872400443
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_6ffdb86b",
@@ -2089,7 +2104,8 @@
       "position": [
         4879.3168743567685,
         168.61006791031002
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_56717695",
@@ -2243,12 +2259,17 @@
         "buffer_38e4202f",
         "buffer_430ed3f8"
       ],
-      "shutdowns": [],
-      "breakdowns": [],
+      "shutdowns": [
+        "shutdowns_8ad1cc27"
+      ],
+      "breakdowns": [
+        "breakdown_6d64bcf3"
+      ],
       "position": [
         5218.506426888734,
         138.34353870775647
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_430ed3f8",
@@ -2271,7 +2292,8 @@
       "position": [
         7743.384536035154,
         643.3203512291246
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_38e4202f",
@@ -2294,7 +2316,8 @@
       "position": [
         5711.713862033018,
         -163.84316596674898
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_3cae838f",
@@ -2447,7 +2470,7 @@
       "max_capacity": 5.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": "inf",
+      "timeout": 240.0,
       "priority": 10,
       "admin": false,
       "collector_type": "DISCRIMINATING_ALTRUISTIC",
@@ -2458,7 +2481,8 @@
         "router_6b8b0ef1"
       ],
       "shutdowns": [
-        "shutdowns_8ba5b8cc"
+        "shutdowns_8ba5b8cc",
+        "shutdowns_867ea8de"
       ],
       "breakdowns": [
         "breakdown_4cd6a3c6"
@@ -2466,7 +2490,8 @@
       "position": [
         6115.333495280998,
         -195.4005181247399
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_b8b3f7d4",
@@ -2489,7 +2514,8 @@
       "position": [
         6888.526433859925,
         39.56292334767227
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_79e94d3c",
@@ -2513,7 +2539,8 @@
       "position": [
         7841.3191372427655,
         104.38684869981466
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "router_135a3027",
@@ -2539,7 +2566,8 @@
       "position": [
         8513.290749467204,
         75.4115239643993
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_dc32b97e",
@@ -2562,7 +2590,8 @@
       "position": [
         8889.729897526307,
         12.128192855475618
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_f4a72741",
@@ -2585,7 +2614,8 @@
       "position": [
         8892.63399514751,
         208.88544216518574
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "router_764975f4",
@@ -2611,7 +2641,8 @@
       "position": [
         2107.584898870905,
         46.979822599044496
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_fc84cb13",
@@ -2632,7 +2663,8 @@
       "position": [
         2416.3094473789106,
         -256.151889885266
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "router_b3fd0d38",
@@ -2657,7 +2689,8 @@
       "position": [
         2504.6762565532927,
         13.422806456869807
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "router_5cd20885",
@@ -2682,7 +2715,8 @@
       "position": [
         3458.8140821957613,
         -241.61051622365454
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_2247a7f2",
@@ -2807,9 +2841,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -2825,7 +2859,8 @@
       "position": [
         3945.4867521380393,
         -369.06982011155316
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_34ac731e",
@@ -2846,7 +2881,8 @@
       "position": [
         3722.450333666048,
         -165.4547076837369
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_6beb763a",
@@ -2869,7 +2905,8 @@
       "position": [
         3717.9847970354886,
         -359.56413819233103
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_706eeefc",
@@ -2895,7 +2932,8 @@
       "position": [
         9677.835379645312,
         527.7282345639495
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_ac27859f",
@@ -3048,7 +3086,7 @@
       "max_capacity": 5.0,
       "contiguous_carriers": false,
       "independent_carriers": false,
-      "timeout": "inf",
+      "timeout": 240.0,
       "priority": 10,
       "admin": false,
       "collector_type": "DISCRIMINATING_ALTRUISTIC",
@@ -3067,7 +3105,8 @@
       "position": [
         7413.608672891099,
         75.51766848258853
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_5bd0ff94",
@@ -3235,7 +3274,8 @@
       "position": [
         8161.390322602879,
         27.831784103793893
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_fc0560b9",
@@ -3403,7 +3443,8 @@
       "position": [
         8156.746479991593,
         177.5957083176853
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_6ca20bfe",
@@ -3503,9 +3544,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -3521,7 +3562,8 @@
       "position": [
         9185.967291212319,
         -8.0462808912215
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_bb06c997",
@@ -3544,7 +3586,8 @@
       "position": [
         9767.549843688186,
         -83.60750423791478
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "router_b8819f05",
@@ -3569,7 +3612,8 @@
       "position": [
         9464.374600489136,
         1.8984101903787405
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_f57f7a54",
@@ -3590,7 +3634,8 @@
       "position": [
         9770.074053436521,
         97.67786269224666
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_e84f9acb",
@@ -3715,9 +3760,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -3733,7 +3778,8 @@
       "position": [
         10046.542815648863,
         -98.71292705367387
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_dfda3dbf",
@@ -3756,7 +3802,8 @@
       "position": [
         7704.122284551492,
         -416.7216066457279
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "router_1c2aa169",
@@ -3781,7 +3828,8 @@
       "position": [
         7400.947041352442,
         -331.2156922174345
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_0b03bc33",
@@ -3906,9 +3954,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -3924,7 +3972,8 @@
       "position": [
         7982.201902994219,
         -431.827029461487
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_f7472eaf",
@@ -3945,7 +3994,8 @@
       "position": [
         7716.512487673967,
         -234.62611924115527
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "router_6b8b0ef1",
@@ -3973,7 +4023,8 @@
       "position": [
         6444.320095974649,
         -184.19512887243894
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_70baa0d8",
@@ -3996,7 +4047,8 @@
       "position": [
         6836.092177553283,
         -306.2935175700597
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_72f65731",
@@ -4096,9 +4148,9 @@
       "operator_scope": "PER_BATCH",
       "resource_scope": "PER_BATCH",
       "min_carriers": 1,
-      "max_capacity": 1.0,
-      "contiguous_carriers": false,
-      "independent_carriers": false,
+      "max_capacity": 1000000000.0,
+      "contiguous_carriers": true,
+      "independent_carriers": true,
       "timeout": "inf",
       "priority": 10,
       "admin": false,
@@ -4114,7 +4166,8 @@
       "position": [
         7129.604768638425,
         -335.8413749248625
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "task_ecf331de",
@@ -4248,7 +4301,8 @@
       "position": [
         9282.026895691364,
         484.00586262665513
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "breakdown_97702ad0",
@@ -4262,7 +4316,7 @@
           "params": {
             "mean": {
               "kind": "constant",
-              "value": 3000.0
+              "value": 30000.0
             }
           }
         }
@@ -4286,7 +4340,8 @@
       "position": [
         1129.8151574493847,
         -125.09469105147812
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "shutdowns_4f73919f",
@@ -4302,8 +4357,9 @@
         "in_between": 120000.0,
         "duration": 240.0,
         "start": "01-01-2026 00:00",
-        "end": "01-01-2027 00:00"
-      }
+        "end": "01-01-2028 00:00"
+      },
+      "enabled": true
     },
     {
       "id": "breakdown_404c6432",
@@ -4317,7 +4373,7 @@
           "params": {
             "mean": {
               "kind": "constant",
-              "value": 3000.0
+              "value": 30000.0
             }
           }
         }
@@ -4341,7 +4397,8 @@
       "position": [
         1120.4786512614842,
         440.1186393329175
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "shutdowns_77f161a3",
@@ -4357,8 +4414,9 @@
         "in_between": 120000.0,
         "duration": 240.0,
         "start": "01-01-2026 00:00",
-        "end": "01-01-2027 00:00"
-      }
+        "end": "01-01-2028 00:00"
+      },
+      "enabled": true
     },
     {
       "id": "buffer_346369bd",
@@ -4379,7 +4437,8 @@
       "position": [
         1394.887957975947,
         -137.8532487781924
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_6d2e62dd",
@@ -4400,7 +4459,8 @@
       "position": [
         1388.7048179498393,
         447.5457747119149
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "breakdown_cba1dbb5",
@@ -4414,7 +4474,7 @@
           "params": {
             "mean": {
               "kind": "constant",
-              "value": 1800.0
+              "value": 30000.0
             }
           }
         }
@@ -4424,7 +4484,7 @@
         "params": {
           "mean": {
             "kind": "constant",
-            "value": 240.0
+            "value": 120.0
           },
           "sigma": {
             "kind": "constant",
@@ -4438,7 +4498,8 @@
       "position": [
         1127.5007815994097,
         881.8633360915052
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_4cde0bf9",
@@ -4459,7 +4520,8 @@
       "position": [
         1391.0861537571122,
         869.1047783647911
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "shutdowns_5c8da79c",
@@ -4475,8 +4537,9 @@
         "in_between": 120000.0,
         "duration": 240.0,
         "start": "01-01-2026 00:00",
-        "end": "01-01-2027 00:00"
-      }
+        "end": "01-01-2028 00:00"
+      },
+      "enabled": true
     },
     {
       "id": "breakdown_734ecd19",
@@ -4490,7 +4553,7 @@
           "params": {
             "mean": {
               "kind": "constant",
-              "value": 1800.0
+              "value": 30000.0
             }
           }
         }
@@ -4500,7 +4563,7 @@
         "params": {
           "mean": {
             "kind": "constant",
-            "value": 240.0
+            "value": 120.0
           },
           "sigma": {
             "kind": "constant",
@@ -4514,7 +4577,8 @@
       "position": [
         1114.7189036053678,
         1419.0040828927938
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "shutdowns_775eb282",
@@ -4530,8 +4594,9 @@
         "in_between": 120000.0,
         "duration": 240.0,
         "start": "01-01-2026 00:00",
-        "end": "01-01-2027 00:00"
-      }
+        "end": "01-01-2028 00:00"
+      },
+      "enabled": true
     },
     {
       "id": "buffer_6920bf06",
@@ -4552,7 +4617,8 @@
       "position": [
         1379.7917041319301,
         1406.2455251660797
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "breakdown_4cd6a3c6",
@@ -4566,7 +4632,7 @@
           "params": {
             "mean": {
               "kind": "constant",
-              "value": 120000.0
+              "value": 30000.0
             }
           }
         }
@@ -4576,11 +4642,11 @@
         "params": {
           "mean": {
             "kind": "constant",
-            "value": 60.0
+            "value": 120.0
           },
           "sigma": {
             "kind": "constant",
-            "value": 20.0
+            "value": 30.0
           }
         }
       },
@@ -4590,7 +4656,8 @@
       "position": [
         6120.65195365514,
         -316.6707661032146
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "shutdowns_8ba5b8cc",
@@ -4607,7 +4674,8 @@
         "duration": 240.0,
         "start": "01-01-2026 00:00",
         "end": "01-01-2027 00:00"
-      }
+      },
+      "enabled": true
     },
     {
       "id": "buffer_2b928421",
@@ -4628,12 +4696,13 @@
       "position": [
         6385.724754181702,
         -329.42932382992893
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "buffer_c3d0081b",
       "kind": "Buffer",
-      "name": "Rebuts après panne 6",
+      "name": "Rebuts après panne 7",
       "valid_models": [
         "model_f6960dbd",
         "model_c1c20e4c",
@@ -4649,7 +4718,8 @@
       "position": [
         7683.236504781795,
         308.29258422003034
-      ]
+      ],
+      "enabled": true
     },
     {
       "id": "shutdowns_086fcab0",
@@ -4665,8 +4735,9 @@
         "in_between": 120000.0,
         "duration": 240.0,
         "start": "01-01-2026 00:00",
-        "end": "01-01-2027 00:00"
-      }
+        "end": "01-01-2028 00:00"
+      },
+      "enabled": true
     },
     {
       "id": "breakdown_63d6a12a",
@@ -4680,7 +4751,7 @@
           "params": {
             "mean": {
               "kind": "constant",
-              "value": 120000.0
+              "value": 30000.0
             }
           }
         }
@@ -4690,11 +4761,11 @@
         "params": {
           "mean": {
             "kind": "constant",
-            "value": 60.0
+            "value": 120.0
           },
           "sigma": {
             "kind": "constant",
-            "value": 20.0
+            "value": 30.0
           }
         }
       },
@@ -4704,7 +4775,144 @@
       "position": [
         7418.163704255232,
         321.0511419467447
-      ]
+      ],
+      "enabled": true
+    },
+    {
+      "id": "shutdowns_8ad1cc27",
+      "kind": "Shutdowns",
+      "name": "Shutdowns 7",
+      "shutdown_type": "FLEXIBLE",
+      "mode": "generator",
+      "position": [
+        5191.11815941597,
+        267.0417432182097
+      ],
+      "generator": {
+        "in_between": 120000.0,
+        "duration": 240.0,
+        "start": "01-01-2026 00:00",
+        "end": "01-01-2028 00:00"
+      },
+      "enabled": true
+    },
+    {
+      "id": "breakdown_6d64bcf3",
+      "kind": "Breakdown",
+      "name": "Breakdown 7",
+      "task": "task_56717695",
+      "mtbf": {
+        "mode": "distribution",
+        "distribution": {
+          "dist_type": "Exponential",
+          "params": {
+            "mean": {
+              "kind": "constant",
+              "value": 30000.0
+            }
+          }
+        }
+      },
+      "mttr": {
+        "dist_type": "LogNormal",
+        "params": {
+          "mean": {
+            "kind": "constant",
+            "value": 120.0
+          },
+          "sigma": {
+            "kind": "constant",
+            "value": 30.0
+          }
+        }
+      },
+      "outlets": [
+        "buffer_a078d67d"
+      ],
+      "position": [
+        5230.807754073796,
+        373.14786838067937
+      ],
+      "enabled": true
+    },
+    {
+      "id": "buffer_a078d67d",
+      "kind": "Buffer",
+      "name": "Rebuts après panne 6",
+      "valid_models": [
+        "model_f6960dbd",
+        "model_c1c20e4c",
+        "model_f551538b",
+        "model_f8a1d4ad",
+        "model_742fd366",
+        "model_3853af8a",
+        "model_300990ff",
+        "model_e093ec36",
+        "model_02d3ef7d",
+        "model_256d4101"
+      ],
+      "buffer_type": "SCRAP",
+      "inputs_from": [
+        "breakdown_6d64bcf3"
+      ],
+      "outputs_to": [],
+      "position": [
+        5495.880554600359,
+        360.389310653965
+      ],
+      "enabled": true
+    },
+    {
+      "id": "shutdowns_6178ccb4",
+      "kind": "Shutdowns",
+      "name": "Shutdowns 8",
+      "shutdown_type": "NON_FLEXIBLE",
+      "mode": "custom",
+      "position": [
+        1079.8229354472448,
+        -327.3463605766316
+      ],
+      "intervals": [
+        {
+          "start": "28-02-2026 08:00",
+          "end": "01-01-2026 12:00"
+        },
+        {
+          "start": "13-03-2026 17:00",
+          "end": "01-01-2026 18:00"
+        },
+        {
+          "start": "22-05-2026 22:00",
+          "end": "01-01-2026 23:00"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "shutdowns_867ea8de",
+      "kind": "Shutdowns",
+      "name": "Shutdowns 9",
+      "shutdown_type": "NON_FLEXIBLE",
+      "mode": "custom",
+      "position": [
+        6083.622777087153,
+        -523.1400875002605
+      ],
+      "intervals": [
+        {
+          "start": "28-08-2026 08:00",
+          "end": "01-01-2026 12:00"
+        },
+        {
+          "start": "13-07-2026 17:00",
+          "end": "01-01-2026 18:00"
+        },
+        {
+          "start": "22-09-2026 22:00",
+          "end": "01-01-2026 23:00"
+        }
+      ],
+      "enabled": true
     }
   ],
   "connections": [
@@ -5299,7 +5507,46 @@
       "to_node": "buffer_c3d0081b",
       "to_kind": "Buffer",
       "to_port": "from_task"
+    },
+    {
+      "from_node": "shutdowns_8ad1cc27",
+      "from_kind": "Shutdowns",
+      "from_port": "shutdowns",
+      "to_node": "task_56717695",
+      "to_kind": "Task",
+      "to_port": "shutdowns"
+    },
+    {
+      "from_node": "breakdown_6d64bcf3",
+      "from_kind": "Breakdown",
+      "from_port": "breakdown",
+      "to_node": "task_56717695",
+      "to_kind": "Task",
+      "to_port": "breakdowns"
+    },
+    {
+      "from_node": "breakdown_6d64bcf3",
+      "from_kind": "Breakdown",
+      "from_port": "bufs_out",
+      "to_node": "buffer_a078d67d",
+      "to_kind": "Buffer",
+      "to_port": "from_task"
+    },
+    {
+      "from_node": "shutdowns_6178ccb4",
+      "from_kind": "Shutdowns",
+      "from_port": "shutdowns",
+      "to_node": "task_48f57b5a",
+      "to_kind": "Task",
+      "to_port": "shutdowns"
+    },
+    {
+      "from_node": "shutdowns_867ea8de",
+      "from_kind": "Shutdowns",
+      "from_port": "shutdowns",
+      "to_node": "task_3cae838f",
+      "to_kind": "Task",
+      "to_port": "shutdowns"
     }
-  ],
-  "backdrops": []
+  ]
 }
