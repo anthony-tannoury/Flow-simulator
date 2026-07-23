@@ -35,7 +35,7 @@ Deux principes s'appliquent partout :
 
 Une **pièce** est un article individuel circulant sur la ligne. Elle est créée par le générateur et termine dans un buffer de sortie ou de rebut.
 
-Un **modèle** est le type d'une pièce, comparable à une référence produit. Les pièces d'un même modèle sont interchangeables ; des modèles distincts peuvent suivre des routes différentes et avoir des paramètres de traitement différents.
+Un **modèle** est le type d'une pièce, comparable à une référence produit. Les pièces d'un même modèle sont interchangeables ; des modèles distincts peuvent suivre des routes différentes et avoir des paramètres de traitement différents. (LE TERME INTERCHANGEABLES PORTE A CONFUSION ICI, ON POURRAIT PENSER A TORT QUE CA VEUT DIRE QUE LES PIECES D'UN MEME MODELE SONT LPAREILLE ALORS QU'ELLES SONT CARACTERISEES CHACUNES PAR UN ID DIFFERENT: REFORMULER LA PHARSE CORRECTEMENT)
 
 Les modèles forment une hiérarchie. Un modèle peut déclarer un **parent**, et tout composant configuré pour accepter un modèle accepte également l'ensemble de ses descendants. Cela permet une configuration commune au niveau de la famille, avec des surcharges par variante lorsque nécessaire.
 
@@ -110,7 +110,7 @@ Un poste peut faire tourner plusieurs carriers simultanément, dans la limite de
 
 Chaque carrier traverse les mêmes étapes. Les rapports d'exécution mesurent le temps passé dans chacune, ce cycle est donc la base de l'interprétation des indicateurs de poste.
 
-1. **Mise en route.** Préparation de la station (préchauffage, réglage). La mise en route a lieu au démarrage de la station, après toute interruption, et au début de chaque shift.
+1. **Mise en route.** Préparation de la station (préchauffage, réglage). La mise en route a lieu au démarrage de la station, après toute interruption, et au début de chaque shift. (LA MISE EN ROUTE N'EST PAS VRAIMENT DANS LE CYCLE DE VIE DU CARRIER, C'ES PLUTOT FAIT DANS LA TASK, LE CARRIER N'EST PAS ENCORE CREE QUAND ON EFFECTUE LE STARTUP)
 2. **Collecte.** Le carrier rassemble des pièces depuis les buffers d'entrée jusqu'à satisfaire ses exigences de lot ou jusqu'à expiration de son timeout.
 3. **Chargement.** Le lot est chargé sur la station. Le chargement prend du temps et peut requérir des opérateurs.
 4. **Traitement.** L'opération elle-même. Sa durée peut dépendre du modèle et peut requérir des opérateurs et des ressources.
@@ -133,7 +133,7 @@ Cette section définit chaque réglage d'un poste à pièces.
 - **Capacité minimale du carrier.** Le plus petit lot que le carrier accepte avant de procéder. La valeur 1 autorise le fonctionnement à la pièce.
 - **Capacité maximale du carrier.** Le plus grand lot que le carrier contient.
 
-Une station qui traite toujours des grilles pleines de 4 utilise minimum = maximum = 4. Une station qui démarre avec ce qui est disponible, jusqu'à 4, utilise minimum 1 et maximum 4.
+Une station qui traite toujours des grilles pleines de 4 utilise minimum = maximum = 4. Une station qui démarre avec ce qui est disponible, jusqu'à 4, utilise minimum = 1 et maximum = 4.
 
 ### Capacité de la station
 
@@ -144,8 +144,8 @@ La capacité max doit suffire aux exigences de lot d'un carrier ; sinon les carr
 
 ### Indicateurs de comportement des carriers
 
-- **Carriers contigus.** Détermine la réservation des places. Désactivé, un carrier réserve son empreinte maximale complète pendant la collecte, rendant ces places indisponibles pour les autres. Activé, un carrier n'occupe que les places correspondant aux pièces effectivement détenues.
-- **Carriers indépendants.** Détermine la synchronisation. Des carriers indépendants déroulent leurs cycles sur des chronologies séparées ; des carriers non indépendants avancent ensemble.
+- **Carriers contigus.** Détermine la réservation des places. Désactivé, un carrier réserve son empreinte maximale complète pendant la collecte, rendant ces places indisponibles pour les autres. Activé, un carrier n'occupe que les places correspondant aux pièces effectivement détenues. (IL SERAIT BON DE DONNER UN EXEMPLE CONCRET ICI DE CARRIERS CONTIGUS ET NON CONTIGUS)
+- **Carriers indépendants.** Détermine la synchronisation. Des carriers indépendants déroulent leurs cycles sur des chronologies séparées ; des carriers non indépendants avancent ensemble. (ON PEUT DONNER UN EXEMPLE CONCRET ICI AUSSI SI C'EST PERTINENT)
 
 Les stations ordinaires à lot unique peuvent laisser ces deux réglages à leurs valeurs par défaut. Ils concernent principalement les zones de stockage et d'attente parallèles.
 
@@ -153,7 +153,7 @@ Les stations ordinaires à lot unique peuvent laisser ces deux réglages à leur
 
 Trois durées, chacune spécifiée comme une loi de probabilité (section 10) :
 
-- **Durée de mise en route.** Temps de préparation.
+- **Durée de mise en route.** Temps de préparation. (FAITE UNE FOIS AU DEMARRAGE PAS A CHAQUE LOT)
 - **Durée de chargement.** Temps de chargement du lot.
 - **Durée de traitement.** Temps d'opération, configuré par modèle.
 
@@ -167,7 +167,7 @@ Le **timeout** borne l'étape de collecte. À son expiration, le carrier procèd
 
 Un entier de 0 à 10 ; 10 est le plus élevé. Lorsque plusieurs postes se disputent la même entité rare (places, pièces, matières) au même instant, le poste le plus prioritaire est servi en premier.
 
-> **Note.** Le fait que la priorité arbitre également la compétition pour les groupes d'opérateurs dépend de la version du moteur utilisée. Lorsque l'accès d'une station à du personnel partagé est critique, l'approche fiable est un groupe d'opérateurs dédié plutôt que partagé.
+> **Note.** Le fait que la priorité arbitre également la compétition pour les groupes d'opérateurs dépend de la version du moteur utilisée. Lorsque l'accès d'une station à du personnel partagé est critique, l'approche fiable est un groupe d'opérateurs dédié plutôt que partagé. (ENLEVE L'OPTION DE PRIORITE DES POUR LES OPERATEURS DANS LE CODE : EN FAIT, SI J'AI DEUX MACHINES AYANT LA MEME PRIORITE AVEC DES CARRIERS PRETS A L'ENVOI, CA NE M'IMPORTE PAS LAQUELLE PREND LES OPERATEURS DONC PAS BESOIN DE METTRE UNE PRIORITE POUR LES OPERATEURS DU TOUT. MODIFIE LE CODE DE LA SIMULATION POUR CELA , EN PYTHON ET EN C+)
 
 ### Le drapeau Admin
 
@@ -183,6 +183,8 @@ Le comportement du collecteur combine deux choix indépendants.
 
 - Un collecteur **greedy**, une fois son lot minimum atteint, complète vers le maximum avec les pièces immédiatement disponibles, puis procède sans attente supplémentaire.
 - Un collecteur **altruiste** attend plus longtemps pour assembler un lot plus complet.
+
+(CE N'EST PAS CORRECT, CE N'EST PAS LA VRAIE DIFFERENCE ENTRE GREEDY ET ALTRUISTE : IL EST VRAI QUE LE COLLECTEUR GREEDY, UNE FOIS SON LOT MINIMUM ARREINT, COMPLETE VERS LE MAXIMUM AVEC LES PIECES IMMEDIATEMENT DISPONIBLES, PUIS PROCEDE SANS ATTENTE SUPPLEMENTAIRE, MAIS LE COLLECTEUR ALTRUISTE FAIT AUSSI CELA. LA DIFFERENCE EST QUE LE COLLECTEUR GREEDY N'ATTEND PAS D'AVOIR AU MOINS UN LOT MINIMUM DE PIECES DISPONIBLES AVANT DE LES RESERVER, IL COLLECTE LES PIECES UNE PAR UNE DIRECTEMENT QUAND ELLES DEVIENNENT DISPONIBLES, QUITTE A RALENTIR LE TRAVAIL D'AUTRE COLLECTEUR QUI TRAVAILLENT EN PARALLELE. POUR LE COLLECTEUR ALTRUISTE, IL ATTEND QUE AU MOINS UN LOT MINIMUM DE PIECES SOIT DISPONIBLE AVANT DE LES RESERVER, LAISSANT AINSI LA CHANCE A D'AUTRE COLLECTEURS AYANT UN LOT MINIMUM PLUS PETIT DE PRENDRE LES PIECES EN PREMIER)
 
 **Discriminant contre non discriminant** régit la sélection de modèle :
 
@@ -202,6 +204,7 @@ Au sein du focus, les pièces individuelles sont sélectionnées selon l'**ordre
 ---
 
 ## 7. Les opérateurs
+(LA PARTIE OPERATEURS SERAIT MIEUX PLACEE AVANT LA PARTIE POSTE ET APRES LA PARTIE RESSOURCES, CAR ON MENTIONNE A LA FIN LE SCOPE RESSOURCE QUI N'A PAS ETE INTRODUIT AVANT)
 
 Un **groupe d'opérateurs** représente une équipe de travailleurs interchangeables.
 
@@ -226,6 +229,7 @@ Le scope opérateur ne peut pas être par unité, et le scope ressource ne peut 
 ---
 
 ## 8. Les ressources
+(CETTE PARTIE SERAIT MIEUX PLACEE AVANT LA PARTIES POSTES ET AVANT LA PARTIE OPERATEUR. AUSSI IL FAUT INTRODUIRE LE SCOPE RESSOURCE COMME LE SCOPE OPERATEUR A LA FIN DE CETTE PARTIE)
 
 Une **ressource** est une matière consommable ou un équipement réutilisable (cire liquide, barbotine, moules). Les postes peuvent requérir des ressources pour opérer.
 
@@ -235,6 +239,7 @@ Propriétés :
 - **Durée de vie.** La durée d'utilisabilité d'une unité. Une durée de vie infinie désactive la péremption ; une durée finie modélise une matière périssable.
 
 Une **ressource réapprovisionnable** se recommande automatiquement. Lorsque le stock passe sous son **seuil**, une commande est passée ; après écoulement de la **durée de commande** puis de la **durée de livraison**, le stock est remis à capacité. Les postes qui requièrent une ressource épuisée attendent, et cette attente apparaît dans les rapports comme attente matière, délais de recommande inclus.
+(PRECISER ICI QUE LE CARRIER ATTEND ET QUE LES OPERATEURS SONT RESERVES POUR LA DUREE DE COMMANDE)
 
 ---
 
@@ -242,10 +247,10 @@ Une **ressource réapprovisionnable** se recommande automatiquement. Lorsque le 
 
 Un poste à ressources transforme des matières. Ses réglages spécifiques :
 
-- **Ressources non transformées.** Matières qui doivent être présentes mais ne sont pas consommées.
+- **Ressources non transformées.** Matières qui doivent être présentes mais ne sont pas consommées. (CORRECTION : ELLES SONT CONSOMMEES MAIS NE VONT PAS CONTRIBUER A LA RESSOURCE EN SORTIE DIRECTEMENT, EXEMPLES : ELECTRICITE, RESSOURCES UTILISEES POUR LES MACHINES...)
 - **Ressources transformées.** Matières consommées en entrée, chacune avec une **proportion** définissant sa part du mélange. Les proportions décrivent une recette et totalisent 1.
-- **Récupérable (salvageable).** Par ressource transformée, si le surplus inutilisé est récupéré plutôt que perdu.
-- **Ressources de sortie.** Quantités produites, spécifiées comme une loi bornée.
+- **Récupérable (salvageable).** Par ressource transformée, si le surplus inutilisé est récupéré plutôt que perdu. (FAUX : UNE RESSOURCE TRANSFORMEE EST "SALVAGEABLE" SI ELLE EST RECUPERABLE OU PAS SI LE CARRIER EST ABANDONNE)
+- **Ressources de sortie.** Quantités produites, spécifiées comme une loi bornée. (PARTIELLEMENT CORRECT : IL FAUT PRECISER QUE CE QUI EST DEFINI PAS LA LOI PROBABILISTE, C'EST LE COEFFICIENT QUI MULTIPLIE LE REQUESTED QUANTITY DU CARRIER, DONC LA QUANTITE EN SORTIE EST PROPORTIONNELLE A UN FACTEUR ALEATOIRE PRES DE LA QUANTITE DE RESSOURCES CONSOMMEES EN ENTREE)
 
 Les opérateurs, durées, shifts et interruptions se comportent comme pour les postes à pièces. Les postes à ressources utilisent un collecteur simplifié avec le seul choix greedy contre altruiste.
 
@@ -265,14 +270,18 @@ La plupart des paramètres numériques acceptent une **loi de probabilité** plu
 | LogNormal | Asymétrique à droite, positive | Durées parfois très longues |
 
 Certains paramètres acceptent en outre des **fonctions du temps** : des valeurs qui évoluent au fil de l'exécution selon un profil linéaire, exponentiel, ou par paliers. Applications : taux de rebut dérivants, montées en cadence.
+(PRECISE QUE CELA PEUT ETRE UTILISE POUR MODELISER UN RAMUP. PRECISE AUSSI QUE LES PARAMETRES DES LOIS ALEATOIRES EUX MEMES PEUVENT ETRE DES FONCTIONS DU TEMPS.)
 
-Chaque exécution utilise une **graine (seed)** qui initialise le générateur de nombres aléatoires. Graine et modèle identiques produisent une exécution identique ; changer la graine donne une réalisation indépendante. Utilisez une graine fixe pour la reproductibilité et plusieurs graines pour évaluer la variabilité.
+Chaque exécution utilise une **graine (seed)** qui initialise le générateur de nombres aléatoires. Graine et modèle identiques produisent une exécution identique ; changer la graine donne une réalisation indépendante. Utilisez une graine fixe pour la reproductibilité et plusieurs graines pour évaluer la variabilité. (PRECISE QUE UNE MEME GRAINE POUR UN RUN EN PYTHON ET EN C++ NE PRODUIT PAS LES MEMES RESULTATS, C'EST JUSTE POUR LES RUNS D'UN MEME MOTEUR)
+
+(TU PEUX AJOUTER A LA FIN ICI UN TABLEAU POUR PRESENTER BRIEVEMENT LES FONCTIONS DU TEMPS (LINEAIRE, STEP, EXPONENTIELLE) COMME TU AS FAIS POUR LES LOIS DE PROBA)
 
 ---
 
 ## 11. Les shifts et le calendrier
 
 Un **shift** définit les heures de travail d'un poste, d'un générateur, ou d'un groupe d'opérateurs. Hors de ses shifts, l'entité est inactive.
+(IL EST PERTINENT DE PRECISER ICI QUE LES "SHIFTS" DES TACHES ET DUU GENERATEUR DE PIECES REPRESENTENT EN FAIT LES TEMPS D'OUVERTURE, DONC SONT DIFFERENTS DES SHIFTS DES GROUPES D'OPERATEURS)
 
 Deux modes de définition :
 
@@ -295,6 +304,7 @@ Une **panne** est une défaillance aléatoire non planifiée, caractérisée par
 - **Le temps moyen de réparation (MTTR).**
 
 Lors d'une défaillance, le travail en cours est interrompu. Pour un poste à pièces, les pièces en cours sont déposées dans des **outlets canots de sauvetage** désignés plutôt que perdues. La station reprend après réparation.
+(MENTIONNER AUSSI POUR LES MTBF QU'IL Y A LA POSSIBILITE DE METTRE SOIT UNE DISTRIBUTION DE PROBA SOIT DE DEFINIR LE MTBF PAR UNE COURBE EN BAIGNOIRE "BATHTUB CURVE" DU TAUX DE DEFAILLANCE QUI PREND EN ENTREE 5 PARAMETRES ET EXPLIQUER CE QUE CHAQUE PARAMETRE REPRESENTE : LARGEUR DU PLATEUAU, PENTES...)
 
 ### Les arrêts programmés (shutdowns)
 
@@ -315,7 +325,7 @@ Chaque flux contient exactement un **générateur de pièces**, la source de tou
 
 ### Le mode objectifs
 
-Chaque modèle feuille reçoit un objectif de bonnes pièces. Le générateur cadence l'émission par un **gap** (l'intervalle entre pièces), fixé manuellement ou calculé automatiquement à partir de l'objectif total et du temps de travail disponible.
+Chaque modèle feuille reçoit un objectif de bonnes pièces. Le générateur cadence l'émission par un **gap** (l'intervalle entre deux pièces crées), fixé manuellement ou calculé automatiquement à partir de l'objectif total et du temps de travail disponible.
 
 - **La période de grâce.** Avec un gap automatique, une période de grâce peut être réservée : une portion du temps de travail en fin d'horizon exclue du calcul de cadence. Elle fournit du mou pour que la ligne se vide et que les pièces rebutées soient refaites avant l'échéance.
 - **La refabrication consciente du rebut.** Le générateur surveille le rebut. Une pièce rebutée laisse son objectif non satisfait, et le générateur émet un remplacement. Les objectifs s'expriment donc en bonnes pièces livrées ; le nombre de pièces injectées peut dépasser l'objectif du nombre de rebuts.
@@ -336,6 +346,7 @@ Le **critère d'arrêt** termine l'exécution.
 - **Par pièces produites (by pieces produced).** L'exécution se termine lorsque le buffer de sortie atteint l'objectif total. Utilisé avec le mode objectifs. Un **timeout** fournit une borne supérieure : si l'objectif n'est pas atteint au timeout, l'exécution se termine et les rapports reflètent le résultat partiel.
 
 Un garde-fou supplémentaire s'applique aux exécutions non bornées : si le timeout est infini et qu'aucune pièce n'atteint la sortie pendant une longue période de temps simulé, l'exécution se termine avec une erreur explicite plutôt que de continuer indéfiniment.
+(QUESTION ICI : LORSQUE LE TIMEOUT EST INFINI, COMMET EST-CE QU'ON DETERMINE LA FIN DE LA SIMULATION ? EST-CE QUE C'EST APRES UNE LONGUE DUREE DEFINIE COMME EXPLIQUE DANS LA PHRASE PRECEDENTE OU QUAND IL N'Y A PLUS D'EVENEMENTS A VENIR DANS LA SIMULATION ?)
 
 ---
 
@@ -398,5 +409,3 @@ flowchart TD
 
 - Construire et lancer des modèles : [guide du Flow Designer](flow-designer.fr.md).
 - Interpréter les sorties d'exécution : [référence des KPI](kpis.fr.md).
-
-Lorsque les résultats s'écartent des attentes, vérifiez, dans l'ordre : la configuration des shifts (une entité était fermée), la disponibilité des opérateurs, l'accumulation dans les buffers (un goulot en aval), et la période de grâce au regard du taux de rebut. Ces quatre causes expliquent la grande majorité des résultats inattendus.
