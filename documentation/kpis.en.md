@@ -28,13 +28,15 @@ This is the classic OEE decomposition: each rate steps down one level, and OEE i
 
 **Net time and useful time are reconstructed, not measured.** TN = ideal cycle x pieces produced; TU = ideal cycle x good pieces. Useful time is the net time of the good pieces alone.
 
-**The ideal cycle time** is the theoretical time to produce one piece under perfect conditions: full batch, nominal pace, no waiting. Example, an oven:
+**The ideal cycle time** is the theoretical time to produce one piece when the station runs at full capacity, with no losses. Divide the batch time (processing + loading) by the **station capacity** (`max_capacity`, the total number of slots), that is, by the number of pieces the station processes at once at full load. Example, a single-batch oven:
 
 - configured processing time: 120 minutes per batch (mean),
 - loading: 10 minutes,
-- maximum batch: 4 pieces.
+- capacity: 4 slots (one batch at a time).
 
-A full batch requires 130 minutes and yields 4 pieces: ideal cycle = 130 / 4 = 32.5 minutes per piece; nominal rate = 60 / 32.5, approximately 1.85 pieces per hour.
+A batch requires 130 minutes and fills the 4 slots: ideal cycle = 130 / 4 = 32.5 minutes per piece.
+
+Dividing by the total capacity rather than by one batch's size matters for parallel stations: an 8-slot oven (two batches at once) yields 8 pieces per 130 minutes, ideal cycle = 130 / 8 = 16.25 minutes per piece. This keeps the OEE of a station running at its nominal capacity within [0, 100%], including heavily parallel stations (storage, drying). For a serial station (one batch at a time), capacity equals the batch size and the ideal cycle is unchanged.
 
 Since configured durations are distributions, the reference uses their mean (evaluated at t = 0 when parameters vary over time). This is a reference convention, analogous to the nominal rate on a machine's specification sheet, not a measurement. The ideal cycle serves exclusively to construct TN, and thereby performance and OEE. Each model has its own ideal cycle (`tc_ideal` in `postes_modeles.csv`).
 
@@ -66,7 +68,7 @@ The `admin` column (yes/no) reflects the task's admin flag. It has no effect on 
 - `disponibilite` = TF / TR: the share of required time the station is not broken down. Only breakdowns count here; everything else (starvation, startups, frozen time, partial batches) falls into performance.
 - `performance` = TN / TF: the pace achieved relative to running time. Losses: slower-than-nominal cycles, starvation (missing pieces or materials), startups, waits, frozen time, partial batches.
 
-  > **Note.** The ideal cycle is a per-piece serial reference. On a station running many batches in parallel (storage, drying, waiting), TN can exceed TF, and performance, hence OEE, can exceed 100%. On a serial station (one machine, one batch at a time), performance and OEE stay within [0, 100%].
+  > **Note.** The ideal cycle divides by the station's total capacity, so performance measures output against what the station can deliver at full load. It stays within [0, 100%], parallel stations included. A slight overshoot is only possible when sampled durations occasionally fall below their mean.
 
 - `qualite` = good / produced. A station's good pieces are those its immediate downstream router did not send to scrap; without a scrap route, quality equals 1.
 - `trs` = availability x performance x quality = **useful time / required time**. The cascade telescopes exactly: (TF / TR) x (TN / TF) x (good / produced) = (ideal cycle x good) / TR = useful time / required time.
@@ -111,7 +113,7 @@ Two accounting columns with deliberately different aggregation rules:
 
 Per piece task and model: the ideal cycle time (`tc_ideal`) and the produced, good, and scrapped counts. This is the detail underlying TN.
 
-> **Note.** `tc_ideal` is the mean of the configured durations (processing and loading taken at their mean), not a measured time; it is the same ideal-cycle convention as in the time cascade.
+> **Note.** `tc_ideal` is the per-piece time at full capacity: (processing + loading, taken at their mean) divided by the station capacity. It is the same ideal-cycle convention as in the time cascade, not a measured time.
 
 ---
 

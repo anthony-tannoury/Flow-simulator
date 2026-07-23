@@ -150,10 +150,11 @@ def _num(value) -> float | str:
 def ideal_cycle_times(task) -> dict:
     from .piece_task import PieceTask
     loading = task.config.loading_duration.mean(0.0)
+    capacity = task.config.max_capacity
     if isinstance(task, PieceTask):
-        return {model: (mc.duration.mean(0.0) + loading) / mc.max_carrier_capacity
+        return {model: (mc.duration.mean(0.0) + loading) / capacity
                 for model, mc in task.config.models_configs.items()}
-    return {None: (task.config.duration.mean(0.0) + loading) / task.config.max_carrier_capacity}
+    return {None: (task.config.duration.mean(0.0) + loading) / capacity}
 
 
 def task_kpis(task) -> dict:

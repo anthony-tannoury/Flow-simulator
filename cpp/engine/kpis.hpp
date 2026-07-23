@@ -205,13 +205,14 @@ inline const Model* config_key(const PieceTaskConfig& cfg, const Model* model) {
 inline std::map<const Model*, double> ideal_cycle_times(Task* task) {
     std::map<const Model*, double> tc;
     double loading = task->config->loading_duration->mean(0.0);
+    double capacity = task->config->max_capacity;
     if (auto* pt = dynamic_cast<PieceTask*>(task)) {
         auto* cfg = pt->pconfig().get();
         for (const auto& [model, mc] : cfg->models_configs)
-            tc[model] = (mc.duration->mean(0.0) + loading) / mc.max_carrier_capacity;
+            tc[model] = (mc.duration->mean(0.0) + loading) / capacity;
     } else {
         auto* cfg = static_cast<ResourceTaskConfig*>(task->config.get());
-        tc[nullptr] = (cfg->duration->mean(0.0) + loading) / cfg->max_carrier_capacity;
+        tc[nullptr] = (cfg->duration->mean(0.0) + loading) / capacity;
     }
     return tc;
 }

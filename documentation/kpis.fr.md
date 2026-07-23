@@ -28,13 +28,15 @@ C'est la décomposition classique du TRS : chaque taux fait descendre d'un cran,
 
 **Le temps net et le temps utile sont reconstruits, pas mesurés.** TN = cycle idéal x pièces produites ; TU = cycle idéal x pièces bonnes. Le temps utile est le temps net des seules bonnes pièces.
 
-**Le temps de cycle idéal** est le temps théorique de production d'une pièce dans des conditions parfaites : lot plein, cadence nominale, aucune attente. Exemple, un four :
+**Le temps de cycle idéal** est le temps théorique de production d'une pièce lorsque le poste tourne à pleine capacité, sans perte. On divise le temps d'un lot (traitement + chargement) par la **capacité du poste** (`max_capacity`, le nombre total de places), c'est-à-dire par le nombre de pièces que le poste traite simultanément à pleine charge. Exemple, un four à une seule fournée :
 
 - temps de traitement configuré : 120 minutes par lot (moyenne),
 - chargement : 10 minutes,
-- lot maximum : 4 pièces.
+- capacité : 4 places (une fournée à la fois).
 
-Un lot plein demande 130 minutes et livre 4 pièces : cycle idéal = 130 / 4 = 32.5 minutes par pièce ; cadence nominale = 60 / 32.5, environ 1.85 pièce par heure.
+Une fournée demande 130 minutes et occupe les 4 places : cycle idéal = 130 / 4 = 32.5 minutes par pièce.
+
+Diviser par la capacité totale, et non par la taille d'un seul lot, importe pour les postes parallèles : un four de 8 places (deux fournées simultanées) sort 8 pièces par 130 minutes, cycle idéal = 130 / 8 = 16.25 minutes par pièce. C'est ce qui maintient le TRS d'un poste tournant à sa capacité nominale dans [0, 100%], y compris pour les postes très parallèles (stockage, séchage). Pour un poste sériel (une fournée à la fois), la capacité égale la taille d'un lot et le cycle idéal est inchangé.
 
 Les durées configurées étant des distributions, la référence utilise leur moyenne (évaluée à t = 0 quand les paramètres varient dans le temps). Il s'agit d'une convention de référence, analogue à la cadence nominale d'une fiche machine, pas d'une mesure. Le cycle idéal sert exclusivement à construire TN, et par là la performance et le TRS. Chaque modèle a son propre cycle idéal (`tc_ideal` dans `postes_modeles.csv`).
 
@@ -66,7 +68,7 @@ La colonne `admin` (oui/non) reflète le marqueur admin de la tâche. Elle n'a a
 - `disponibilite` = TF / TR : la part du temps requis où le poste n'est pas en panne. Seules les pannes sont comptées ici ; tout le reste (famine, mises en route, temps gelé, lots partiels) se reporte sur la performance.
 - `performance` = TN / TF : la cadence obtenue rapportée au temps de fonctionnement. Pertes : cycles plus lents que le nominal, famine (pièces ou matière manquantes), mises en route, attentes, temps gelé, lots partiels.
 
-  > **Note.** Le cycle idéal est une référence par pièce en marche sérielle. Sur un poste faisant tourner de nombreux lots en parallèle (stockage, séchage, attente), TN peut dépasser TF, et la performance, donc le TRS, dépasser 100%. Sur un poste sériel (une machine, un lot à la fois), performance et TRS restent dans [0, 100%].
+  > **Note.** Le cycle idéal divise par la capacité totale du poste, si bien que la performance rapporte la production à ce que le poste peut sortir à pleine charge. Elle reste dans [0, 100%], postes parallèles compris. Un léger dépassement n'est possible que si des durées échantillonnées tombent ponctuellement sous leur moyenne.
 
 - `qualite` = bonnes / produites. Les bonnes pièces d'un poste sont celles que son router aval immédiat n'a pas envoyées au rebut ; sans route de rebut, la qualité vaut 1.
 - `trs` = disponibilité x performance x qualité = **temps utile / temps requis**. La cascade télescope exactement : (TF / TR) x (TN / TF) x (bonnes / produites) = (cycle idéal x bonnes) / TR = temps utile / temps requis.
@@ -111,7 +113,7 @@ Deux colonnes comptables aux règles d'agrégation délibérément différentes 
 
 Par tâche pièces et par modèle : le temps de cycle idéal (`tc_ideal`) et les comptes produit, bon, rebuté. C'est le détail sous-jacent à TN.
 
-> **Note.** `tc_ideal` est la valeur moyenne des durées configurées (traitement et chargement évalués à leur moyenne), pas un temps mesuré ; c'est la même convention de cycle idéal que dans la cascade des temps.
+> **Note.** `tc_ideal` est le temps par pièce à pleine capacité : (traitement + chargement, évalués à leur moyenne) divisé par la capacité du poste. C'est la même convention de cycle idéal que dans la cascade des temps, pas un temps mesuré.
 
 ---
 
