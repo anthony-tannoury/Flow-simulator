@@ -97,9 +97,10 @@ def write_machine_report(parser, directory: str, run_info: dict) -> None:
         return rel if os.path.isfile(os.path.join(directory, rel)) else None
 
     safe = graphs._safe
-    flux, flux_modeles = kpis.flow_kpis(
-        [b for b in parser.outlets.values() if isinstance(b, Buffer)], parser.piece_generator)
     task_kpi_rows = {id_: kpis.task_kpis(t) for id_, t in parser.tasks.items()}
+    flux, flux_modeles = kpis.flow_kpis(
+        [b for b in parser.outlets.values() if isinstance(b, Buffer)], parser.piece_generator,
+        list(task_kpi_rows.values()))
     data = {
         'format': 'flow-simulator-report',
         'version': 1,

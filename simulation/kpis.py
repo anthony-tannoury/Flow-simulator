@@ -390,7 +390,7 @@ def _lead_stats(leads: list[float]) -> dict:
     }
 
 
-def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
+def flow_kpis(buffers, piece_generator=None, task_rows=None) -> tuple[dict, list[dict]]:
     from .outlet import BufferType
     tt = env.now()
     exits = [p for b in buffers if b.buffer_type is BufferType.EXIT for p in b]
@@ -411,6 +411,9 @@ def flow_kpis(buffers, piece_generator=None) -> tuple[dict, list[dict]]:
         'encours_max': WIP.maximum(),
         'encours_final': WIP(),
     }
+    if task_rows is not None:
+        flux['heures_machine_totales'] = round(sum(r['heures_machine'] for r in task_rows), 3)
+        flux['heures_main_oeuvre_totales'] = round(sum(r['heures_main_oeuvre'] for r in task_rows), 3)
 
     par_modele = []
     if piece_generator is not None:
@@ -524,6 +527,7 @@ DUREE_COLS = {
     'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee', 'temps_rupture',
+    'heures_machine_totales', 'heures_main_oeuvre_totales',
 }
 PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
             'trs', 'trg', 'tre', 'taux_rebut', 'atteinte', 'taux_occupation'}
@@ -584,9 +588,7 @@ def write_report(directory: str, tasks: list, buffers: list, piece_generator=Non
     _write_csv(os.path.join(directory, 'ressources.csv'),
                [resource_kpis(r) for r in (resources or [])], sim_start)
 
-    flux, par_modele = flow_kpis(buffers, piece_generator)
-    flux['heures_machine_totales'] = round(sum(r['heures_machine'] for r in task_rows), 3)
-    flux['heures_main_oeuvre_totales'] = round(sum(r['heures_main_oeuvre'] for r in task_rows), 3)
+    flux, par_modele = flow_kpis(buffers, piece_generator, task_rows)
     _write_csv(os.path.join(directory, 'flux.csv'),
                [{'cle': k, 'valeur': v} for k, v in _format_row(flux, sim_start).items()])
     _write_csv(os.path.join(directory, 'flux_modeles.csv'), par_modele, sim_start)

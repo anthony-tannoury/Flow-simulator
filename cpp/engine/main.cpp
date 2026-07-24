@@ -234,7 +234,7 @@ int main(int argc, char** argv) {
         for (const auto& [id, g] : p.operator_groups) ops_j[id] = kpis::operator_kpis(g);
         kpis::ojson resources_j = kpis::ojson::object();
         for (const auto& [id, r] : p.resources) resources_j[id] = kpis::resource_kpis(r);
-        auto [flux, flux_modeles] = kpis::flow_kpis(buffers, p.piece_generator);
+        auto [flux, flux_modeles] = kpis::flow_kpis(buffers, p.piece_generator, &task_rows);
 
         kpis::ojson report;
         report["format"] = "flow-simulator-report";

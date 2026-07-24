@@ -17,7 +17,7 @@ DUREE_COLS = {
     'sejour_moyen', 'sejour_max', 'temps_moyen_entre_arrivees', 'temps_poste',
     'traversee_moyenne', 'traversee_mediane', 'traversee_p90', 'traversee_max',
     'temps_traversee', 'tc_ideal', 'duree_simulee', 'sim_end_minutes',
-    'temps_rupture',
+    'temps_rupture', 'heures_machine_totales', 'heures_main_oeuvre_totales',
 }
 PCT_COLS = {'taux_de_charge', 'disponibilite', 'performance', 'qualite',
             'trs', 'trg', 'tre', 'taux_rebut', 'atteinte', 'taux_occupation'}
@@ -36,6 +36,8 @@ LABEL_OVERRIDES = {
     'heures_machine': 'Heures machine',
     'heures_en_poste': 'Heures en poste', 'heures_hors_poste': 'Heures hors poste',
     'heures_main_oeuvre': "Heures main-d'\u0153uvre",
+    'heures_machine_totales': 'Heures machine totales',
+    'heures_main_oeuvre_totales': "Heures main-d'\u0153uvre totales",
     'capacite': 'Capacit\u00e9', 'consommation_totale': 'Consommation totale',
     'consommation_j': 'Consommation / jour', 'entrees_totales': 'Entr\u00e9es totales',
     'nb_ruptures': 'Nb ruptures', 'temps_rupture': 'Temps rupture',
