@@ -21,3 +21,13 @@ def fresh_parser():
         return Parser(path), simulation.env
 
     return load
+
+
+@pytest.fixture
+def fresh_sim():
+    os.chdir(REPO)
+    for mod in [m for m in list(sys.modules)
+                if m == 'simulation' or m.startswith('simulation.')]:
+        del sys.modules[mod]
+    import simulation
+    return simulation

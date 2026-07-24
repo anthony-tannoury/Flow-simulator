@@ -52,11 +52,12 @@ class Piece(sim.Component):
             q.model_counts[p.model] = q.model_counts.get(p.model, 0) + 1
         q.trigger.trigger()
         if q.piece_generator is not None:
-            idx = q.piece_generator.models.index(self.model)
-            q.piece_generator.generated[idx] -= len(self.family)
+            for p in self.family:
+                if p.model in q.piece_generator.models:
+                    q.piece_generator.generated[q.piece_generator.models.index(p.model)] -= 1
             q.piece_generator.trigger.trigger()
         if q.buffer_type in (BufferType.EXIT, BufferType.SCRAP):
-            WIP.tally(WIP() - 1)
+            WIP.tally(WIP() - len(self.family))
         if len(self.journal) < Piece.JOURNAL_CAP:
             self.journal.append(('in', q.name(), env.now()))
         return super().enter(q, priority)

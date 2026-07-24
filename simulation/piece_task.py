@@ -42,6 +42,10 @@ class PieceCollector(Component, Dispatchable, Donnable):
         self.task = task
         self.collected_pieces: list[Piece] = []
 
+    @property
+    def collected_weight(self) -> int:
+        return sum(len(piece.family) for piece in self.collected_pieces)
+
     def check_piece_family_discrimination_compatibility(self, piece: Piece) -> None:
         assert isinstance(self.task.config, PieceTaskConfig)
         discriminating = PieceCollectorType.is_discriminating(self.task.config.piece_collector_type)
@@ -67,68 +71,74 @@ class PieceCollector(Component, Dispatchable, Donnable):
         kwargs.setdefault('mode', 'wait_pieces')
         return self.from_store(**kwargs), self.from_store_store()
 
+    def guard_carrier_capacity(self, piece: Piece, max_carrier_capacity: int) -> None:
+        weight = len(piece.family)
+        if weight > max_carrier_capacity:
+            raise ValueError(f"cluster of {weight} pieces exceeds max_carrier_capacity "
+                             f"{max_carrier_capacity} at task '{self.task.name()}'")
+
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
         assert isinstance(self.task.config, PieceTaskConfig)
-        while len(self.collected_pieces) < target:
+        while self.collected_weight < target:
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
             if self.failed():
                 return True
             piece, buffer = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
+            if self.failed():
+                self.release((self.task.vacant_slots, 1))
+                return True
             self.check_piece_family_discrimination_compatibility(piece)
-            if self.failed():
-                self.release((self.task.vacant_slots, 1))
-                return True
-            elif len(piece.family) > self.task.config.get_model_config(piece.model).max_carrier_capacity:
-                # We could add a 'blacklisted' flag to the piece lest we pick it again
+            weight = len(piece.family)
+            max_carrier_capacity = self.task.config.get_model_config(piece.model).max_carrier_capacity
+            self.guard_carrier_capacity(piece, max_carrier_capacity)
+            if self.collected_weight + weight > max_carrier_capacity:
                 self.release((self.task.vacant_slots, 1))
                 piece.enter(buffer)
-                continue
-            
-            self.request((self.task.vacant_slots, len(piece.family) - 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
+                return False
+
+            self.request((self.task.vacant_slots, weight - 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
             if self.failed():
                 piece.enter(buffer)
                 return True
-            
+
             self.collected_pieces.append(piece)
-            self.task.pieces_in += 1
+            self.task.pieces_in += weight
         return False
 
     def ensure_one(self) -> None:
         assert isinstance(self.task.config, PieceTaskConfig)
-        if not self.collected_pieces:
-            self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
-            piece, buffer = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
-            self.check_piece_family_discrimination_compatibility(piece)
-            if len(piece.family) > self.task.config.get_model_config(piece.model).max_carrier_capacity:
-                self.release((self.task.vacant_slots, 1))
-                self.ensure_one()
-                piece.enter(buffer)
-                return
-            
-            self.request((self.task.vacant_slots, len(piece.family) - 1), request_priority=self.task.request_priority, mode="wait_slot")
-            assert isinstance(piece, Piece)
-            self.collected_pieces.append(piece)
-            self.task.pieces_in += 1
+        if self.collected_pieces:
+            return
+        self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
+        piece, buffer = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
+        self.check_piece_family_discrimination_compatibility(piece)
+        weight = len(piece.family)
+        max_carrier_capacity = self.task.config.get_model_config(piece.model).max_carrier_capacity
+        self.guard_carrier_capacity(piece, max_carrier_capacity)
+        self.request((self.task.vacant_slots, weight - 1), request_priority=self.task.request_priority, mode="wait_slot")
+        self.collected_pieces.append(piece)
+        self.task.pieces_in += weight
 
     def top_up(self, limit: int, piece_filter) -> None:
-        while self.task.vacant_slots.available_quantity() > 0 and len(self.collected_pieces) < limit:
+        while self.collected_weight < limit and self.task.vacant_slots.available_quantity() > 0:
             piece, buffer = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_delay=0, request_priority=self.task.request_priority)
-            self.check_piece_family_discrimination_compatibility(piece)
             if self.failed():
                 break
-            elif len(piece.family) > self.task.vacant_slots.available_quantity():
+            self.check_piece_family_discrimination_compatibility(piece)
+            weight = len(piece.family)
+            if self.collected_weight + weight > limit or weight > self.task.vacant_slots.available_quantity():
                 piece.enter(buffer)
                 break
 
-            self.request((self.task.vacant_slots, len(piece.family)), request_priority=self.task.request_priority, mode="wait_slot")
-            assert isinstance(piece, Piece)
+            self.request((self.task.vacant_slots, weight), request_priority=self.task.request_priority, mode="wait_slot")
             self.collected_pieces.append(piece)
-            self.task.pieces_in += 1
+            self.task.pieces_in += weight
 
     def block_remainder(self, max_carrier_capacity: int) -> None:
         if not self.task.config.contiguous_carriers:
-            remainder = max_carrier_capacity - sum(len(piece.family) for piece in self.collected_pieces)
-            self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority, mode="wait_slot")
+            remainder = max_carrier_capacity - self.collected_weight
+            if remainder > 0:
+                self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority, mode="wait_slot")
 
     def present_counts(self) -> dict[Model, int]:
         cache = getattr(self.task, '_can_take_cache', None)
@@ -233,34 +243,53 @@ class AltruisticMixin:
                 case ExitOrder.FIRST_CREATED_FIRST_OUT:
                     valid_pieces.sort(key=lambda pb: pb[0].creation_time())
 
-            truncate = min(max_carrier_capacity, self.task.vacant_slots.available_quantity() + min_carrier_capacity)
-            valid_pieces = valid_pieces[:truncate]
+            available_extra = self.task.vacant_slots.available_quantity()
+            selected: list[tuple[Piece, Buffer]] = []
+            weight_sum = 0
+            for piece, buffer in valid_pieces:
+                weight = len(piece.family)
+                if weight > max_carrier_capacity:
+                    raise ValueError(f"cluster of {weight} pieces exceeds max_carrier_capacity "
+                                     f"{max_carrier_capacity} at task '{self.task.name()}'")
+                if weight_sum + weight > max_carrier_capacity:
+                    break
+                if max(0, weight_sum + weight - min_carrier_capacity) > available_extra:
+                    break
+                selected.append((piece, buffer))
+                weight_sum += weight
 
-            if len(valid_pieces) >= min_carrier_capacity:
-                additional = len(valid_pieces) - min_carrier_capacity
+            if weight_sum >= min_carrier_capacity:
+                additional = weight_sum - min_carrier_capacity
                 if additional > 0:
                     self.request((self.task.vacant_slots, additional), fail_delay=0, request_priority=self.task.request_priority, mode="wait_slot")
                     if self.failed():
                         additional = 0
-                        valid_pieces = valid_pieces[:min_carrier_capacity]
+                        trimmed, weight_sum = [], 0
+                        for piece, buffer in selected:
+                            if weight_sum + len(piece.family) > min_carrier_capacity:
+                                break
+                            trimmed.append((piece, buffer))
+                            weight_sum += len(piece.family)
+                        selected = trimmed
 
-                valid_pieces = [pb for pb in valid_pieces if pb[0] in pb[1]]
-                if len(valid_pieces) < min_carrier_capacity:
+                selected = [pb for pb in selected if pb[0] in pb[1]]
+                weight_sum = sum(len(pb[0].family) for pb in selected)
+                if weight_sum < min_carrier_capacity:
                     if additional > 0:
                         self.release((self.task.vacant_slots, additional))
                     continue
 
-                surplus = additional - (len(valid_pieces) - min_carrier_capacity)
+                surplus = (min_carrier_capacity + additional) - weight_sum
                 if surplus > 0:
                     self.release((self.task.vacant_slots, surplus))
 
-                for piece, buffer in valid_pieces:
+                for piece, buffer in selected:
                     piece.leave(buffer)
                     self.collected_pieces.append(piece)
-                    self.task.pieces_in += 1
+                    self.task.pieces_in += len(piece.family)
 
                 if not self.task.config.contiguous_carriers:
-                    self.request((self.task.vacant_slots, max_carrier_capacity - len(valid_pieces)), request_priority=self.task.request_priority, mode="wait_slot")
+                    self.request((self.task.vacant_slots, max_carrier_capacity - weight_sum), request_priority=self.task.request_priority, mode="wait_slot")
             else:
                 self.wait(*[inlet.trigger for inlet in self.task.inlets], fail_at=deadline, mode="wait_pieces")
                 if self.failed():
@@ -330,7 +359,7 @@ class PieceProtocols(Protocols):
 class PieceTaskConfig(TaskConfig):
     models_configs: dict[Model, ModelConfig]
     piece_collector_type: PieceCollectorType
-    association_type: AssociationType
+    association_type: AssociationType = AssociationType.PASSIVE
 
     def get_model_config(self, model: Model) -> ModelConfig:
         m = model
@@ -411,7 +440,7 @@ class PieceCarrier(Carrier):
     def request_resources(self, fail_at):
         assert isinstance(self.task.config, PieceTaskConfig)
         model = self.piece_collector.collected_pieces[0].model
-        mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else len(self.piece_collector.collected_pieces)
+        mult = 1 if self.task.config.resource_scope is Scope.PER_BATCH else self.piece_collector.collected_weight
         resources = [(r, q*mult) for r, q in self.task.config.get_model_config(model).resources]
         self.request(*resources, fail_at=fail_at, cap_now=True, mode="wait_materials")
         self.freeze_abort_if(self.failed())
@@ -425,7 +454,7 @@ class PieceCarrier(Carrier):
         self.piece_collector.cancel()
 
         pieces = self.piece_collector.collected_pieces
-        self.task.batch_sizes.tally(len(pieces))
+        self.task.batch_sizes.tally(self.piece_collector.collected_weight)
         self.task.cycle_times.tally(env.now() - self.creation_time())
         for piece in pieces:
             if len(piece.journal) < piece.JOURNAL_CAP:
@@ -434,17 +463,24 @@ class PieceCarrier(Carrier):
         match self.task.config.association_type:
             case AssociationType.ASSOCIATIVE:
                 Piece.associate_all(pieces)
-                place([pieces[0].parent], self.task.outlets)
+                tokens = [pieces[0]]
             case AssociationType.DISSOCIATIVE:
-                Piece.dissociate_all(pieces)
-                place(pieces[0].family, self.task.outlets)
+                tokens = []
+                for piece in pieces:
+                    family = piece.family
+                    Piece.dissociate_all(family)
+                    tokens.extend(family)
             case AssociationType.PASSIVE:
-                place(pieces, self.task.outlets)
-        
-        for piece in pieces:
-            self.task.deposited[piece.model] += len(piece.family)
-            if any(isinstance(q, Buffer) and q.buffer_type is BufferType.SCRAP for q in piece.queues()):
-                self.task.scrapped[piece.model] += len(piece.family)
+                tokens = pieces
+
+        place(tokens, self.task.outlets)
+
+        for token in tokens:
+            scrapped = any(isinstance(q, Buffer) and q.buffer_type is BufferType.SCRAP for q in token.queues())
+            for member in token.family:
+                self.task.deposited[member.model] += 1
+                if scrapped:
+                    self.task.scrapped[member.model] += 1
 
         self.set_mode("")
         self.done.set(True)
