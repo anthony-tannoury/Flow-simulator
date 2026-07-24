@@ -158,6 +158,75 @@ def test_cluster_over_capacity_raises(fresh_sim):
         _run_guard("NON_DISCRIMINATING_GREEDY", 3)
 
 
+def test_focus_on_child_model_raises_instead_of_stalling(fresh_sim):
+    # A mixed token rooted M1 (children include M2) waits in front of a
+    # discriminating task whose focus protocol always picks M2 and whose
+    # timeout is infinite. The focus filter must match the token through its
+    # family so the mixed-cluster guard raises immediately; matching the root
+    # alone made the collector wait forever on a filter no token could satisfy.
+    import salabim as sim
+    from simulation import env
+    from simulation.interval import Interval
+    from simulation.piece import Model, GoalPieceGenerator
+    from simulation.outlet import Buffer, BufferType
+    from simulation.sampler import Distribution
+    from simulation.operator import Alternative
+    from simulation.protocols import (AbortPendingCarriers, NotConstrainedByShift,
+                                       Conscious, FirstInFirstOut, MostPresent,
+                                       FastestTaskDuration)
+    from simulation.task import Scope
+    from simulation.piece_task import (PieceTaskConfig, ModelConfig, PieceTask,
+                                       PieceCollectorType, PieceProtocols, AssociationType)
+    from simulation.judgement_day import ByTime, SimulationStopper
+
+    env.trace(False)
+    m1, m2 = Model("M1"), Model("M2")
+    long_shift = [Interval(0, 1_000_000)]
+    late_shift = [Interval(50, 1_000_000)]
+    b0 = Buffer("B0", valid_models=[m1, m2], buffer_type=BufferType.PASSAGE)
+    b1 = Buffer("B1", valid_models=[m1, m2], buffer_type=BufferType.PASSAGE)
+    exit_buffer = Buffer("EXIT", valid_models=[m1, m2], buffer_type=BufferType.EXIT)
+    GoalPieceGenerator(models_goals={m1: 4, m2: 1}, shifts=long_shift, outlets=[b0], gap=1.0)
+
+    slow, fast = Distribution(sim.Constant, 5), Distribution(sim.Constant, 1)
+    base = dict(startup_duration=Distribution(sim.Constant, 0),
+                loading_duration=Distribution(sim.Constant, 1),
+                startup_operators=Alternative(), loading_operators=Alternative(),
+                operators=Alternative(), operator_scope=Scope.PER_BATCH,
+                resource_scope=Scope.PER_BATCH, min_carriers=1, max_capacity=8,
+                contiguous_carriers=False, independent_carriers=True,
+                priority=5, admin=False)
+
+    assoc_protocols = PieceProtocols(AbortPendingCarriers(), AbortPendingCarriers(),
+                                     NotConstrainedByShift(), NotConstrainedByShift(),
+                                     Conscious(), FirstInFirstOut(), MostPresent())
+    fastest_focus = PieceProtocols(AbortPendingCarriers(), AbortPendingCarriers(),
+                                   NotConstrainedByShift(), NotConstrainedByShift(),
+                                   Conscious(), FirstInFirstOut(), FastestTaskDuration())
+
+    PieceTask(name="ASSOC", config=PieceTaskConfig(
+        task_shifts=long_shift, timeout=50, protocols=assoc_protocols,
+        models_configs={m: ModelConfig(duration=slow, resources=[],
+                                       min_carrier_capacity=4, max_carrier_capacity=4)
+                        for m in (m1, m2)},
+        piece_collector_type=PieceCollectorType.NON_DISCRIMINATING_GREEDY,
+        association_type=AssociationType.ASSOCIATIVE, **base),
+        inlets=[b0], outlets=[b1])
+    PieceTask(name="MID", config=PieceTaskConfig(
+        task_shifts=late_shift, timeout=float('inf'), protocols=fastest_focus,
+        models_configs={m1: ModelConfig(duration=slow, resources=[],
+                                        min_carrier_capacity=1, max_carrier_capacity=4),
+                        m2: ModelConfig(duration=fast, resources=[],
+                                        min_carrier_capacity=1, max_carrier_capacity=4)},
+        piece_collector_type=PieceCollectorType.DISCRIMINATING_GREEDY,
+        association_type=AssociationType.PASSIVE, **base),
+        inlets=[b1], outlets=[exit_buffer])
+
+    SimulationStopper(criterion=ByTime(time=200))
+    with pytest.raises(RuntimeError, match="cluster of different models"):
+        env.run(till=10_000_000)
+
+
 def test_cluster_over_station_capacity_raises(fresh_sim):
     # carrier cap fits the w4 cluster but the station only has 3 slots in total:
     # the sibling reservation could never be satisfied, so it must raise instead

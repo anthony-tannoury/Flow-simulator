@@ -67,6 +67,9 @@ class Piece(sim.Component):
     @property
     def has_family(self) -> bool:
         return self.parent is not None or bool(self.children)
+
+    def has_model(self, model: Model) -> bool:
+        return any(p.model is model for p in self.family)
     
     @property
     def family(self) -> list[Piece]:

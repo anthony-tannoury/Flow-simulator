@@ -213,7 +213,7 @@ class DiscriminatingGreedyPieceCollector(PieceCollector):
             focus_on = self.collected_pieces[0].model
 
         model_config = self.task.config.get_model_config(focus_on)
-        focus_filter = lambda p: self.task.can_take(p) and p.model is focus_on
+        focus_filter = lambda p: self.task.can_take(p) and p.has_model(focus_on)
 
         timed_out = self.collect_until(deadline, model_config.min_carrier_capacity, focus_filter)
         if timed_out:
@@ -333,7 +333,7 @@ class DiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
             focus_on = self.choose_focus_model(counts)
             model_config = self.task.config.get_model_config(focus_on)
             timed_out = self.collect_batch(deadline, model_config.min_carrier_capacity, model_config.max_carrier_capacity,
-                                           lambda p: self.task.can_take(p) and p.model is focus_on)
+                                           lambda p: self.task.can_take(p) and p.has_model(focus_on))
 
         if timed_out:
             self.ensure_one()
