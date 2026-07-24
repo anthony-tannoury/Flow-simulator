@@ -506,11 +506,10 @@ struct Model {
 
 class Piece : public sim::Component {
   public:
-    static constexpr size_t JOURNAL_CAP = 512;
     Model* model;
     std::string id;
-    struct JournalEntry { std::string kind, name; double t; };
-    std::vector<JournalEntry> journal;
+    Piece* parent = nullptr;
+    std::vector<Piece*> children;
 
     explicit Piece(Model* model_) : model(model_) {
         char buf[8];
@@ -518,6 +517,60 @@ class Piece : public sim::Component {
         id = buf;
         counters::piece_id += 1;
         if (kpis_state::WIP) kpis_state::WIP->tally(++kpis_state::wip_level);
+    }
+
+    bool has_family() const { return parent != nullptr || !children.empty(); }
+
+    std::vector<Piece*> family() {
+        if (!has_family()) return {this};
+        Piece* root = parent != nullptr ? parent : this;
+        std::vector<Piece*> fam;
+        fam.reserve(1 + root->children.size());
+        fam.push_back(root);
+        fam.insert(fam.end(), root->children.begin(), root->children.end());
+        return fam;
+    }
+
+    bool has_model(const Model* m) {
+        for (Piece* p : family())
+            if (p->model == m) return true;
+        return false;
+    }
+
+    void associate_with_parent(Piece* p) {
+        parent = p;
+        p->children.push_back(this);
+    }
+
+    void dissociate_from_parent() {
+        if (parent == nullptr) throw std::runtime_error("Cannot dissociate an unassociated piece");
+        auto& sibs = parent->children;
+        sibs.erase(std::remove(sibs.begin(), sibs.end(), this), sibs.end());
+        parent = nullptr;
+    }
+
+    static void associate_all(const std::vector<Piece*>& pieces) {
+        for (Piece* p : pieces)
+            if (p->has_family())
+                throw std::runtime_error("Pieces to be associated should not be already related");
+        for (size_t i = 1; i < pieces.size(); ++i) pieces[i]->associate_with_parent(pieces[0]);
+    }
+
+    static void dissociate_all(const std::vector<Piece*>& pieces) {
+        Piece* root = nullptr;
+        for (Piece* p : pieces)
+            if (p->parent == nullptr) {
+                if (root != nullptr)
+                    throw std::runtime_error("Piece to be dissociated must be part of one family");
+                root = p;
+            }
+        if (root == nullptr)
+            throw std::runtime_error("Piece to be dissociated must be part of one family");
+        for (Piece* p : pieces)
+            if (p != root && p->parent != root)
+                throw std::runtime_error("Piece to be dissociated must be part of one family");
+        for (Piece* p : pieces)
+            if (p != root) p->dissociate_from_parent();
     }
 
     void enter(Buffer& q);
@@ -709,26 +762,28 @@ class Router : public Outlet {
 
 
 inline void Piece::enter(Buffer& q) {
-    q.model_counts[model] += 1;
+    std::vector<Piece*> fam = family();
+    for (Piece* p : fam) q.model_counts[p->model] += 1;
     q.trigger.trigger();
     if (q.piece_generator != nullptr) {
         auto& models = q.piece_generator->models;
-        auto it = std::find(models.begin(), models.end(), model);
-        assert(it != models.end());
-        q.piece_generator->generated[it - models.begin()] -= 1;
+        for (Piece* p : fam) {
+            auto it = std::find(models.begin(), models.end(), p->model);
+            if (it != models.end()) q.piece_generator->generated[it - models.begin()] -= 1;
+        }
         q.piece_generator->trigger.trigger();
     }
     if (q.buffer_type == BufferType::EXIT || q.buffer_type == BufferType::SCRAP)
-        if (kpis_state::WIP) kpis_state::WIP->tally(--kpis_state::wip_level);
-    if (journal.size() < JOURNAL_CAP) journal.push_back({"in", q.name(), env->now()});
+        if (kpis_state::WIP) {
+            kpis_state::wip_level -= static_cast<long long>(fam.size());
+            kpis_state::WIP->tally(kpis_state::wip_level);
+        }
     sim::Component::enter(q);
 }
 
 inline sim::Component& Piece::leave(sim::Queue& q) {
-    if (auto* b = dynamic_cast<Buffer*>(&q)) {
-        b->model_counts[model] -= 1;
-        if (journal.size() < JOURNAL_CAP) journal.push_back({"out", b->name(), env->now()});
-    }
+    if (auto* b = dynamic_cast<Buffer*>(&q))
+        for (Piece* p : family()) b->model_counts[p->model] -= 1;
     return sim::Component::leave(q);
 }
 
@@ -1972,6 +2027,12 @@ inline bool is_discriminating(PieceCollectorType bct) {
            bct == PieceCollectorType::DISCRIMINATING_ALTRUISTIC;
 }
 
+enum class AssociationType {
+    ASSOCIATIVE,
+    DISSOCIATIVE,
+    PASSIVE,
+};
+
 struct ModelConfig {
     SamplerPtr duration;
     std::vector<std::pair<Resource*, double>> resources;
@@ -1982,6 +2043,7 @@ struct ModelConfig {
 struct PieceTaskConfig : TaskConfig {
     std::vector<std::pair<Model*, ModelConfig>> models_configs;
     PieceCollectorType piece_collector_type = PieceCollectorType::NON_DISCRIMINATING_GREEDY;
+    AssociationType association_type = AssociationType::PASSIVE;
 
 
     std::shared_ptr<PieceExitOrder> piece_exit_order = std::make_shared<FirstInFirstOut>();
@@ -2011,6 +2073,14 @@ class PieceCollector : public Component, public Dispatchable, public Donnable {
     std::vector<sim::Store*> inlet_stores();
     sim::Resource& vacant_slots();
 
+    int collected_weight() {
+        int w = 0;
+        for (Piece* p : collected_pieces) w += static_cast<int>(p->family().size());
+        return w;
+    }
+
+    void check_piece_family_discrimination_compatibility(Piece* piece);
+    void guard_carrier_capacity(Piece* piece, int max_carrier_capacity);
 
     sim::Process pick_piece(PieceFilter piece_filter, sim::StoreOpts opts, Piece** out);
     std::map<Model*, int> present_counts();
@@ -2145,6 +2215,24 @@ inline std::vector<sim::Store*> PieceCollector::inlet_stores() {
 
 inline sim::Resource& PieceCollector::vacant_slots() { return *task->vacant_slots; }
 
+inline void PieceCollector::check_piece_family_discrimination_compatibility(Piece* piece) {
+    if (!is_discriminating(cfg().piece_collector_type)) return;
+    for (Piece* sibling : piece->family())
+        if (sibling->model != piece->model)
+            throw std::runtime_error(
+                "Piece collector picked a cluster of different models for a discriminating task");
+}
+
+inline void PieceCollector::guard_carrier_capacity(Piece* piece, int max_carrier_capacity) {
+    int weight = static_cast<int>(piece->family().size());
+    if (weight > max_carrier_capacity || double(weight) > cfg().max_capacity) {
+        std::ostringstream msg;
+        msg << "incoherent task configs: task '" << task->name() << "' cannot digest a cluster of "
+            << weight << " pieces formed upstream (max_carrier_capacity " << max_carrier_capacity
+            << ", station capacity " << cfg().max_capacity << ")";
+        throw std::runtime_error(msg.str());
+    }
+}
 
 
 inline sim::Process PieceCollector::pick_piece(PieceFilter piece_filter, sim::StoreOpts opts,
@@ -2229,7 +2317,7 @@ inline Model* PieceCollector::choose_focus_model(const std::map<Model*, int>& co
 
 inline sim::Process PieceCollector::collect_until(double deadline, int target, PieceFilter piece_filter,
                                                   bool* timed_out) {
-    while (static_cast<int>(collected_pieces.size()) < target) {
+    while (collected_weight() < target) {
         co_await call(request({{vacant_slots(), 1}}, {.fail_at = deadline,
                                                       .mode = "wait_slot",
                                                       .request_priority = task->request_priority}));
@@ -2246,42 +2334,77 @@ inline sim::Process PieceCollector::collect_until(double deadline, int target, P
             *timed_out = true;
             co_return;
         }
+        check_piece_family_discrimination_compatibility(piece);
+        int weight = static_cast<int>(piece->family().size());
+        int max_carrier_capacity = cfg().get_model_config(piece->model).max_carrier_capacity;
+        guard_carrier_capacity(piece, max_carrier_capacity);
+        Buffer* origin = static_cast<Buffer*>(from_store_store());
+        if (collected_weight() + weight > max_carrier_capacity) {
+            release({{vacant_slots(), 1}});
+            piece->enter(*origin);
+            *timed_out = false;
+            co_return;
+        }
+
+        if (weight > 1) {
+            co_await call(request({{vacant_slots(), double(weight - 1)}},
+                                  {.fail_at = deadline, .mode = "wait_slot",
+                                   .request_priority = task->request_priority}));
+            if (failed()) {
+                release({{vacant_slots(), 1}});
+                piece->enter(*origin);
+                *timed_out = true;
+                co_return;
+            }
+        }
+
         collected_pieces.push_back(piece);
-        task->pieces_in += 1;
+        task->pieces_in += weight;
     }
     *timed_out = false;
 }
 
 inline sim::Process PieceCollector::ensure_one() {
-    if (collected_pieces.empty()) {
-        co_await call(request({{vacant_slots(), 1}},
+    if (!collected_pieces.empty()) co_return;
+    co_await call(request({{vacant_slots(), 1}},
+                          {.mode = "wait_slot", .request_priority = task->request_priority}));
+    Piece* piece = nullptr;
+    co_await call(pick_piece([this](Piece* p) { return task->can_take(p); },
+                             {.request_priority = task->request_priority}, &piece));
+    check_piece_family_discrimination_compatibility(piece);
+    int weight = static_cast<int>(piece->family().size());
+    guard_carrier_capacity(piece, cfg().get_model_config(piece->model).max_carrier_capacity);
+    if (weight > 1)
+        co_await call(request({{vacant_slots(), double(weight - 1)}},
                               {.mode = "wait_slot", .request_priority = task->request_priority}));
-        Piece* piece = nullptr;
-        co_await call(pick_piece([this](Piece* p) { return task->can_take(p); },
-                                 {.request_priority = task->request_priority}, &piece));
-        collected_pieces.push_back(piece);
-        task->pieces_in += 1;
-    }
+    collected_pieces.push_back(piece);
+    task->pieces_in += weight;
 }
 
 inline sim::Process PieceCollector::top_up(int limit, PieceFilter piece_filter) {
-    while (vacant_slots().available_quantity() > 0 &&
-           static_cast<int>(collected_pieces.size()) < limit) {
+    while (collected_weight() < limit && vacant_slots().available_quantity() > 0) {
         Piece* piece = nullptr;
         co_await call(pick_piece(piece_filter,
                                  {.fail_delay = 0, .request_priority = task->request_priority}, &piece));
         if (failed()) break;
+        check_piece_family_discrimination_compatibility(piece);
+        int weight = static_cast<int>(piece->family().size());
+        if (collected_weight() + weight > limit ||
+            double(weight) > vacant_slots().available_quantity()) {
+            piece->enter(*static_cast<Buffer*>(from_store_store()));
+            break;
+        }
 
-        co_await call(request({{vacant_slots(), 1}},
+        co_await call(request({{vacant_slots(), double(weight)}},
                               {.mode = "wait_slot", .request_priority = task->request_priority}));
         collected_pieces.push_back(piece);
-        task->pieces_in += 1;
+        task->pieces_in += weight;
     }
 }
 
 inline sim::Process PieceCollector::block_remainder(int max_carrier_capacity) {
     if (!cfg().contiguous_carriers) {
-        int remainder = max_carrier_capacity - static_cast<int>(collected_pieces.size());
+        int remainder = max_carrier_capacity - collected_weight();
         co_await call(request({{vacant_slots(), double(remainder)}},
                               {.mode = "wait_slot", .request_priority = task->request_priority}));
     }
@@ -2320,47 +2443,65 @@ inline sim::Process PieceCollector::collect_batch(double deadline, int min_carri
                                  });
                 break;
         }
-        int truncate = static_cast<int>(std::min(
-            double(max_carrier_capacity), vacant_slots().available_quantity() + min_carrier_capacity));
-        if (static_cast<int>(valid_pieces.size()) > truncate) valid_pieces.resize(truncate);
+        double available_extra = vacant_slots().available_quantity();
+        std::vector<std::pair<Piece*, Buffer*>> selected;
+        int weight_sum = 0;
+        for (auto& [piece, buffer] : valid_pieces) {
+            check_piece_family_discrimination_compatibility(piece);
+            guard_carrier_capacity(piece, max_carrier_capacity);
+            int weight = static_cast<int>(piece->family().size());
+            if (weight_sum + weight > max_carrier_capacity) break;
+            if (double(std::max(0, weight_sum + weight - min_carrier_capacity)) > available_extra) break;
+            selected.push_back({piece, buffer});
+            weight_sum += weight;
+        }
 
-        if (static_cast<int>(valid_pieces.size()) >= min_carrier_capacity) {
-            int additional = static_cast<int>(valid_pieces.size()) - min_carrier_capacity;
+        if (weight_sum >= min_carrier_capacity) {
+            int additional = weight_sum - min_carrier_capacity;
             if (additional > 0) {
                 co_await call(request({{vacant_slots(), double(additional)}},
                                       {.fail_delay = 0, .mode = "wait_slot",
                                        .request_priority = task->request_priority}));
                 if (failed()) {
                     additional = 0;
-                    valid_pieces.resize(min_carrier_capacity);
+                    std::vector<std::pair<Piece*, Buffer*>> trimmed;
+                    weight_sum = 0;
+                    for (auto& pb : selected) {
+                        int w = static_cast<int>(pb.first->family().size());
+                        if (weight_sum + w > min_carrier_capacity) break;
+                        trimmed.push_back(pb);
+                        weight_sum += w;
+                    }
+                    selected = std::move(trimmed);
                 }
             }
 
             {
                 std::vector<std::pair<Piece*, Buffer*>> still;
-                for (auto& pb : valid_pieces)
+                for (auto& pb : selected)
                     if (pb.second->contains(pb.first)) still.push_back(pb);
-                valid_pieces = std::move(still);
+                selected = std::move(still);
             }
-            if (static_cast<int>(valid_pieces.size()) < min_carrier_capacity) {
+            weight_sum = 0;
+            for (auto& pb : selected) weight_sum += static_cast<int>(pb.first->family().size());
+            if (weight_sum < min_carrier_capacity) {
                 if (additional > 0) release({{vacant_slots(), double(additional)}});
                 continue;
             }
 
-            int surplus = additional - (static_cast<int>(valid_pieces.size()) - min_carrier_capacity);
+            int surplus = (min_carrier_capacity + additional) - weight_sum;
             if (surplus > 0) release({{vacant_slots(), double(surplus)}});
 
-            for (auto& [piece, buffer] : valid_pieces) {
+            for (auto& [piece, buffer] : selected) {
                 piece->leave(*buffer);
                 collected_pieces.push_back(piece);
-                task->pieces_in += 1;
+                task->pieces_in += static_cast<int>(piece->family().size());
             }
 
             if (!cfg().contiguous_carriers) {
-                co_await call(
-                    request({{vacant_slots(), double(max_carrier_capacity -
-                                                     static_cast<int>(valid_pieces.size()))}},
-                            {.mode = "wait_slot", .request_priority = task->request_priority}));
+                co_await call(request({{vacant_slots(), double(max_carrier_capacity - weight_sum)}},
+                                      {.mode = "wait_slot",
+                                       .request_priority = task->request_priority}));
             }
         } else {
             std::vector<sim::WaitSpec> specs;
@@ -2418,7 +2559,7 @@ inline sim::Process DiscriminatingGreedyPieceCollector::process() {
 
     const ModelConfig& model_config = cfg().get_model_config(focus_on);
     PieceFilter focus_filter = [this, focus_on](Piece* p) {
-        return task->can_take(p) && p->model == focus_on;
+        return task->can_take(p) && p->has_model(focus_on);
     };
 
     bool timed_out = false;
@@ -2477,7 +2618,7 @@ inline sim::Process DiscriminatingAltruisticPieceCollector::process() {
         co_await call(collect_batch(deadline, model_config.min_carrier_capacity,
                                     model_config.max_carrier_capacity,
                                     [this, focus_on](Piece* p) {
-                                        return task->can_take(p) && p->model == focus_on;
+                                        return task->can_take(p) && p->has_model(focus_on);
                                     },
                                     &timed_out));
     }
@@ -2566,7 +2707,7 @@ inline sim::Process PieceCarrier::request_resources(double fail_at) {
     Model* model = piece_collector->collected_pieces.front()->model;
     double mult = task->config->resource_scope == Scope::PER_BATCH
                       ? 1.0
-                      : double(piece_collector->collected_pieces.size());
+                      : double(piece_collector->collected_weight());
     std::vector<sim::ReqSpec> resources;
     for (const auto& [r, q] : ptask_()->pconfig()->get_model_config(model).resources)
         resources.push_back(sim::ReqSpec(*r, q * mult));
@@ -2580,20 +2721,41 @@ inline sim::Process PieceCarrier::successfully_end_process() {
     piece_collector->cancel();
 
     auto& pieces = piece_collector->collected_pieces;
-    task->batch_sizes.tally(static_cast<double>(pieces.size()));
+    task->batch_sizes.tally(static_cast<double>(piece_collector->collected_weight()));
     task->cycle_times.tally(env->now() - creation_time());
-    for (Piece* piece : pieces)
-        if (piece->journal.size() < Piece::JOURNAL_CAP)
-            piece->journal.push_back({"task", task->name(), env->now()});
-    place(pieces, ptask_()->outlets);
-    for (Piece* piece : pieces) {
-        ptask_()->deposited[piece->model] += 1;
-        for (sim::Queue* q : piece->queues())
+
+    std::vector<Piece*> tokens;
+    switch (ptask_()->pconfig()->association_type) {
+        case AssociationType::ASSOCIATIVE:
+            Piece::associate_all(pieces);
+            tokens = {pieces.front()};
+            break;
+        case AssociationType::DISSOCIATIVE:
+            for (Piece* piece : pieces) {
+                std::vector<Piece*> fam = piece->family();
+                Piece::dissociate_all(fam);
+                tokens.insert(tokens.end(), fam.begin(), fam.end());
+            }
+            break;
+        case AssociationType::PASSIVE:
+            tokens = pieces;
+            break;
+    }
+
+    place(tokens, ptask_()->outlets);
+
+    for (Piece* token : tokens) {
+        bool scrapped_here = false;
+        for (sim::Queue* q : token->queues())
             if (auto* b = dynamic_cast<Buffer*>(q);
                 b != nullptr && b->buffer_type == BufferType::SCRAP) {
-                ptask_()->scrapped[piece->model] += 1;
+                scrapped_here = true;
                 break;
             }
+        for (Piece* member : token->family()) {
+            ptask_()->deposited[member->model] += 1;
+            if (scrapped_here) ptask_()->scrapped[member->model] += 1;
+        }
     }
     done.set(true);
 

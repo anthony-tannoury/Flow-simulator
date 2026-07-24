@@ -1,6 +1,88 @@
 import collections
+import json
 
 import pytest
+
+
+CONST = lambda v: {"kind": "constant", "value": v}
+DIST = lambda v: {"dist_type": "Constant", "params": {"value": CONST(v)}}
+
+CLUSTER_POLICIES = {
+    "pending_carriers_pre_flexible_shutdowns": {"type": "AbortPendingCarriers"},
+    "pending_carrier_pre_task_shift_end": {"type": "AbortPendingCarriers"},
+    "operator_shift_constraint": {"type": "NotConstrainedByShift"},
+    "task_shift_constraint": {"type": "NotConstrainedByShift"},
+    "operators_self_conscious": {"type": "Unconscious"},
+    "piece_exit_order": {"type": "FirstInFirstOut"},
+    "batch_model_choice": {"type": "MostPresent"},
+}
+
+
+def cluster_flow_json(tmp_path, goal=40):
+    def task(tid, name, assoc, min_cc, max_cc, buf_in, buf_out):
+        return {
+            "id": tid, "kind": "Task", "name": name, "enabled": True,
+            "models_configs": [{"model": "m1", "duration": DIST(5.0), "resources": [],
+                                "min_carrier_capacity": min_cc, "max_carrier_capacity": max_cc}],
+            "startup_duration": DIST(0.0), "loading_duration": DIST(1.0),
+            "operators": [], "loading_operators": [], "startup_operators": [],
+            "task_shifts": ["sh1"], "policies": CLUSTER_POLICIES,
+            "operator_scope": "PER_BATCH", "resource_scope": "PER_BATCH",
+            "min_carriers": 1, "max_capacity": 8,
+            "contiguous_carriers": False, "independent_carriers": True,
+            "timeout": 50.0, "priority": 5, "admin": False,
+            "collector_type": "NON_DISCRIMINATING_GREEDY",
+            "association_type": assoc,
+            "bufs_in": [buf_in], "bufs_out": [buf_out],
+            "shutdowns": [], "breakdowns": [],
+            "position": [0, 0],
+        }
+
+    flow = {
+        "editor": {"name": "test", "version": "0", "format": "clean-json"},
+        "models": [{"id": "m1", "name": "M1", "parent": None}],
+        "resources": [],
+        "operators": [],
+        "closing_days": [],
+        "shifts": [{"id": "sh1", "name": "always", "mode": "custom",
+                    "custom_intervals": [{"start": "01-01-2026 00:00",
+                                          "end": "01-06-2026 00:00"}],
+                    "days_off": []}],
+        "stopping_criterion": {"type": "ByPiecesProduced", "timeout": 43200.0, "gap": 1.0,
+                               "grace_period": 0.0,
+                               "models_goals": [{"model": "m1", "goal": goal}]},
+        "start_date": "01-01-2026 00:00",
+        "seed": 0,
+        "nodes": [
+            {"id": "gen", "kind": "PieceGenerator", "name": "Gen", "enabled": True,
+             "shifts": ["sh1"], "outlets": ["b0"], "position": [0, 0]},
+            {"id": "b0", "kind": "Buffer", "name": "In", "enabled": True,
+             "buffer_type": "PASSAGE", "valid_models": ["m1"], "position": [0, 0]},
+            task("t_assoc", "ASSOC", "ASSOCIATIVE", 2, 2, "b0", "b1"),
+            {"id": "b1", "kind": "Buffer", "name": "Mid", "enabled": True,
+             "buffer_type": "PASSAGE", "valid_models": ["m1"], "position": [0, 0]},
+            task("t_dis", "DIS", "DISSOCIATIVE", 1, 4, "b1", "bout"),
+            {"id": "bout", "kind": "Buffer", "name": "Out", "enabled": True,
+             "buffer_type": "EXIT", "valid_models": ["m1"], "position": [0, 0]},
+        ],
+        "connections": [],
+    }
+    path = tmp_path / "cluster_flow.json"
+    path.write_text(json.dumps(flow))
+    return str(path)
+
+
+def test_association_flow_via_parser(fresh_parser, tmp_path):
+    p, env = fresh_parser(cluster_flow_json(tmp_path))
+    p.load_all()
+    crit = p.stopping_criterion
+    while not crit.done():
+        env.run(duration=1440.0)
+        if env.peek() == float("inf") and not crit.done():
+            break
+    exits = collections.Counter(piece.model.name for piece in crit.exit_buffer)
+    assert exits == {"M1": 40}
+    assert all(not piece.has_family for piece in crit.exit_buffer)
 
 
 def _build_chain(assoc_collector_name, mid_collector_name):

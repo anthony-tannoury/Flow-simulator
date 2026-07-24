@@ -23,6 +23,15 @@ def test_collector_types_in_sync():
     assert designer == python == cpp
 
 
+def test_association_types_in_sync():
+    import ui_helpers
+    from parser import parser as pyparser
+    designer = set(ui_helpers.ASSOCIATION_TYPES)
+    python = set(pyparser.STR_TO_ASSOCIATION_TYPE)
+    cpp = cpp_table_keys("association_types")
+    assert designer == python == cpp
+
+
 def test_resource_collector_types_in_sync():
     import ui_helpers
     from parser import parser as pyparser

@@ -335,11 +335,7 @@ int main(int argc, char** argv) {
                 if (b->buffer_type == BufferType::EXIT || b->buffer_type == BufferType::SCRAP)
                     for (sim::Component* c : *b) {
                         auto* piece = static_cast<Piece*>(c);
-                        kpis::ojson jj = kpis::ojson::array();
-                        for (auto& je : piece->journal)
-                            jj.push_back(kpis::ojson::array({je.kind, je.name, je.t}));
-                        fps.push_back(kpis::ojson{{"buffer_id", id}, {"model", piece->model->name},
-                                                  {"journal", jj}});
+                        fps.push_back(kpis::ojson{{"buffer_id", id}, {"model", piece->model->name}});
                     }
             }
             gd["buffers"] = jb;

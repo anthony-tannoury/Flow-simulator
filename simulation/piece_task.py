@@ -97,11 +97,12 @@ class PieceCollector(Component, Dispatchable, Donnable):
                 piece.enter(buffer)
                 return False
 
-            self.request((self.task.vacant_slots, weight - 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
-            if self.failed():
-                self.release((self.task.vacant_slots, 1))
-                piece.enter(buffer)
-                return True
+            if weight > 1:
+                self.request((self.task.vacant_slots, weight - 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
+                if self.failed():
+                    self.release((self.task.vacant_slots, 1))
+                    piece.enter(buffer)
+                    return True
 
             self.collected_pieces.append(piece)
             self.task.pieces_in += weight
@@ -117,7 +118,8 @@ class PieceCollector(Component, Dispatchable, Donnable):
         weight = len(piece.family)
         max_carrier_capacity = self.task.config.get_model_config(piece.model).max_carrier_capacity
         self.guard_carrier_capacity(piece, max_carrier_capacity)
-        self.request((self.task.vacant_slots, weight - 1), request_priority=self.task.request_priority, mode="wait_slot")
+        if weight > 1:
+            self.request((self.task.vacant_slots, weight - 1), request_priority=self.task.request_priority, mode="wait_slot")
         self.collected_pieces.append(piece)
         self.task.pieces_in += weight
 
@@ -139,8 +141,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
     def block_remainder(self, max_carrier_capacity: int) -> None:
         if not self.task.config.contiguous_carriers:
             remainder = max_carrier_capacity - self.collected_weight
-            if remainder > 0:
-                self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority, mode="wait_slot")
+            self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority, mode="wait_slot")
 
     def present_counts(self) -> dict[Model, int]:
         cache = getattr(self.task, '_can_take_cache', None)

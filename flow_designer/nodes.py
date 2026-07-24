@@ -179,6 +179,7 @@ class TaskNode(SimNode):
         self.create_property("priority", 5)
         self.create_property("admin", False)
         self.create_property("collector_type", "NON_DISCRIMINATING_GREEDY")
+        self.create_property("association_type", "PASSIVE")
 
     def to_clean_json(self) -> dict:
         return {
@@ -203,6 +204,7 @@ class TaskNode(SimNode):
             "priority": as_int(self.get_property("priority"), 5),
             "admin": bool(self.get_property("admin")),
             "collector_type": self.get_property("collector_type"),
+            "association_type": self.get_property("association_type"),
             "bufs_in": connected_refs_from_port(self, "bufs_in", "input"),
             "bufs_out": get_output_refs(self, "bufs_out"),
             "shutdowns": connected_refs_from_port(self, "shutdowns", "input"),

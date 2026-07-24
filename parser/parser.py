@@ -5,7 +5,8 @@ from time import perf_counter
 from simulation import reseed
 
 from datetime import date, datetime, timedelta
-from simulation.piece_task import PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType, PieceProtocols
+from simulation.piece_task import (PieceTask, PieceTaskConfig, ModelConfig, PieceCollectorType,
+                                   PieceProtocols, AssociationType)
 from simulation.resource_task import ResourceTask, ResourceTaskConfig, ResourceCollectorType
 from simulation.piece import Model, GoalPieceGenerator, RatePieceGenerator
 from simulation.task import Task, Scope, Protocols
@@ -183,6 +184,12 @@ STR_TO_PIECE_COLLECTOR_TYPE = {
 STR_TO_RESOURCE_COLLECTOR_TYPE = {
     'GREEDY': ResourceCollectorType.GREEDY,
     'ALTRUISTIC': ResourceCollectorType.ALTRUISTIC
+}
+
+STR_TO_ASSOCIATION_TYPE = {
+    'PASSIVE': AssociationType.PASSIVE,
+    'ASSOCIATIVE': AssociationType.ASSOCIATIVE,
+    'DISSOCIATIVE': AssociationType.DISSOCIATIVE,
 }
 
 STR_TO_SCOPE = {
@@ -525,7 +532,9 @@ class Parser:
                 independent_carriers=pt['independent_carriers'],
                 protocols=make_piece_protocols(pt['policies']),
                 models_configs=self.make_models_configs(pt['models_configs']),
-                piece_collector_type=lookup(STR_TO_PIECE_COLLECTOR_TYPE, pt['collector_type'], 'collector type')
+                piece_collector_type=lookup(STR_TO_PIECE_COLLECTOR_TYPE, pt['collector_type'], 'collector type'),
+                association_type=lookup(STR_TO_ASSOCIATION_TYPE, pt.get('association_type', 'PASSIVE'),
+                                        'association type')
             )
             self.tasks[pt['id']] = PieceTask(
                 name=pt['name'],

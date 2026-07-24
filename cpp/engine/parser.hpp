@@ -77,6 +77,14 @@ inline const std::vector<std::pair<std::string, ResourceCollectorType>>& resourc
     return t;
 }
 
+inline const std::vector<std::pair<std::string, AssociationType>>& association_types() {
+    static const std::vector<std::pair<std::string, AssociationType>> t = {
+        {"PASSIVE", AssociationType::PASSIVE},
+        {"ASSOCIATIVE", AssociationType::ASSOCIATIVE},
+        {"DISSOCIATIVE", AssociationType::DISSOCIATIVE}};
+    return t;
+}
+
 inline const std::vector<std::pair<std::string, Scope>>& scopes() {
     static const std::vector<std::pair<std::string, Scope>> t = {
         {"PER_UNIT", Scope::PER_UNIT}, {"PER_BATCH", Scope::PER_BATCH}, {"PER_TASK", Scope::PER_TASK}};
@@ -685,6 +693,9 @@ class Parser {
             cfg->models_configs = make_models_configs(t.at("models_configs"));
             cfg->piece_collector_type =
                 lookup(piece_collector_types(), t.at("collector_type").get<std::string>(), "collector type");
+            cfg->association_type = lookup(association_types(),
+                                           t.value("association_type", std::string("PASSIVE")),
+                                           "association type");
             std::string id = t.at("id").get<std::string>();
             tasks[id] = sim::make<PieceTask>({.name = t.at("name").get<std::string>()}, cfg,
                                              resolve_buffers(t.at("bufs_in")), resolve_outlets(t.at("bufs_out")));

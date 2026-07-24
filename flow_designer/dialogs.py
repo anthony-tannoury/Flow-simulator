@@ -14,9 +14,9 @@ from Qt import QtCore, QtGui, QtWidgets
 from NodeGraphQt import BaseNode, NodeGraph, PropertiesBinWidget
 
 try:
-    from .ui_helpers import BUFFER_TYPES, COLLECTOR_TYPES, PIECE_POLICY_OPTIONS, PY_DATE_TIME_FORMAT, RESOURCE_COLLECTOR_TYPES, SHUTDOWN_TYPES, STOPPING_CRITERION_TYPES, WEEKDAYS, _clear_layout, _leaf_model_names, _names, as_float, as_int, connected_nodes_from_port, fill_combo, get_property_json, node_uid, parse_date, parse_date_time, qmessage, sentence_case, set_property_json, translate_shift_entry
+    from .ui_helpers import ASSOCIATION_TYPES, BUFFER_TYPES, COLLECTOR_TYPES, PIECE_POLICY_OPTIONS, PY_DATE_TIME_FORMAT, RESOURCE_COLLECTOR_TYPES, SHUTDOWN_TYPES, STOPPING_CRITERION_TYPES, WEEKDAYS, _clear_layout, _leaf_model_names, _names, as_float, as_int, connected_nodes_from_port, fill_combo, get_property_json, node_uid, parse_date, parse_date_time, qmessage, sentence_case, set_property_json, translate_shift_entry
 except ImportError:
-    from ui_helpers import BUFFER_TYPES, COLLECTOR_TYPES, PIECE_POLICY_OPTIONS, PY_DATE_TIME_FORMAT, RESOURCE_COLLECTOR_TYPES, SHUTDOWN_TYPES, STOPPING_CRITERION_TYPES, WEEKDAYS, _clear_layout, _leaf_model_names, _names, as_float, as_int, connected_nodes_from_port, fill_combo, get_property_json, node_uid, parse_date, parse_date_time, qmessage, sentence_case, set_property_json, translate_shift_entry
+    from ui_helpers import ASSOCIATION_TYPES, BUFFER_TYPES, COLLECTOR_TYPES, PIECE_POLICY_OPTIONS, PY_DATE_TIME_FORMAT, RESOURCE_COLLECTOR_TYPES, SHUTDOWN_TYPES, STOPPING_CRITERION_TYPES, WEEKDAYS, _clear_layout, _leaf_model_names, _names, as_float, as_int, connected_nodes_from_port, fill_combo, get_property_json, node_uid, parse_date, parse_date_time, qmessage, sentence_case, set_property_json, translate_shift_entry
 
 try:
     from .widgets import AlternativesWidget, ClosingDayPickerWidget, CustomIntervalListWidget, DateTimeWidget, DateWidget, FixedGoalsWidget, FixedModelProbsWidget, InfFloatWidget, ModelConfigsWidget, ModelTreeWidget, PoliciesWidget, ResourcePickerWidget, SamplerWidget, ShiftPickerWidget, TimeFunctionWidget, _DayRow, _OutputsWidget, _TransformedWidget
@@ -953,6 +953,13 @@ def _carrier_common_tab(node, operator_names, shift_names, collector_types, extr
         fill_combo(acc["collector_type"], collector_types,
                    node.get_property("collector_type") if node.has_property("collector_type") else collector_types[0])
         f.addRow("Collector type", acc["collector_type"])
+        acc["association_type"] = QtWidgets.QComboBox()
+        acc["association_type"].setToolTip("Passive: pieces go through unchanged. Associative: the batch leaves as one "
+                                           "inseparable cluster. Dissociative: incoming clusters are split back into "
+                                           "their individual pieces.")
+        fill_combo(acc["association_type"], ASSOCIATION_TYPES,
+                   node.get_property("association_type") if node.has_property("association_type") else ASSOCIATION_TYPES[0])
+        f.addRow("Association", acc["association_type"])
     for label, wdg in extra.get("scopes", []):
         f.addRow(label, wdg)
     tabs.append(("Scopes", _scroll(t)))
@@ -985,6 +992,8 @@ def _apply_carrier_common(node, acc):
     node.set_property("resource_scope", acc["resource_scope"].currentData())
     if "collector_type" in acc:
         node.set_property("collector_type", acc["collector_type"].currentData())
+    if "association_type" in acc:
+        node.set_property("association_type", acc["association_type"].currentData())
     node.set_property("min_carriers", as_int(acc["min_carriers"].text(), 1))
     node.set_property("max_capacity", as_float(acc["max_capacity"].text(), 1.0))
     node.set_property("timeout", acc["timeout"].get_value())
