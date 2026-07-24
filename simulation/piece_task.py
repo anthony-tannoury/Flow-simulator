@@ -73,9 +73,10 @@ class PieceCollector(Component, Dispatchable, Donnable):
 
     def guard_carrier_capacity(self, piece: Piece, max_carrier_capacity: int) -> None:
         weight = len(piece.family)
-        if weight > max_carrier_capacity:
-            raise ValueError(f"cluster of {weight} pieces exceeds max_carrier_capacity "
-                             f"{max_carrier_capacity} at task '{self.task.name()}'")
+        if weight > max_carrier_capacity or weight > self.task.config.max_capacity:
+            raise ValueError(f"incoherent task configs: task '{self.task.name()}' cannot digest a cluster of "
+                             f"{weight} pieces formed upstream (max_carrier_capacity {max_carrier_capacity:g}, "
+                             f"station capacity {self.task.config.max_capacity:g})")
 
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
         assert isinstance(self.task.config, PieceTaskConfig)
@@ -249,10 +250,8 @@ class AltruisticMixin:
             weight_sum = 0
             for piece, buffer in valid_pieces:
                 self.check_piece_family_discrimination_compatibility(piece)
+                self.guard_carrier_capacity(piece, max_carrier_capacity)
                 weight = len(piece.family)
-                if weight > max_carrier_capacity:
-                    raise ValueError(f"cluster of {weight} pieces exceeds max_carrier_capacity "
-                                     f"{max_carrier_capacity} at task '{self.task.name()}'")
                 if weight_sum + weight > max_carrier_capacity:
                     break
                 if max(0, weight_sum + weight - min_carrier_capacity) > available_extra:
@@ -458,9 +457,6 @@ class PieceCarrier(Carrier):
         pieces = self.piece_collector.collected_pieces
         self.task.batch_sizes.tally(self.piece_collector.collected_weight)
         self.task.cycle_times.tally(env.now() - self.creation_time())
-        for piece in pieces:
-            if len(piece.journal) < piece.JOURNAL_CAP:
-                piece.journal.append(('task', self.task.name(), env.now()))
 
         match self.task.config.association_type:
             case AssociationType.ASSOCIATIVE:

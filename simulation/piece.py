@@ -35,13 +35,10 @@ class Piece(sim.Component):
         self.model = model
         self.id = str(Piece.ID).zfill(6)
         Piece.ID += 1
-        self.journal: list[tuple[str, str, float]] = []
         WIP.tally(WIP() + 1)
 
         self.parent: Piece | None = None
         self.children: list[Piece] = []
-
-    JOURNAL_CAP = 512
 
     def enter(self, q, priority = None):
         from .outlet import Buffer, BufferType
@@ -58,8 +55,6 @@ class Piece(sim.Component):
             q.piece_generator.trigger.trigger()
         if q.buffer_type in (BufferType.EXIT, BufferType.SCRAP):
             WIP.tally(WIP() - len(self.family))
-        if len(self.journal) < Piece.JOURNAL_CAP:
-            self.journal.append(('in', q.name(), env.now()))
         return super().enter(q, priority)
 
     def leave(self, q=None):
@@ -67,8 +62,6 @@ class Piece(sim.Component):
         if isinstance(q, Buffer):
             for p in self.family:
                 q.model_counts[p.model] -= 1
-            if len(self.journal) < Piece.JOURNAL_CAP:
-                self.journal.append(('out', q.name(), env.now()))
         return super().leave(q)
     
     @property

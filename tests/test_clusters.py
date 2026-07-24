@@ -100,7 +100,7 @@ def test_associate_passthrough_dissociate(fresh_sim, assoc_collector, mid_collec
     assert r["dis_deposited_sum"] == r["total"]
 
 
-def _run_guard(mid_collector_name, mid_max_carrier_capacity):
+def _run_guard(mid_collector_name, mid_max_carrier_capacity, mid_station_capacity=8):
     import salabim as sim
     from simulation import env
     from simulation.interval import Interval
@@ -127,13 +127,13 @@ def _run_guard(mid_collector_name, mid_max_carrier_capacity):
                                Conscious(), FirstInFirstOut(), MostPresent())
     duration = Distribution(sim.Constant, 5)
 
-    def cfg(assoc, collector, min_cc, max_cc):
+    def cfg(assoc, collector, min_cc, max_cc, station_cap=8):
         return PieceTaskConfig(
             task_shifts=shifts, startup_duration=Distribution(sim.Constant, 0),
             loading_duration=Distribution(sim.Constant, 1),
             startup_operators=Alternative(), loading_operators=Alternative(),
             operators=Alternative(), operator_scope=Scope.PER_BATCH,
-            resource_scope=Scope.PER_BATCH, min_carriers=1, max_capacity=8,
+            resource_scope=Scope.PER_BATCH, min_carriers=1, max_capacity=station_cap,
             contiguous_carriers=False, independent_carriers=True, timeout=50,
             priority=5, admin=False, protocols=protocols,
             models_configs={
@@ -145,7 +145,8 @@ def _run_guard(mid_collector_name, mid_max_carrier_capacity):
     # ASSOC (non-disc) forms mixed clusters of exactly 4 patterns
     PieceTask(name="ASSOC", config=cfg(AssociationType.ASSOCIATIVE, PieceCollectorType.NON_DISCRIMINATING_GREEDY, 4, 4),
               inlets=[b0], outlets=[b1])
-    PieceTask(name="MID", config=cfg(AssociationType.PASSIVE, getattr(PieceCollectorType, mid_collector_name), 1, mid_max_carrier_capacity),
+    PieceTask(name="MID", config=cfg(AssociationType.PASSIVE, getattr(PieceCollectorType, mid_collector_name), 1,
+                                     mid_max_carrier_capacity, mid_station_capacity),
               inlets=[b1], outlets=[exit_buffer])
     SimulationStopper(criterion=ByTime(time=2000))
     env.run(till=10_000_000)
@@ -153,8 +154,16 @@ def _run_guard(mid_collector_name, mid_max_carrier_capacity):
 
 def test_cluster_over_capacity_raises(fresh_sim):
     # a weight-4 cluster reaching a task whose carrier cap is 3 is unsatisfiable
-    with pytest.raises(ValueError, match="exceeds max_carrier_capacity"):
+    with pytest.raises(ValueError, match="incoherent task configs"):
         _run_guard("NON_DISCRIMINATING_GREEDY", 3)
+
+
+def test_cluster_over_station_capacity_raises(fresh_sim):
+    # carrier cap fits the w4 cluster but the station only has 3 slots in total:
+    # the sibling reservation could never be satisfied, so it must raise instead
+    # of wedging the collector forever
+    with pytest.raises(ValueError, match="incoherent task configs"):
+        _run_guard("NON_DISCRIMINATING_GREEDY", 4, mid_station_capacity=3)
 
 
 def test_mixed_cluster_into_discriminating_raises(fresh_sim):

@@ -18,7 +18,6 @@ from . import kpis
 WAIT_COLOR = '#4a7ba6'
 TASK_COLOR = '#d9581e'
 LINE_COLOR = '#2b5f8c'
-ABORT_COLOR = '#9aa0a5'
 
 
 def _safe(name: str) -> str:
@@ -141,114 +140,6 @@ def operator_graphs(base, operator_groups, sim_start):
                       ymax=group.n_operators)
 
 
-def _segments(piece) -> list[tuple[str, str, float]]:
-    segments = []
-    in_buffer = None
-    out_time = None
-    task_name = None
-    for kind, name, t in piece.journal:
-        if kind == 'in':
-            if out_time is not None:
-                segments.append((task_name or '(interrompu)', 'poste', t - out_time))
-                out_time, task_name = None, None
-            in_buffer = (name, t)
-        elif kind == 'out':
-            if in_buffer is not None:
-                segments.append((in_buffer[0], 'attente', t - in_buffer[1]))
-                in_buffer = None
-            out_time = t
-        elif kind == 'task':
-            task_name = name
-    return segments
-
-
-def _duration_unit(max_minutes: float) -> tuple[float, str]:
-    if max_minutes > 2 * 1440:
-        return 1440.0, 'jours'
-    if max_minutes > 120:
-        return 60.0, 'heures'
-    return 1.0, 'minutes'
-
-
-def trajectory_graphs(base, buffers, piece_generator, sim_start, max_branches: int = 8):
-    from .outlet import BufferType
-    finished = [p for b in buffers if b.buffer_type in (BufferType.EXIT, BufferType.SCRAP) for p in b]
-    if piece_generator is None or not finished:
-        return
-
-    for model in piece_generator.models:
-        pieces = [p for p in finished if p.model is model]
-        if not pieces:
-            continue
-
-        branches: dict[tuple, list] = {}
-        for p in pieces:
-            segments = _segments(p)
-            branches.setdefault(tuple(s[0] for s in segments), []).append(segments)
-
-        ranked = sorted(branches.items(), key=lambda kv: len(kv[1]), reverse=True)
-        rows = []
-        for rank, (signature, journeys) in enumerate(ranked, start=1):
-            n = len(journeys)
-            for position in range(len(signature)):
-                mean = sum(j[position][2] for j in journeys) / n
-                rows.append({
-                    'modele': model.name, 'trajectoire': rank, 'n_pieces': n,
-                    'part': kpis.fmt_pct(n / len(pieces)),
-                    'ordre': position + 1, 'etape': signature[position],
-                    'type': journeys[0][position][1],
-                    'duree_moyenne_min': round(mean, 2),
-                    'duree_moyenne': kpis.fmt_duree(mean),
-                })
-
-        stem = f"trajectoires_{_safe(model.name)}"
-        with open(_out_path(base, 'csv', 'modeles', stem, 'csv'), 'w', newline='', encoding='utf-8-sig') as f:
-            writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-            writer.writeheader()
-            writer.writerows(rows)
-
-        plotted = ranked[:max_branches]
-        totals = []
-        for signature, journeys in plotted:
-            n = len(journeys)
-            totals.append(sum(sum(j[k][2] for j in journeys) / n for k in range(len(signature))))
-        div, unit = _duration_unit(max(totals))
-
-        fig_height = 1.1 + 0.62 * len(plotted)
-        fig, ax = plt.subplots(figsize=(12, fig_height))
-        xmax = max(t / div for t in totals)
-        for y, (signature, journeys) in enumerate(plotted):
-            n = len(journeys)
-            left = 0.0
-            for position, step in enumerate(signature):
-                mean = sum(j[position][2] for j in journeys) / n / div
-                seg_type = journeys[0][position][1]
-                color = {'attente': WAIT_COLOR, 'poste': TASK_COLOR}.get(seg_type, ABORT_COLOR)
-                ax.barh(y, mean, left=left, height=0.5, color=color,
-                        alpha=0.55 if seg_type == 'attente' else 0.9,
-                        edgecolor='white', linewidth=0.6)
-
-                if mean > (len(step) + 2) * 0.008 * xmax:
-                    ax.text(left + mean / 2, y, step, ha='center', va='center',
-                            fontsize=6.5, rotation=0, clip_on=True)
-                left += mean
-            ax.text(left + 0.01 * xmax, y,
-                    f"n={n} ({n / len(pieces) * 100:.0f}%)", va='center', fontsize=8)
-        ax.set_yticks(range(len(plotted)))
-        ax.set_yticklabels([f"traj. {i + 1}" for i in range(len(plotted))])
-        ax.invert_yaxis()
-        ax.set_xlabel(f"durée moyenne cumulée ({unit})")
-        extra = f", {len(ranked) - len(plotted)} trajectoires rares non tracées" if len(ranked) > len(plotted) else ""
-        ax.set_title(f"Trajectoires : {model.name} ({len(pieces)} pièces finies{extra})")
-        ax.grid(axis='x', alpha=0.25)
-        handles = [plt.Rectangle((0, 0), 1, 1, color=WAIT_COLOR, alpha=0.55),
-                   plt.Rectangle((0, 0), 1, 1, color=TASK_COLOR, alpha=0.9)]
-        ax.legend(handles, ['attente (buffer)', 'poste'], loc='lower right', fontsize=8)
-        fig.tight_layout()
-        fig.savefig(_out_path(base, 'png', 'modeles', stem, 'png'), dpi=130)
-        plt.close(fig)
-
-
 def production_histogram(base, buffers, piece_generator):
     from .outlet import BufferType
     if piece_generator is None:
@@ -309,6 +200,5 @@ def write_graphs(directory: str, tasks: list, buffers: list, resources: list,
     line_graphs(directory, buffers, sim_start)
     task_graphs(directory, tasks, sim_start)
     operator_graphs(directory, operator_groups, sim_start)
-    trajectory_graphs(directory, buffers, piece_generator, sim_start)
     production_histogram(directory, buffers, piece_generator)
     return directory

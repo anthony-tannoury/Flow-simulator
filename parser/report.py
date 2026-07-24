@@ -136,8 +136,6 @@ def write_machine_report(parser, directory: str, run_info: dict) -> None:
                           if (p := png('operateurs', f"disponibles_{safe(g.name())}"))},
             'resources': {id_: p for id_, r in parser.resources.items()
                           if (p := png('ressources', f"stock_{safe(r.name())}"))},
-            'models': {m.name: p for m in parser.piece_generator.models
-                       if (p := png('modeles', f"trajectoires_{safe(m.name)}"))},
             'production': png('modeles', 'production'),
             'encours': png('ligne', 'encours'),
             'attente': png('ligne', 'pieces_en_attente'),

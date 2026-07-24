@@ -72,9 +72,11 @@ class _Model:
 
 
 class _Piece:
-    def __init__(self, model, journal):
+
+    __slots__ = ('model',)
+
+    def __init__(self, model):
         self.model = model
-        self.journal = [tuple(entry) for entry in journal]
 
 
 def _png_if_exists(run_dir: str, category: str, stem: str) -> str | None:
@@ -102,7 +104,7 @@ def render(run_dir: str) -> None:
 
     buffer_by_id = {row['id']: buf for row, buf in zip(gd.get('buffers', []), buffers)}
     for fp in gd.get('finished_pieces', []):
-        buffer_by_id[fp['buffer_id']].pieces.append(_Piece(model(fp['model']), fp['journal']))
+        buffer_by_id[fp['buffer_id']].pieces.append(_Piece(model(fp['model'])))
 
     gen_block = gd.get('generator') or {}
     generator = None
@@ -134,8 +136,6 @@ def render(run_dir: str) -> None:
         'buffers': keyed(gd.get('buffers', []), 'buffers', lambda n: f"longueur_{safe(n)}"),
         'operators': keyed(gd.get('operators', []), 'operateurs', lambda n: f"disponibles_{safe(n)}"),
         'resources': keyed(gd.get('resources', []), 'ressources', lambda n: f"stock_{safe(n)}"),
-        'models': {m: p for m in (gen_block.get('models') or [])
-                   if (p := _png_if_exists(run_dir, 'modeles', f"trajectoires_{safe(m)}"))},
         'production': _png_if_exists(run_dir, 'modeles', 'production'),
         'encours': _png_if_exists(run_dir, 'ligne', 'encours'),
         'attente': _png_if_exists(run_dir, 'ligne', 'pieces_en_attente'),
