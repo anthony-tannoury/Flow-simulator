@@ -1,14 +1,18 @@
 name: build-engines
 
 # Builds the native flow_sim engine for each platform and commits the binaries
-# into engines/ on this same (non-main) branch, so the flow designer can pick a
-# bundled executable with nothing to download. Triggered on changes to the
-# engine / simulation sources (never on engines/ itself) or by hand.
+# into engines/ on the branch that triggered the run, so the flow designer can
+# pick a bundled executable with nothing to download. Triggered on changes to
+# the engine / simulation sources (never on engines/ itself) or by hand.
 
 on:
   workflow_dispatch:
   push:
-    branches: [claude/latest-commit-check-tl51wu]
+    branches:
+      - main
+      - claude/latest-commit-check-tl51wu
+      - associative_dissociative_test
+      - associative_dissociative_test_B
     paths:
       # Match by extension: GitHub path filters reject any '+' in the pattern
       # (extglob), so 'salabim++/**' / 'simulation++/**' can't be written — but
@@ -99,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: claude/latest-commit-check-tl51wu
+          ref: ${{ github.ref_name }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -126,9 +130,9 @@ jobs:
           else
             git commit -m "ci: rebuild native engines [skip ci]"
             for attempt in 1 2 3 4; do
-              if git push origin HEAD:claude/latest-commit-check-tl51wu; then
+              if git push origin "HEAD:${{ github.ref_name }}"; then
                 break
               fi
-              git pull --rebase -X theirs origin claude/latest-commit-check-tl51wu
+              git pull --rebase -X theirs origin "${{ github.ref_name }}"
             done
           fi
