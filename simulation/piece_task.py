@@ -42,6 +42,13 @@ class PieceCollector(Component, Dispatchable, Donnable):
         self.task = task
         self.collected_pieces: list[Piece] = []
 
+    def check_piece_family_discrimination_compatibility(self, piece: Piece) -> None:
+        assert isinstance(self.task.config, PieceTaskConfig)
+        discriminating = PieceCollectorType.is_discriminating(self.task.config.piece_collector_type)
+        different_models = any(sibling.model is not piece.model for sibling in piece.family)
+        if discriminating and different_models:
+            raise RuntimeError("Piece collector picked a cluster of different models for a discriminating task")
+
     def pick_piece(self, **kwargs) -> tuple[Piece, Buffer]:
         assert isinstance(self.task.config.protocols, PieceProtocols)
 
@@ -67,6 +74,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
             if self.failed():
                 return True
             piece, buffer = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
+            self.check_piece_family_discrimination_compatibility(piece)
             if self.failed():
                 self.release((self.task.vacant_slots, 1))
                 return True
@@ -90,6 +98,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
         if not self.collected_pieces:
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
             piece, buffer = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
+            self.check_piece_family_discrimination_compatibility(piece)
             if len(piece.family) > self.task.config.get_model_config(piece.model).max_carrier_capacity:
                 self.release((self.task.vacant_slots, 1))
                 self.ensure_one()
@@ -103,6 +112,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
     def top_up(self, limit: int, piece_filter) -> None:
         while self.task.vacant_slots.available_quantity() > 0 and len(self.collected_pieces) < limit:
             piece, buffer = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_delay=0, request_priority=self.task.request_priority)
+            self.check_piece_family_discrimination_compatibility(piece)
             if self.failed():
                 break
             elif len(piece.family) > self.task.vacant_slots.available_quantity():
