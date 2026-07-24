@@ -51,8 +51,9 @@ class Piece(sim.Component):
         from .kpis import WIP
         if not isinstance(q, Buffer):
             raise TypeError(f"piece {self.name()} ({self.model.name}) can only enter a Buffer, got {q!r}")
-        q.model_counts[self.model] = q.model_counts.get(self.model, 0) + 1
-        q.trigger.trigger()
+        for p in self.siblings:
+            q.model_counts[p.model] = q.model_counts.get(p.model, 0) + 1
+            q.trigger.trigger()
         if q.piece_generator is not None:
             idx = q.piece_generator.models.index(self.model)
             q.piece_generator.generated[idx] -= 1
@@ -66,7 +67,8 @@ class Piece(sim.Component):
     def leave(self, q=None):
         from .outlet import Buffer
         if isinstance(q, Buffer):
-            q.model_counts[self.model] -= 1
+            for p in self.siblings:
+                q.model_counts[p.model] -= 1
             if len(self.journal) < Piece.JOURNAL_CAP:
                 self.journal.append(('out', q.name(), env.now()))
         return super().leave(q)
@@ -109,7 +111,7 @@ class PickyPieceTaker:
             can_take |= model in self.valid_models
             model = model.parent
         return can_take
-
+    
     def can_flush_into(self, ppt: PickyPieceTaker) -> bool:
         return all(ppt.can_take(model) for model in self.valid_models)
 

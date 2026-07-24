@@ -58,7 +58,15 @@ class PieceCollector(Component, Dispatchable, Donnable):
             kwargs['filter'] = lambda piece: piece is target
 
         kwargs.setdefault('mode', 'wait_pieces')
-        return self.from_store(**kwargs)
+        piece = self.from_store(**kwargs)
+        if not self.failed() and piece is not None:
+            assert isinstance(self.task.config, PieceTaskConfig)
+            cap = self.task.config.get_model_config(piece.model).max_carrier_capacity
+            if len(piece.siblings) > cap:
+                raise ValueError(
+                    f"cluster of {len(piece.siblings)} pieces exceeds max_carrier_capacity "
+                    f"{cap} at task '{self.task.name()}'")
+        return piece
 
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
         while len(self.collected_pieces) < target:
@@ -66,28 +74,29 @@ class PieceCollector(Component, Dispatchable, Donnable):
             if self.failed():
                 return True
 
-            valid_pieces = [(piece, buffer) for buffer in self.task.inlets for piece in buffer if piece_filter(piece)]
+            piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, request_priority=self.task.request_priority, fail_at=deadline)
             
-            while True:
-                if valid_pieces[0][0].related:
-                    self.request((self.task.vacant_slots, len(valid_pieces[0][0].siblings - 1)), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
-                    if self.failed():
-                        self.release((self.task.vacant_slots, 1))
-                        return True
-                    piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
-                    if self.failed():
-                        self.release((self.task.vacant_slots, len(valid_pieces[0][0].siblings - 1)))
-                        return True
+            if self.failed():
+                self.release((self.task.vacant_slots, 1))
+                return True
+
+            extra = len(piece.siblings) - 1
+            if extra > 0:
+                self.request((self.task.vacant_slots, extra), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
+                if self.failed():
+                    self.release((self.task.vacant_slots, 1))
+                    piece.enter(piece.from_store_store)
+                    return True
 
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
-            self.task.pieces_in += 1
+            self.task.pieces_in += len(piece.siblings)
         return False
 
     def ensure_one(self) -> None:
         if not self.collected_pieces:
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
-            piece = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
+            piece = self.pick_piece(store=self.task.inlets, filter=self.task.accepts, request_priority=self.task.request_priority)
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
             self.task.pieces_in += 1
@@ -152,11 +161,11 @@ class NonDiscriminatingGreedyPieceCollector(PieceCollector):
         self.wait(self.allow_dispatch)
         deadline = env.now() + self.task.config.timeout
 
-        timed_out = self.collect_until(deadline, model_config.min_carrier_capacity, self.task.can_take)
+        timed_out = self.collect_until(deadline, model_config.min_carrier_capacity, self.task.accepts)
         if timed_out:
             self.ensure_one()
         else:
-            self.top_up(model_config.max_carrier_capacity, self.task.can_take)
+            self.top_up(model_config.max_carrier_capacity, self.task.accepts)
 
         self.block_remainder(model_config.max_carrier_capacity)
         self.set_mode("")
@@ -174,12 +183,12 @@ class DiscriminatingGreedyPieceCollector(PieceCollector):
         if counts:
             focus_on = self.choose_focus_model(counts)
         else:
-            if self.collect_until(deadline, 1, self.task.can_take):
+            if self.collect_until(deadline, 1, self.task.accepts):
                 self.ensure_one()
             focus_on = self.collected_pieces[0].model
 
         model_config = self.task.config.get_model_config(focus_on)
-        focus_filter = lambda p: self.task.can_take(p) and p.model is focus_on
+        focus_filter = lambda p: self.task.accepts(p) and p.model is focus_on
 
         timed_out = self.collect_until(deadline, model_config.min_carrier_capacity, focus_filter)
         if timed_out:
@@ -256,7 +265,7 @@ class NonDiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin)
         self.wait(self.allow_dispatch)
         deadline = env.now() + self.task.config.timeout
 
-        if self.collect_batch(deadline, model_config.min_carrier_capacity, model_config.max_carrier_capacity, self.task.can_take):
+        if self.collect_batch(deadline, model_config.min_carrier_capacity, model_config.max_carrier_capacity, self.task.accepts):
             self.ensure_one()
 
         self.set_mode("")
@@ -281,7 +290,7 @@ class DiscriminatingAltruisticPieceCollector(PieceCollector, AltruisticMixin):
             focus_on = self.choose_focus_model(counts)
             model_config = self.task.config.get_model_config(focus_on)
             timed_out = self.collect_batch(deadline, model_config.min_carrier_capacity, model_config.max_carrier_capacity,
-                                           lambda p: self.task.can_take(p) and p.model is focus_on)
+                                           lambda p: self.task.accepts(p) and p.model is focus_on)
 
         if timed_out:
             self.ensure_one()
@@ -308,6 +317,7 @@ class PieceProtocols(Protocols):
 class PieceTaskConfig(TaskConfig):
     models_configs: dict[Model, ModelConfig]
     piece_collector_type: PieceCollectorType
+    takes_clusters: bool
     cluster_former: ClusterFormer
 
     def get_model_config(self, model: Model) -> ModelConfig:
@@ -418,8 +428,9 @@ class PieceCarrier(Carrier):
                 for parent in parents:
                     place(parent.siblings, self.task.outlets)
                     Piece.dissociate_all(parent.siblings)
+            case ClusterFormer.PASSIVE:
+                place(pieces, self.task.outlets)
 
-        place(pieces, self.task.outlets)
         for piece in pieces:
             self.task.deposited[piece.model] += 1
             if any(isinstance(q, Buffer) and q.buffer_type is BufferType.SCRAP for q in piece.queues()):
@@ -460,3 +471,7 @@ class PieceTask(Task, PickyPieceTaker):
             carrier.abort(*args)
         self.release_task_operators()
         self.started_up = False
+
+    def accepts(self, piece: Piece):
+        return self.can_take(piece) and (bool(piece.related == self.config.takes_clusters))
+
