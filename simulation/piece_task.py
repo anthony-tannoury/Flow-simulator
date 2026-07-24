@@ -98,6 +98,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
 
             self.request((self.task.vacant_slots, weight - 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
             if self.failed():
+                self.release((self.task.vacant_slots, 1))
                 piece.enter(buffer)
                 return True
 
@@ -247,6 +248,7 @@ class AltruisticMixin:
             selected: list[tuple[Piece, Buffer]] = []
             weight_sum = 0
             for piece, buffer in valid_pieces:
+                self.check_piece_family_discrimination_compatibility(piece)
                 weight = len(piece.family)
                 if weight > max_carrier_capacity:
                     raise ValueError(f"cluster of {weight} pieces exceeds max_carrier_capacity "
