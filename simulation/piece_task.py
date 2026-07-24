@@ -27,6 +27,12 @@ class PieceCollectorType(Enum):
     @staticmethod
     def is_discriminating(bct: PieceCollectorType) -> bool:
         return bct in (PieceCollectorType.DISCRIMINATING_GREEDY, PieceCollectorType.DISCRIMINATING_ALTRUISTIC)
+    
+
+class AssociationType(Enum):
+    ASSOCIATIVE = auto()
+    DISSOCIATIVE = auto()
+    PASSIVE = auto()
 
 
 class PieceCollector(Component, Dispatchable, Donnable):
@@ -36,7 +42,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
         self.task = task
         self.collected_pieces: list[Piece] = []
 
-    def pick_piece(self, **kwargs) -> Piece:
+    def pick_piece(self, **kwargs) -> tuple[Piece, Buffer]:
         assert isinstance(self.task.config.protocols, PieceProtocols)
 
         stores = kwargs['store'] if isinstance(kwargs['store'], list) else [kwargs['store']]
@@ -46,50 +52,71 @@ class PieceCollector(Component, Dispatchable, Donnable):
         if pieces:
             match self.task.config.protocols.piece_exit_order.decide():
                 case ExitOrder.FIRST_IN_FIRST_OUT:
-                    target = min(pieces, key=lambda pb: pb[0].enter_time(pb[1]))[0]
+                    target = min(pieces, key=lambda pb: pb[0].enter_time(pb[1]))
                 case ExitOrder.FIRST_CREATED_FIRST_OUT:
-                    target = min(pieces, key=lambda pb: pb[0].creation_time())[0]
-            kwargs['filter'] = lambda piece: piece is target
+                    target = min(pieces, key=lambda pb: pb[0].creation_time())
+            kwargs['filter'] = lambda piece: piece is target[0]
 
         kwargs.setdefault('mode', 'wait_pieces')
-        return self.from_store(**kwargs)
+        return self.from_store(**kwargs), target[1]
 
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
+        assert isinstance(self.task.config, PieceTaskConfig)
         while len(self.collected_pieces) < target:
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
             if self.failed():
                 return True
-            piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
+            piece, buffer = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
             if self.failed():
                 self.release((self.task.vacant_slots, 1))
                 return True
-            assert isinstance(piece, Piece)
+            elif len(piece.family) > self.task.config.get_model_config(piece.model).max_carrier_capacity:
+                # We could add a 'blacklisted' flag to the piece lest we pick it again
+                self.release((self.task.vacant_slots, 1))
+                piece.enter(buffer)
+                continue
+            
+            self.request((self.task.vacant_slots, len(piece.family) - 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
+            if self.failed():
+                piece.enter(buffer)
+                return True
+            
             self.collected_pieces.append(piece)
             self.task.pieces_in += 1
         return False
 
     def ensure_one(self) -> None:
+        assert isinstance(self.task.config, PieceTaskConfig)
         if not self.collected_pieces:
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
-            piece = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
+            piece, buffer = self.pick_piece(store=self.task.inlets, filter=self.task.can_take, request_priority=self.task.request_priority)
+            if len(piece.family) > self.task.config.get_model_config(piece.model).max_carrier_capacity:
+                self.release((self.task.vacant_slots, 1))
+                self.ensure_one()
+                piece.enter(buffer)
+            
+            self.request((self.task.vacant_slots, len(piece.family) - 1), request_priority=self.task.request_priority, mode="wait_slot")
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
             self.task.pieces_in += 1
 
     def top_up(self, limit: int, piece_filter) -> None:
         while self.task.vacant_slots.available_quantity() > 0 and len(self.collected_pieces) < limit:
-            piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_delay=0, request_priority=self.task.request_priority)
+            piece, buffer = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_delay=0, request_priority=self.task.request_priority)
             if self.failed():
                 break
+            elif len(piece.family) > self.task.vacant_slots.available_quantity():
+                piece.enter(buffer)
+                break
 
-            self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, mode="wait_slot")
+            self.request((self.task.vacant_slots, len(piece.family)), request_priority=self.task.request_priority, mode="wait_slot")
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
             self.task.pieces_in += 1
 
     def block_remainder(self, max_carrier_capacity: int) -> None:
         if not self.task.config.contiguous_carriers:
-            remainder = max_carrier_capacity - len(self.collected_pieces)
+            remainder = max_carrier_capacity - sum(len(piece.family) for piece in self.collected_pieces)
             self.request((self.task.vacant_slots, remainder), request_priority=self.task.request_priority, mode="wait_slot")
 
     def present_counts(self) -> dict[Model, int]:
@@ -292,6 +319,7 @@ class PieceProtocols(Protocols):
 class PieceTaskConfig(TaskConfig):
     models_configs: dict[Model, ModelConfig]
     piece_collector_type: PieceCollectorType
+    association_type: AssociationType
 
     def get_model_config(self, model: Model) -> ModelConfig:
         m = model
@@ -381,6 +409,8 @@ class PieceCarrier(Carrier):
     @override
     def successfully_end_process(self):
         assert isinstance(self.task, PieceTask)
+        assert isinstance(self.task.config, PieceTaskConfig)
+
         self.piece_collector.set_mode("")
         self.piece_collector.cancel()
 
@@ -390,11 +420,18 @@ class PieceCarrier(Carrier):
         for piece in pieces:
             if len(piece.journal) < piece.JOURNAL_CAP:
                 piece.journal.append(('task', self.task.name(), env.now()))
+
+        match self.task.config.association_type:
+            case AssociationType.ASSOCIATIVE:
+                Piece.associate_all(pieces)
+            case AssociationType.DISSOCIATIVE:
+                Piece.dissociate_all(pieces)
+        
         place(pieces, self.task.outlets)
         for piece in pieces:
-            self.task.deposited[piece.model] += 1
+            self.task.deposited[piece.model] += len(piece.family)
             if any(isinstance(q, Buffer) and q.buffer_type is BufferType.SCRAP for q in piece.queues()):
-                self.task.scrapped[piece.model] += 1
+                self.task.scrapped[piece.model] += len(piece.family)
 
         self.set_mode("")
         self.done.set(True)

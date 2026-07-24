@@ -928,8 +928,7 @@
         "buffer_064a900c"
       ],
       "shutdowns": [
-        "shutdowns_4f73919f",
-        "shutdowns_6178ccb4"
+        "shutdowns_4f73919f"
       ],
       "breakdowns": [
         "breakdown_97702ad0"
@@ -2481,8 +2480,7 @@
         "router_6b8b0ef1"
       ],
       "shutdowns": [
-        "shutdowns_8ba5b8cc",
-        "shutdowns_867ea8de"
+        "shutdowns_8ba5b8cc"
       ],
       "breakdowns": [
         "breakdown_4cd6a3c6"
@@ -4861,58 +4859,6 @@
         360.389310653965
       ],
       "enabled": true
-    },
-    {
-      "id": "shutdowns_6178ccb4",
-      "kind": "Shutdowns",
-      "name": "Shutdowns 8",
-      "shutdown_type": "NON_FLEXIBLE",
-      "mode": "custom",
-      "position": [
-        1079.8229354472448,
-        -327.3463605766316
-      ],
-      "intervals": [
-        {
-          "start": "28-02-2026 08:00",
-          "end": "01-01-2026 12:00"
-        },
-        {
-          "start": "13-03-2026 17:00",
-          "end": "01-01-2026 18:00"
-        },
-        {
-          "start": "22-05-2026 22:00",
-          "end": "01-01-2026 23:00"
-        }
-      ],
-      "enabled": true
-    },
-    {
-      "id": "shutdowns_867ea8de",
-      "kind": "Shutdowns",
-      "name": "Shutdowns 9",
-      "shutdown_type": "NON_FLEXIBLE",
-      "mode": "custom",
-      "position": [
-        6083.622777087153,
-        -523.1400875002605
-      ],
-      "intervals": [
-        {
-          "start": "28-08-2026 08:00",
-          "end": "01-01-2026 12:00"
-        },
-        {
-          "start": "13-07-2026 17:00",
-          "end": "01-01-2026 18:00"
-        },
-        {
-          "start": "22-09-2026 22:00",
-          "end": "01-01-2026 23:00"
-        }
-      ],
-      "enabled": true
     }
   ],
   "connections": [
@@ -5531,22 +5477,6 @@
       "to_node": "buffer_a078d67d",
       "to_kind": "Buffer",
       "to_port": "from_task"
-    },
-    {
-      "from_node": "shutdowns_6178ccb4",
-      "from_kind": "Shutdowns",
-      "from_port": "shutdowns",
-      "to_node": "task_48f57b5a",
-      "to_kind": "Task",
-      "to_port": "shutdowns"
-    },
-    {
-      "from_node": "shutdowns_867ea8de",
-      "from_kind": "Shutdowns",
-      "from_port": "shutdowns",
-      "to_node": "task_3cae838f",
-      "to_kind": "Task",
-      "to_port": "shutdowns"
     }
   ]
 }

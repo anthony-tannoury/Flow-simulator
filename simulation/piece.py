@@ -38,6 +38,9 @@ class Piece(sim.Component):
         self.journal: list[tuple[str, str, float]] = []
         WIP.tally(WIP() + 1)
 
+        self.parent: Piece | None = None
+        self.children: list[Piece] = []
+
     JOURNAL_CAP = 512
 
     def enter(self, q, priority = None):
@@ -45,7 +48,7 @@ class Piece(sim.Component):
         from .kpis import WIP
         if not isinstance(q, Buffer):
             raise TypeError(f"piece {self.name()} ({self.model.name}) can only enter a Buffer, got {q!r}")
-        q.model_counts[self.model] = q.model_counts.get(self.model, 0) + 1
+        q.model_counts[self.model] = q.model_counts.get(self.model, 0) + len(q.family)
         q.trigger.trigger()
         if q.piece_generator is not None:
             idx = q.piece_generator.models.index(self.model)
@@ -60,10 +63,48 @@ class Piece(sim.Component):
     def leave(self, q=None):
         from .outlet import Buffer
         if isinstance(q, Buffer):
-            q.model_counts[self.model] -= 1
+            q.model_counts[self.model] -= len(self.family)
             if len(self.journal) < Piece.JOURNAL_CAP:
                 self.journal.append(('out', q.name(), env.now()))
         return super().leave(q)
+    
+    @property
+    def has_family(self) -> bool:
+        return self.parent is not None or bool(self.children)
+    
+    @property
+    def family(self) -> list[Piece]:
+        if self.parent is None:
+            return [self]
+        return [self.parent] + self.parent.children
+    
+    def associate_with_parent(self, parent: Piece) -> None:
+        self.parent = parent
+        parent.children.append(self)
+
+    def dissociate_from_parent(self) -> None:
+        if self.parent is None:
+            raise ValueError("Cannot dissociate an unassociated piece")
+        self.parent.children.remove(self)
+        self.parent = None
+
+    @staticmethod
+    def associate_all(pieces: list[Piece]) -> None:
+        if any(piece.has_family for piece in pieces):
+            raise ValueError("Pieces to be associated should not be already related")
+        for piece in pieces[1:]:
+            piece.associate_with_parent(pieces[0])
+
+    @staticmethod
+    def dissociate_all(pieces: list[Piece]) -> None:
+        orphans = list(filter(lambda piece: piece.parent is None, pieces))
+        assert len(orphans) == 1
+        parent = orphans[0]
+        if any(piece.parent is not parent for piece in pieces if piece is not parent):
+            raise ValueError("Piece to be dissociated must be part of one family")
+        for piece in pieces:
+            if piece is not parent:
+                piece.dissociate_from_parent()
 
 
 class PickyPieceTaker:
