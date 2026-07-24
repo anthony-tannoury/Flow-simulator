@@ -59,13 +59,13 @@ class PieceCollector(Component, Dispatchable, Donnable):
         if pieces:
             match self.task.config.protocols.piece_exit_order.decide():
                 case ExitOrder.FIRST_IN_FIRST_OUT:
-                    target = min(pieces, key=lambda pb: pb[0].enter_time(pb[1]))
+                    target = min(pieces, key=lambda pb: pb[0].enter_time(pb[1]))[0]
                 case ExitOrder.FIRST_CREATED_FIRST_OUT:
-                    target = min(pieces, key=lambda pb: pb[0].creation_time())
-            kwargs['filter'] = lambda piece: piece is target[0]
+                    target = min(pieces, key=lambda pb: pb[0].creation_time())[0]
+            kwargs['filter'] = lambda piece: piece is target
 
         kwargs.setdefault('mode', 'wait_pieces')
-        return self.from_store(**kwargs), target[1]
+        return self.from_store(**kwargs), self.from_store_store()
 
     def collect_until(self, deadline: float, target: int, piece_filter) -> bool:
         assert isinstance(self.task.config, PieceTaskConfig)
@@ -103,6 +103,7 @@ class PieceCollector(Component, Dispatchable, Donnable):
                 self.release((self.task.vacant_slots, 1))
                 self.ensure_one()
                 piece.enter(buffer)
+                return
             
             self.request((self.task.vacant_slots, len(piece.family) - 1), request_priority=self.task.request_priority, mode="wait_slot")
             assert isinstance(piece, Piece)
@@ -379,7 +380,6 @@ class PieceCarrier(Carrier):
         self.task.pending_carriers.remove(self)
         self.task.active_carriers.remove(self)
 
-
         if not self.task.active_carriers:
             self.task.release_task_operators()
         self.cancel()
@@ -434,10 +434,13 @@ class PieceCarrier(Carrier):
         match self.task.config.association_type:
             case AssociationType.ASSOCIATIVE:
                 Piece.associate_all(pieces)
+                place([pieces[0].parent], self.task.outlets)
             case AssociationType.DISSOCIATIVE:
                 Piece.dissociate_all(pieces)
+                place(pieces[0].family, self.task.outlets)
+            case AssociationType.PASSIVE:
+                place(pieces, self.task.outlets)
         
-        place(pieces, self.task.outlets)
         for piece in pieces:
             self.task.deposited[piece.model] += len(piece.family)
             if any(isinstance(q, Buffer) and q.buffer_type is BufferType.SCRAP for q in piece.queues()):

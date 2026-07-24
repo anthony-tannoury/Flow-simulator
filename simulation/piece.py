@@ -76,8 +76,10 @@ class Piece(sim.Component):
     
     @property
     def family(self) -> list[Piece]:
-        if self.parent is None:
+        if not self.has_family:
             return [self]
+        elif self.parent is None:
+            return [self] + self.children
         return [self.parent] + self.parent.children
     
     def associate_with_parent(self, parent: Piece) -> None:
