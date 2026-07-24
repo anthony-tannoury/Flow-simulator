@@ -480,8 +480,14 @@ inline std::vector<ojson> lead_time_rows(const std::vector<Buffer*>& buffers) {
     return rows;
 }
 
+inline double cell_num(const ojson& v) {
+    return v.is_number() ? v.get<double>() : 0.0;
+}
+
+
 inline std::pair<ojson, std::vector<ojson>> flow_kpis(const std::vector<Buffer*>& buffers,
-                                                      PieceGenerator* gen) {
+                                                      PieceGenerator* gen,
+                                                      const std::vector<ojson>* task_rows = nullptr) {
     double tt = env->now();
     std::vector<Piece*> exits, scraps;
     for (Buffer* b : buffers) {
@@ -536,12 +542,16 @@ inline std::pair<ojson, std::vector<ojson>> flow_kpis(const std::vector<Buffer*>
             par_modele.push_back(row);
         }
     }
+    if (task_rows) {
+        double hm_total = 0.0, hmo_total = 0.0;
+        for (const ojson& r : *task_rows) {
+            hm_total += cell_num(r.value("heures_machine", ojson(0)));
+            hmo_total += cell_num(r.value("heures_main_oeuvre", ojson(0)));
+        }
+        flux["heures_machine_totales"] = roundn(hm_total, 3);
+        flux["heures_main_oeuvre_totales"] = roundn(hmo_total, 3);
+    }
     return {flux, par_modele};
-}
-
-
-inline double cell_num(const ojson& v) {
-    return v.is_number() ? v.get<double>() : 0.0;
 }
 
 
@@ -744,14 +754,7 @@ inline void write_report(const fs::path& dir, const std::vector<Task*>& tasks,
     for (sim::Resource* r : resources) res_rows.push_back(resource_kpis(r));
     write_csv(dir / "ressources.csv", res_rows, sim_start);
 
-    auto [flux, flux_modeles] = flow_kpis(buffers, gen);
-    double hm_total = 0.0, hmo_total = 0.0;
-    for (const ojson& r : task_rows) {
-        hm_total += cell_num(r.value("heures_machine", ojson(0)));
-        hmo_total += cell_num(r.value("heures_main_oeuvre", ojson(0)));
-    }
-    flux["heures_machine_totales"] = roundn(hm_total, 3);
-    flux["heures_main_oeuvre_totales"] = roundn(hmo_total, 3);
+    auto [flux, flux_modeles] = flow_kpis(buffers, gen, &task_rows);
     write_kv_csv(dir / "flux.csv", flux, sim_start);
     write_csv(dir / "flux_modeles.csv", flux_modeles, sim_start);
     write_csv(dir / "temps_traversee.csv", lead_time_rows(buffers), sim_start);
