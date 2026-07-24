@@ -27,6 +27,12 @@ class PieceCollectorType(Enum):
     @staticmethod
     def is_discriminating(bct: PieceCollectorType) -> bool:
         return bct in (PieceCollectorType.DISCRIMINATING_GREEDY, PieceCollectorType.DISCRIMINATING_ALTRUISTIC)
+    
+
+class ClusterFormer(Enum):
+    ASSOCIATIVE = auto()
+    DISSOCIATIVE = auto()
+    PASSIVE = auto()
 
 
 class PieceCollector(Component, Dispatchable, Donnable):
@@ -59,10 +65,20 @@ class PieceCollector(Component, Dispatchable, Donnable):
             self.request((self.task.vacant_slots, 1), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
             if self.failed():
                 return True
-            piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
-            if self.failed():
-                self.release((self.task.vacant_slots, 1))
-                return True
+
+            valid_pieces = [(piece, buffer) for buffer in self.task.inlets for piece in buffer if piece_filter(piece)]
+            
+            while True:
+                if valid_pieces[0][0].related:
+                    self.request((self.task.vacant_slots, len(valid_pieces[0][0].siblings - 1)), request_priority=self.task.request_priority, fail_at=deadline, mode="wait_slot")
+                    if self.failed():
+                        self.release((self.task.vacant_slots, 1))
+                        return True
+                    piece = self.pick_piece(store=self.task.inlets, filter=piece_filter, fail_at=deadline, request_priority=self.task.request_priority)
+                    if self.failed():
+                        self.release((self.task.vacant_slots, len(valid_pieces[0][0].siblings - 1)))
+                        return True
+
             assert isinstance(piece, Piece)
             self.collected_pieces.append(piece)
             self.task.pieces_in += 1
@@ -292,6 +308,7 @@ class PieceProtocols(Protocols):
 class PieceTaskConfig(TaskConfig):
     models_configs: dict[Model, ModelConfig]
     piece_collector_type: PieceCollectorType
+    cluster_former: ClusterFormer
 
     def get_model_config(self, model: Model) -> ModelConfig:
         m = model
@@ -390,6 +407,18 @@ class PieceCarrier(Carrier):
         for piece in pieces:
             if len(piece.journal) < piece.JOURNAL_CAP:
                 piece.journal.append(('task', self.task.name(), env.now()))
+
+        assert isinstance(self.task.config, PieceTaskConfig)
+        match self.task.config.cluster_former:
+            case ClusterFormer.ASSOCIATIVE:
+                Piece.associate_all(pieces)
+                place([pieces[0].parent], self.task.outlets)
+            case ClusterFormer.DISSOCIATIVE:
+                parents = set([p.parent for p in pieces])
+                for parent in parents:
+                    place(parent.siblings, self.task.outlets)
+                    Piece.dissociate_all(parent.siblings)
+
         place(pieces, self.task.outlets)
         for piece in pieces:
             self.task.deposited[piece.model] += 1

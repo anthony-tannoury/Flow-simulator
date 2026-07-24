@@ -33,10 +33,16 @@ class Piece(sim.Component):
     def setup(self, model: Model) -> None:
         from .kpis import WIP
         self.model = model
+        self.parent: Piece | None = None
+        self.children: list[Piece] = []
         self.id = str(Piece.ID).zfill(6)
         Piece.ID += 1
         self.journal: list[tuple[str, str, float]] = []
         WIP.tally(WIP() + 1)
+
+    @property
+    def related(self) -> bool:
+        return self.parent is not None or self.children
 
     JOURNAL_CAP = 512
 
@@ -64,6 +70,29 @@ class Piece(sim.Component):
             if len(self.journal) < Piece.JOURNAL_CAP:
                 self.journal.append(('out', q.name(), env.now()))
         return super().leave(q)
+
+    @staticmethod
+    def associate_all(pieces: list[Piece]):
+        if any(p.related for p in pieces):
+            raise ValueError("Pieces to associate cannot be already related")
+        for p in pieces:
+            p.parent = pieces[0]
+            pieces[0].children.append(p)
+
+    @staticmethod
+    def dissociate_all(pieces: list[Piece]):
+        if set(pieces) != set(pieces[0].siblings):
+            raise ValueError("Dissociation can only happen on one entire family")
+        for p in pieces:
+            p.parent = None
+            p.children.clear()
+            
+    @property
+    def siblings(self) -> list[Piece]:
+        if not self.related:
+            return [self]
+        assert self.parent is not None
+        return self.parent.children
 
 
 class PickyPieceTaker:
